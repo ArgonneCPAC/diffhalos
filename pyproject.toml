@@ -1,0 +1,51 @@
+[build-system]
+requires = [
+    "setuptools>=45",
+    "setuptools_scm>=7", 
+    "tomli>=1.0.0; python_version >= '3.11'",
+]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+write_to = "diffhalos/_version.py"
+write_to_template = "__version__ = '{version}'\n"
+
+[tool.setuptools]
+include-package-data = true
+packages = {find = {exclude=["tests*", "scripts*", "docs*", "notebooks*"]}}
+package-data = {diffhalos = ["data/*.txt", "tests/testing_data/*.npy"]}
+package-dir = {diffhalos = "diffhalos"}
+
+[project.urls]
+home = "https://github.com/aphearin/diffhalos"
+
+[project]
+name = "diffhalos"
+authors = [
+    {name = "Andrew Hearin", email = "ahearin@anl.gov"},
+]
+description = "Some description"
+readme = "README.rst"
+requires-python = ">=3.11"
+license = {file = "LICENSE.rst"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+dynamic = ["version", "dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.black]
+line-length = 88
+
+[tool.isort]
+profile = "black"
+
+[tool.flake8]
+ignore = ["E203", "E226", "E231", "E501", "W503"]
+per-file-ignores = [
+    "__init__.py:F401",
+]
+max-line-length = 88
+count = true

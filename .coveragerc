@@ -1,0 +1,7 @@
+[run]
+source= diffhalos/
+
+omit =
+    diffhalos/__init__.py
+    diffhalos/_version.py
+    diffhalos/tests/*.py
