@@ -1,7 +1,7 @@
 [build-system]
 requires = [
     "setuptools>=45",
-    "setuptools_scm>=7", 
+    "setuptools_scm>=7",
     "tomli>=1.0.0; python_version >= '3.11'",
 ]
 build-backend = "setuptools.build_meta"
@@ -17,14 +17,15 @@ package-data = {diffhalos = ["data/*.txt", "tests/testing_data/*.npy"]}
 package-dir = {diffhalos = "diffhalos"}
 
 [project.urls]
-home = "https://github.com/aphearin/diffhalos"
+home = "https://github.com/ArgonneCPAC/diffhalos"
 
 [project]
 name = "diffhalos"
 authors = [
+    {name = "Georgios Zacharegkas", email = "gzacharegkas@anl.gov"},
     {name = "Andrew Hearin", email = "ahearin@anl.gov"},
 ]
-description = "Some description"
+description = "Library for differentiable generation of halo lightcones"
 readme = "README.rst"
 requires-python = ">=3.11"
 license = {file = "LICENSE.rst"}
