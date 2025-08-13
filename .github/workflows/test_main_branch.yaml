@@ -51,6 +51,11 @@ jobs:
         run: |
           pytest -v diffhalos --cov --cov-report=xml
 
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
       - name: test versions
         shell: bash -el {0}
         run: |
