@@ -24,6 +24,12 @@ DEFAULT_CCSHMF_KERN_PDICT = OrderedDict(ytp=-0.3, ylo=-0.95)
 CCSHMF_Params = namedtuple("CCSHMF_Params", DEFAULT_CCSHMF_KERN_PDICT.keys())
 DEFAULT_CCSHMF_KERN_PARAMS = CCSHMF_Params(**DEFAULT_CCSHMF_KERN_PDICT)
 
+__all__ = (
+    "lg_ccshmf_kern",
+    "ccshmf_kern",
+    "lg_differential_cshmf_kern",
+)
+
 
 @jjit
 def lg_ccshmf_kern(params, lgmu):
