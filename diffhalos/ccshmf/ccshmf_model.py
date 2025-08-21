@@ -89,6 +89,7 @@ def predict_differential_cshmf(params, lgmhost, lgmu):
     ytp = _ytp_model(params.ytp_params, lgmhost)
     ylo = _ylo_model(params.ylo_params, lgmhost)
     lg_diff_ccshmf = lg_differential_cshmf_kern((ytp, ylo), lgmu)
+
     return lg_diff_ccshmf
 
 

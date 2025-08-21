@@ -54,6 +54,7 @@ def lg_ccshmf_kern(params, lgmu):
     """
     params = CCSHMF_Params(*params)
     lg_ccshmf = _sig_slope(lgmu, XTP, params.ytp, X0, K, params.ylo, YHI)
+
     return lg_ccshmf
 
 
@@ -80,6 +81,7 @@ def ccshmf_kern(params, lgmu):
     """
     lg_cuml = lg_ccshmf_kern(params, lgmu)
     ccshmf = 10**lg_cuml
+
     return ccshmf
 
 
