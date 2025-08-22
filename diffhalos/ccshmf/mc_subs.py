@@ -18,7 +18,10 @@ from .ccshmf_kernels import DEFAULT_CCSHMF_KERN_PARAMS, lg_ccshmf_kern
 N_LGMU_TABLE = 100
 U_TABLE = np.linspace(1, 0, N_LGMU_TABLE)
 
-__all__ = ("generate_subhalopop",)
+__all__ = (
+    "generate_subhalopop",
+    "generate_subhalopop_hist",
+)
 
 
 def generate_subhalopop(
