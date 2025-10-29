@@ -46,6 +46,7 @@ def mc_mah_cenpop(
     t_min=T_GRID_MIN,
     t_max=T_GRID_MAX,
     n_t=N_T_GRID,
+    return_mah_params=False,
 ):
     """
     Generate MC realiations of central halo populations
@@ -82,6 +83,10 @@ def mc_mah_cenpop(
     n_t: int
         number of points in time grid
 
+    return_mah_params: bool
+        if True the MAH parameters from the normalizing flow
+        will also be returned
+
     Returns
     -------
     cen_mah: ndarray of shape (n_sample*n_m_obs*n_t_obs, n_t)
@@ -91,12 +96,16 @@ def mc_mah_cenpop(
     t_grid: ndarray of shape (n_sample*n_m_obs*n_t_obs, n_t)
         time grid for all MC realizations,
         all ``m_obs`` values and all ``t_obs`` values
+
+    cenflow_diffmahparams: namedtuple
+        diffmah parameters from normalizing flow,
+        each parameter is a ndarray of shape(n_sample*n_m_obs*n_t_obs, )
     """
     # create diffmahnet model for centrals
     centrals_model = diffmahnet.load_pretrained_model(centrals_model_key)
     mc_diffmahnet_cenpop = centrals_model.make_mc_diffmahnet()
 
-    # get a list of (m_obs, t_obs) for rach MC realization
+    # get a list of (m_obs, t_obs) for each MC realization
     m_vals, t_vals = [
         jnp.repeat(x.flatten(), n_sample)
         for x in jnp.meshgrid(
@@ -105,7 +114,7 @@ def mc_mah_cenpop(
         )
     ]
 
-    # get diffmah parameters from the  normalizing flow
+    # get diffmah parameters from the normalizing flow
     keys = jax.random.split(randkey, 2)
     cenflow_diffmahparams = mc_diffmahnet_cenpop(
         centrals_model.get_params(), m_vals, t_vals, keys[0]
@@ -128,12 +137,15 @@ def mc_mah_cenpop(
         logm_obs_uncorrected,
     )
 
-    # recompute mah with corrected parameters
+    # compute mah with corrected parameters
     cen_mah = diffmahnet.log_mah_kern(
         cenflow_diffmahparams,
         t_grid,
         t_max,
     )
+
+    if return_mah_params:
+        return cen_mah, t_grid, cenflow_diffmahparams
 
     return cen_mah, t_grid
 

@@ -14,6 +14,7 @@ LGMH_MAX = 17.0
 __all__ = (
     "mc_host_halos_singlez",
     "mc_host_halos_hist_singlez",
+    "mc_host_halos_hist_singlez_out_of_core",
 )
 
 

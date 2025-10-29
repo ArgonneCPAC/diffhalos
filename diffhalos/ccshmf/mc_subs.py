@@ -21,6 +21,7 @@ U_TABLE = np.linspace(1, 0, N_LGMU_TABLE)
 __all__ = (
     "generate_subhalopop",
     "generate_subhalopop_hist",
+    "generate_subhalopop_hist_out_of_core",
 )
 
 
@@ -128,6 +129,89 @@ def generate_subhalopop_hist(
 
     # normalize counts
     dnsub_bins = hist_data[0] / np.diff(dlogmu_bin_edges)
+
+    return dnsub_bins, dlogmu_bins
+
+
+def generate_subhalopop_hist_out_of_core(
+    ran_key,
+    lgmhost,
+    lgmp_min,
+    n_real,
+    logmu_min=-5.0,
+    logmu_max=0.0,
+    ccshmf_params=DEFAULT_CCSHMF_PARAMS,
+    n_bins=20,
+):
+    """
+    Generate a histogram of a population of subhalos
+    with synthetic values of Mpeak
+
+    Parameters
+    ----------
+    ran_key: jax.random.PRNGKey
+        random key
+
+    lgmhost: float
+        base-10 log of host halo mass, in Msun
+
+    lgmp_min: float
+        base-10 log of the smallest Mpeak value
+        of the synthetic subhalos, in Msun
+
+    n_real: int
+        number of realizations to generate
+
+    ccshmf_params: namedtuple
+        CCSHMF parameters named tuple
+
+    n_bins: int
+        number of histogram bins
+
+    Returns
+    -------
+    dsub_bins: ndarray of shape (n_bins, )
+        binned subhalo counts
+
+    dlogmu_bins: ndarray of shape (n_bins, )
+        binned mu values
+    """
+    dlogmu_bin_edges = np.linspace(logmu_min, logmu_max, n_bins + 1)
+    dnsub_bins = np.zeros(n_bins)
+    n_subhalo = 0
+
+    for i in range(n_real):
+        mc_lg_mu = generate_subhalopop(
+            ran_key,
+            lgmhost,
+            lgmp_min,
+            ccshmf_params=ccshmf_params,
+        )[0]
+
+        # put mu values into bins
+        lgmu_digitized = jnp.digitize(mc_lg_mu, dlogmu_bin_edges)
+        # counts of unique mu bins
+        hist_index, unique_counts = jnp.unique_counts(lgmu_digitized)
+        # put the counts into the appropriate histogram bin
+        dnsub_bins[hist_index - 1] += unique_counts
+
+        # keep count of the total number of generated halos for normalization
+        n_subhalo += mc_lg_mu.size
+
+        del mc_lg_mu
+
+    dlogmu_bins = 0.5 * (dlogmu_bin_edges[1:] + dlogmu_bin_edges[:-1])
+
+    # normalize counts
+    mean_counts = _compute_mean_subhalo_counts(
+        lgmhost, lgmp_min, ccshmf_params=ccshmf_params
+    )
+    uran_key, counts_key = jran.split(ran_key, 2)
+    subhalo_counts_per_halo = jran.poisson(counts_key, mean_counts)
+    n_tot = jnp.sum(subhalo_counts_per_halo)
+
+    dnsub_bins = dnsub_bins / np.abs(np.diff(dlogmu_bin_edges))
+    dnsub_bins *= n_tot / n_subhalo
 
     return dnsub_bins, dlogmu_bins
 
