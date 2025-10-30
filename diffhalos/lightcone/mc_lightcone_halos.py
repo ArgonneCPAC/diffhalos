@@ -102,13 +102,6 @@ def mc_lightcone_host_halo_mass_function(
     logmp_halopop: ndarray of shape (n_halos, )
         halo masses derived by Monte Carlo sampling the halo mass function
         at the appropriate redshift for each point
-
-    nhalos_tot: int
-        total number of halos in the lightcone
-
-    Notes
-    -----
-    All mass quantities quoted in Msun (not Msun/h)
     """
 
     # Three randoms: one for Nhalos, one for halo mass, one for redshift
@@ -463,7 +456,11 @@ def get_nhalo_from_grid_interp(
     z_grid = jnp.linspace(z_min, z_max, ngrid_z)
     lgmp_grid = jnp.linspace(lgmp_min, lgmp_max, ngrid_m)
     nhalo_grid = get_nhalo_weighted_lc_grid(
-        lgmp_grid, z_grid, sky_area_degsq, hmf_params, cosmo_params
+        lgmp_grid,
+        z_grid,
+        sky_area_degsq,
+        hmf_params,
+        cosmo_params,
     )
 
     interpolator = RegularGridInterpolator(

@@ -20,7 +20,22 @@ __all__ = ("spherical_shell_comoving_volume",)
 
 @jjit
 def spherical_shell_comoving_volume(z_grid, cosmo_params):
-    """Comoving volume of a spherical shell with width ΔR"""
+    """
+    Comoving volume of a spherical shell with width ΔR
+
+    Parameters
+    ----------
+    z_grid: ndarray of shape (n_z, )
+        grid of redshift values
+
+    cosmo_params: namedtuple
+        cosmological parameters
+
+    Returns
+    -------
+    vol_shell_grid: float
+        volume of grid shell, in comoving Mpc**3
+    """
 
     # Compute comoving distance to each grid point
     r_grid = flat_wcdm.comoving_distance(z_grid, *cosmo_params)
@@ -32,4 +47,5 @@ def spherical_shell_comoving_volume(z_grid, cosmo_params):
 
     # vol_shell_grid = 4π*R*R*ΔR
     vol_shell_grid = 4 * jnp.pi * r_grid * r_grid * d_r_grid
+
     return vol_shell_grid

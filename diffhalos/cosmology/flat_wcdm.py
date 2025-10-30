@@ -50,25 +50,30 @@ def _integrand_oneOverEz1pz(z, Om0, w0, wa):
 
 @jjit
 def comoving_distance_to_z(redshift, Om0, w0, wa, h):
-    """Comoving distance in Mpc
+    """
+    Comoving distance in Mpc
 
     Parameters
     ----------
-    redshift : float
+    redshift: float
+        redshift at which to compute comoving distance
 
-    Om0 : float
+    Om0: float
+        matter density parameter
 
-    w0 : float
+    w0: float
+        dark energy equation of state w0 parameter
 
-    wa : float
+    wa: float
+        dark energy equation of state wa parameter
 
-    h : float
+    h: float
+        little hubble constant, H0/(100 km/s/Mpc)
 
     Returns
     -------
-    d : float
-        comoving distance in Mpc
-
+    d: float
+        comoving distance, in Mpc
     """
     z_table = jnp.linspace(0, redshift, 256)
     integrand = _integrand_oneOverEz(z_table, Om0, w0, wa)
@@ -83,76 +88,91 @@ comoving_distance = jjit(vmap(comoving_distance_to_z, in_axes=_CD))
 
 @jjit
 def luminosity_distance_to_z(redshift, Om0, w0, wa, h):
-    """Luminosity distance in Mpc
+    """
+    Luminosity distance in Mpc
 
     Parameters
     ----------
-    redshift : float
+    redshift: float
+        redshift at which to compute comoving distance
 
-    Om0 : float
+    Om0: float
+        matter density parameter
 
-    w0 : float
+    w0: float
+        dark energy equation of state w0 parameter
 
-    wa : float
+    wa: float
+        dark energy equation of state wa parameter
 
-    h : float
+    h: float
+        little hubble constant, H0/(100 km/s/Mpc)
 
     Returns
     -------
-    d : float
-        luminosity distance in Mpc
-
+    d: float
+        luminosity distance, in Mpc
     """
     return comoving_distance_to_z(redshift, Om0, w0, wa, h) * (1 + redshift)
 
 
 @jjit
 def angular_diameter_distance_to_z(redshift, Om0, w0, wa, h):
-    """Angular diameter distance in Mpc
+    """
+    Angular diameter distance in Mpc
 
     Parameters
     ----------
-    redshift : float
+    redshift: float
+        redshift at which to compute comoving distance
 
-    Om0 : float
+    Om0: float
+        matter density parameter
 
-    w0 : float
+    w0: float
+        dark energy equation of state w0 parameter
 
-    wa : float
+    wa: float
+        dark energy equation of state wa parameter
 
-    h : float
+    h: float
+        little hubble constant, H0/(100 km/s/Mpc)
 
     Returns
     -------
-    d : float
-        angular diameter distance in Mpc
-
+    d: float
+        angular diameter distance, in Mpc
     """
     return comoving_distance_to_z(redshift, Om0, w0, wa, h) / (1 + redshift)
 
 
 @jjit
 def distance_modulus_to_z(redshift, Om0, w0, wa, h):
-    """Distance modulus, defined as apparent-Absolute magnitude
+    """
+    Distance modulus, defined as apparent-Absolute magnitude
     for an object at the input redshift
 
     Parameters
     ----------
-    redshift : float
+    redshift: float
+        redshift at which to compute comoving distance
 
-    Om0 : float
+    Om0: float
+        matter density parameter
 
-    w0 : float
+    w0: float
+        dark energy equation of state w0 parameter
 
-    wa : float
+    wa: float
+        dark energy equation of state wa parameter
 
-    h : float
+    h: float
+        little hubble constant, H0/(100 km/s/Mpc)
 
     Returns
     -------
-    d : float
+    d: float
         distance modulus
-
     """
     d_lum = luminosity_distance_to_z(redshift, Om0, w0, wa, h)
     mu = 5.0 * jnp.log10(d_lum * 1e5)
@@ -168,25 +188,30 @@ def _hubble_time(z, Om0, w0, wa, h):
 
 @jjit
 def lookback_to_z(redshift, Om0, w0, wa, h):
-    """Lookback time in Gyr
+    """
+    Lookback time in Gyr
 
     Parameters
     ----------
-    redshift : float
+    redshift: float
+        redshift at which to compute comoving distance
 
-    Om0 : float
+    Om0: float
+        matter density parameter
 
-    w0 : float
+    w0: float
+        dark energy equation of state w0 parameter
 
-    wa : float
+    wa: float
+        dark energy equation of state wa parameter
 
-    h : float
+    h: float
+        little hubble constant, H0/(100 km/s/Mpc)
 
     Returns
     -------
-    t : float
-        lookback time in Gyr
-
+    t: float
+        lookback time, in Gyr
     """
     z_table = jnp.linspace(0, redshift, 512)
     integrand = 1 / _Ez(z_table, Om0, w0, wa) / (1 + z_table)
@@ -197,22 +222,27 @@ def lookback_to_z(redshift, Om0, w0, wa, h):
 
 @jjit
 def age_at_z0(Om0, w0, wa, h):
-    """Age of the Universe in Gyr at z=0
+    """
+    Age of the Universe in Gyr at z=0
 
     Parameters
     ----------
-    Om0 : float
+    Om0: float
+        matter density parameter
 
-    w0 : float
+    w0: float
+        dark energy equation of state w0 parameter
 
-    wa : float
+    wa: float
+        dark energy equation of state wa parameter
 
-    h : float
+    h: float
+        little hubble constant, H0/(100 km/s/Mpc)
 
     Returns
     -------
-    t0 : float
-        Age of the Universe in Gyr at z=0
+    t0: float
+        age of the Universe at z=0, in Gyr
 
     """
     z_table = jnp.logspace(0, 3, 512) - 1.0
@@ -234,50 +264,60 @@ _age_at_z_vmap = jjit(vmap(_age_at_z_kern, in_axes=(0, *[None] * 4)))
 
 @jjit
 def age_at_z(redshift, Om0, w0, wa, h):
-    """Age of the Universe in Gyr as a function of redshift
+    """
+    Age of the Universe in Gyr as a function of redshift
 
     Parameters
     ----------
-    redshift : ndarray of shape (n, )
+    redshift: ndarray of shape (n_z, )
+        redshift at which to compute comoving distance
 
-    Om0 : float
+    Om0: float
+        matter density parameter
 
-    w0 : float
+    w0: float
+        dark energy equation of state w0 parameter
 
-    wa : float
+    wa: float
+        dark energy equation of state wa parameter
 
-    h : float
+    h: float
+        little hubble constant, H0/(100 km/s/Mpc)
 
     Returns
     -------
-    t : float
-        Age of the Universe in Gyr
-
+    t: ndarray of shape (n_z, )
+        age of the Universe in Gyr
     """
     return _age_at_z_vmap(jnp.atleast_1d(redshift), Om0, w0, wa, h)
 
 
 @jjit
 def rho_crit(redshift, Om0, w0, wa, h):
-    """Critical density in units of physical Msun/kpc**3
+    """
+    Critical density in units of physical Msun/kpc**3
 
     Parameters
     ----------
-    redshift : float
+    redshift: float
+        redshift at which to compute comoving distance
 
-    Om0 : float
+    Om0: float
+        matter density parameter
 
-    w0 : float
+    w0: float
+        dark energy equation of state w0 parameter
 
-    wa : float
+    wa: float
+        dark energy equation of state wa parameter
 
-    h : float
+    h: float
+        little hubble constant, H0/(100 km/s/Mpc)
 
     Returns
     -------
-    rho_crit : float
-        critical density in units of physical Msun/kpc**3
-
+    rho_crit: float
+        critical density, in physical Msun/kpc**3
     """
     rho_crit0 = RHO_CRIT0_KPC3_UNITY_H * h * h
     rho_crit = rho_crit0 * _Ez(redshift, Om0, w0, wa) ** 2
@@ -307,23 +347,29 @@ def _delta_vir(z, Om0, w0, wa):
 
 @jjit
 def virial_dynamical_time(redshift, Om0, w0, wa, h):
-    """Dynamical time to cross the diameter of a halo at redshift z.
+    """
+    Dynamical time to cross the diameter of a halo at redshift z
 
     Parameters
     ----------
-    redshift : float
+    redshift: float
+        redshift at which to compute comoving distance
 
-    Om0 : float
+    Om0: float
+        matter density parameter
 
-    w0 : float
+    w0: float
+        dark energy equation of state w0 parameter
 
-    wa : float
+    wa: float
+        dark energy equation of state wa parameter
 
-    h : float
+    h: float
+        little hubble constant, H0/(100 km/s/Mpc)
 
     Returns
     -------
-    t_cross : float
+    t_cross: float
         dynamical crossing time
 
     Notes
