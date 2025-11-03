@@ -168,6 +168,7 @@ def pdf_weighted_lgmp_grid_singlez(hmf_params, lgmp_grid, redshift):
     """
     weights_grid = hmf_model.predict_differential_hmf(hmf_params, lgmp_grid, redshift)
     weights_grid = weights_grid / weights_grid.sum()
+
     return weights_grid
 
 
@@ -464,7 +465,10 @@ def get_nhalo_from_grid_interp(
     )
 
     interpolator = RegularGridInterpolator(
-        (z_grid, lgmp_grid), nhalo_grid, bounds_error=False, fill_value=None
+        (z_grid, lgmp_grid),
+        nhalo_grid,
+        bounds_error=False,
+        fill_value=None,
     )  # type: ignore
 
     interp = interpolator(jnp.column_stack([z_obs, logmp_obs_mf]))
@@ -492,6 +496,9 @@ def mc_weighted_halo_lightcone(
     ----------
     ran_key: jran.key
         random key
+
+    num_halos: int
+        number of halos to generate
 
     z_min: float
         minimum redshift value
@@ -529,22 +536,22 @@ def mc_weighted_halo_lightcone(
     Returns
     -------
     res: dict with keys:
-        z_obs: float
+        z_obs: ndarray of shape (num_halos, )
             redshift values
 
-        t_obs: float
+        t_obs: ndarray of shape (num_halos, )
             cosmic time at observation, in Gyr
 
-        logmp_obs: ndarray of shape (n_m, )
+        logmp_obs: ndarray of shape (num_halos, )
             base-10 log of halo mass at observation, in Msun
 
-        mah_params: namedtuple
+        mah_params: namedtuple of ndarrays of shape (num_halos, )
             mah parameters
 
-        logmp0: ndarray of shape (n_z*n_m, )
+        logmp0: ndarray of shape (num_halos, )
             base-10 log of halo mass at z=0, in Msun
 
-        nhalos: int
+        nhalos: ndarray of shape (num_halos, )
             weighted number of halos at each grid point
     """
     if comm is None:
@@ -622,6 +629,75 @@ def get_weighted_lightcone_sobol_host_halo_diffmah(
 ):
     """
     Compute the number of halos on the input halo mass and redshift points
+
+    Parameters
+    ----------
+    ran_key: jran.key
+        random key
+
+    num_halos: int
+        number of halos to generate
+
+    z_obs: ndarray of shape (n_halo, )
+        observed redshifts of galaxies
+
+    logmp_obs_mf: ndarray of shape (n_halo, )
+        base-10 log of observed halo masses, in Msun
+
+    z_min: float
+        minimum redshift value
+
+    z_max: float
+        maximum redshift value
+
+    lgmp_min: float
+        minimum halo mass, in Msun
+
+    lgmp_max: float
+        maximum halo mass, in Msun
+
+    sky_area_degsq: float
+        sky area, in deg^2
+
+    cosmo_params: namedtuple
+        cosmological parameters
+
+    hmf_params: namedtuple
+        halo mass function parameters
+
+    diffmahpop_params: namedtuple
+        diffmahpop parameters
+
+    logmp_cutoff: float
+        base-10 log of minimum halo mass for which
+        DiffmahPop is used to generate MAHs, in Msun;
+        for logmp < logmp_cutoff, P(θ_MAH | logmp) = P(θ_MAH | logmp_cutoff)
+
+    logmp_cutoff_himass: float
+        base-10 log of maximum halo mass for which
+        DiffmahPop is used to generate MAHs, in Msun
+
+    Returns
+    -------
+    cenpop_out: dict
+        with keys:
+        z_obs: ndarray of shape (n_halo, )
+            redshift values
+
+        t_obs: ndarray of shape (n_halo, )
+            cosmic time at observation, in Gyr
+
+        logmp_obs: ndarray of shape (n_halo, )
+            base-10 log of halo mass at observation, in Msun
+
+        mah_params: namedtuple of ndarrays of shape (n_halo, )
+            mah parameters
+
+        logmp0: ndarray of shape (n_halo, )
+            base-10 log of halo mass at z=0, in Msun
+
+        nhalos: ndarray of shape (n_halo, )
+            weighted number of halos at each grid point
     """
 
     nhalo_weights = get_nhalo_from_grid_interp(
