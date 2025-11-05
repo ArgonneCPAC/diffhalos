@@ -6,6 +6,7 @@ from jax import config
 config.update("jax_enable_x64", True)
 
 import numpy as np
+from itertools import islice
 import warnings
 from scipy.stats import qmc
 
@@ -439,6 +440,7 @@ def get_weighted_lightcone_grid_host_halo_diffmah(
     return cenpop_out
 
 
+# NOTE: this should be overwritten by the function without interpolation
 def get_nhalo_from_grid_interp(
     tot_num_halos,
     z_obs,
@@ -475,6 +477,122 @@ def get_nhalo_from_grid_interp(
     return interp * ngrid_tot / tot_num_halos
 
 
+# NOTE: this should be the actual function
+# that generates the weighted lc without interpolation on a regular grid
+# @jjit
+def get_nhalo_weighted_lc_sobol(
+    lgmp_obs,
+    z_obs,
+    z_min,
+    z_max,
+    lgmp_min,
+    lgmp_max,
+    sky_area_degsq,
+    hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
+    cosmo_params=cosmo_params.PLANCK15,
+    dz=0.01,
+):
+    """
+    Helper funcrion to compute the number of halos on the grid
+    of halo mass and redshift for a sobol sequence;
+    this is used in the weighted halo lightcone
+
+    Parameters
+    ----------
+    lgmp_grid: ndarray of shape (n_m, )
+        base-10 log halo mass, in Msun
+
+    z_grid: ndarray of shape (n_z, )
+        redshift values on the grid
+
+    sky_area_degsq: float
+        sky area, in deg^2
+
+    cosmo_params: namedtuple
+        dsps.cosmology.flat_wcdm cosmology
+        cosmo_params = (Om0, w0, wa, h)
+
+    dz: float
+        width of redshift slice
+
+    Returns
+    -------
+    nhalo_weighted_lc_grid: ndarray of shape (n_z, n_m)
+        weighted halo counts on a grid of redshift and mass
+    """
+    # thin redshift shells
+    nz_edges = int((z_max - z_min) / dz)
+    z_edges = jnp.linspace(z_min, z_max, nz_edges + 1)
+    z_mid = 0.5 * (z_edges[1:] + z_edges[:-1])
+
+    # compute the comoving volume of a thin shell at each grid point
+    fsky = sky_area_degsq / FULL_SKY_AREA
+    vol_shell_grid_mpc = fsky * spherical_shell_comoving_volume(z_mid, cosmo_params)
+
+    # put halos into redshift bins
+    z_digitized = jnp.digitize(z_obs, z_edges)
+
+    # find out what halos reside in each redshift slice/bin
+    # and sort by redshift, while keeping track of index shuffling
+    _, logmp_sort_by_z, z_sorted, sort_index = zip(
+        *sorted(
+            zip(
+                z_digitized,
+                lgmp_obs,
+                z_obs,
+                jnp.arange(len(z_digitized)),
+            )
+        )
+    )
+    logmp_sort_by_z = jnp.asarray(logmp_sort_by_z)
+    z_sorted = jnp.asarray(z_sorted)
+
+    _, unique_counts = jnp.unique_counts(z_digitized)
+
+    # split halos into groups based on redshift slices
+    logmp_sliced = []
+    z_sliced = []
+    i = 0
+    for chunk in unique_counts:
+        logmp_sliced.append(jnp.asarray(logmp_sort_by_z[i : i + chunk]))
+        z_sliced.append(jnp.asarray(z_sorted[i : i + chunk]))
+        i += chunk
+
+    # compute halo weights
+    weights_z_ordered = jnp.concatenate(
+        [
+            pdf_weighted_lgmp_grid_singlez(hmf_params, logmp_sliced[i], z_mid[i])
+            for i in range(len(z_mid))
+        ]
+    )
+
+    # at each grid point, compute <Nhalos> for the shell volume
+    mean_nhalos_lgmp_min = mc_hosts._compute_nhalos_tot(
+        hmf_params, lgmp_min, z_mid, vol_shell_grid_mpc
+    )
+    mean_nhalos_lgmp_max = mc_hosts._compute_nhalos_tot(
+        hmf_params, lgmp_max, z_mid, vol_shell_grid_mpc
+    )
+    mean_nhalos_z_grid_at_z_mid = mean_nhalos_lgmp_min - mean_nhalos_lgmp_max
+    mean_nhalos_z_grid = jnp.concatenate(
+        [
+            jnp.repeat(mean_nhalos_z_grid_at_z_mid[i], unique_counts[i])
+            for i in range(len(unique_counts))
+        ]
+    )
+
+    nhalo_weighted_lc_grid_ordered = mean_nhalos_z_grid * weights_z_ordered
+
+    # reshuffle to original order
+    _, nhalo_weighted_lc_grid = zip(
+        *sorted(zip(sort_index, nhalo_weighted_lc_grid_ordered))
+    )
+
+    nhalo_weighted_lc_grid = jnp.asarray(nhalo_weighted_lc_grid)
+
+    return nhalo_weighted_lc_grid
+
+
 def mc_weighted_halo_lightcone(
     ran_key,
     num_halos,
@@ -490,7 +608,10 @@ def mc_weighted_halo_lightcone(
     comm=None,
 ):
     """
-    Compute the number of halos on the input halo mass and redshift points
+    Generate a weighted population of halos, with MAHs,
+    on the a sobol grid with weighted halo counts;
+    basically this function sets up and performs a call to
+    ``get_weighted_lightcone_sobol_host_halo_diffmah``
 
     Parameters
     ----------
@@ -604,6 +725,7 @@ def mc_weighted_halo_lightcone(
         logmp_cutoff_himass=logmp_cutoff_himass,
     )
 
+    # generate the halo population
     res = get_weighted_lightcone_sobol_host_halo_diffmah(
         *mclh_args, **mclh_kwargs
     )  # type: ignore
@@ -611,6 +733,9 @@ def mc_weighted_halo_lightcone(
     return res
 
 
+# NOTE: this function needs to be rewritten, e.g.
+# rename to ``get_weighted_lightcone_sobol_host_halo_diffmah_interp``
+# and new one will not use interpolation
 def get_weighted_lightcone_sobol_host_halo_diffmah(
     ran_key,
     num_halos,
@@ -628,7 +753,8 @@ def get_weighted_lightcone_sobol_host_halo_diffmah(
     logmp_cutoff_himass=DEFAULT_LOGMP_HIMASS_CUTOFF,
 ):
     """
-    Compute the number of halos on the input halo mass and redshift points
+    Helper function to generate a weighted population of halos, with MAHs,
+    on the a sobol grid with weighted halo counts
 
     Parameters
     ----------
@@ -700,6 +826,7 @@ def get_weighted_lightcone_sobol_host_halo_diffmah(
             weighted number of halos at each grid point
     """
 
+    # NOTE: replace this to call function without interpolation
     nhalo_weights = get_nhalo_from_grid_interp(
         num_halos,
         z_obs,
@@ -723,26 +850,6 @@ def get_weighted_lightcone_sobol_host_halo_diffmah(
     ran_key, mah_key = jran.split(ran_key, 2)
     args = (diffmahpop_params, tarr, logmp_obs_mf_clipped, t_obs, mah_key, lgt0)
     mah_params_uncorrected = mc_cenpop(*args)[0]
-    # msk_mah_params_nan = np.isnan(mah_params_uncorrected.logm0)
-
-    # # workaround to the problem of diffmahpop occasionally returning NaN for logm0
-    # has_logm0_nans = np.any(msk_mah_params_nan)
-    # while has_logm0_nans:
-    #     ran_key, mah_key = jran.split(ran_key, 2)
-
-    #     args = (diffmahpop_params, tarr, logmp_obs_mf_clipped, t_obs, mah_key, lgt0)
-    #     mah_params_uncorrected_new = mc_cenpop(*args)[0]  # mah_params, dmhdt, log_mah
-    #     mah_params_uncorrected_logm0 = jnp.where(
-    #         msk_mah_params_nan,
-    #         mah_params_uncorrected_new.logm0,
-    #         mah_params_uncorrected.logm0,
-    #     )
-    #     mah_params_uncorrected = mah_params_uncorrected._replace(
-    #         logm0=mah_params_uncorrected_logm0
-    #     )
-
-    #     msk_nan = np.isnan(mah_params_uncorrected.logm0)
-    #     has_logm0_nans = np.sum(msk_nan) > 0
 
     logmp_obs_orig = _log_mah_kern(mah_params_uncorrected, t_obs, lgt0)
     delta_logmh_clip = logmp_obs_orig - logmp_obs_mf
