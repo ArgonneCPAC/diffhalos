@@ -1,4 +1,4 @@
-""" """
+"""Generate MC realizations of the host dark matter halo mass function"""
 
 import numpy as np
 from jax import jit as jjit
