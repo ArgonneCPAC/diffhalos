@@ -34,6 +34,7 @@ __all__ = (
     "get_mean_and_std_of_mah",
     "get_mah_from_unbounded_params",
     "load_diffmahnet_training_data",
+    "get_available_models",
 )
 
 
@@ -41,7 +42,7 @@ def mc_mah_cenpop(
     m_obs,
     t_obs,
     randkey,
-    n_sample=1000,
+    n_sample=1,
     centrals_model_key="cenflow_v2_0.eqx",
     t_min=T_GRID_MIN,
     t_max=T_GRID_MAX,
@@ -67,7 +68,7 @@ def mc_mah_cenpop(
         JAX random key
 
     n_sample: int
-        number of MC samples in the galaxy population
+        number of MC samples per (m_obs,t_obs) pair
 
     centrals_model_key: str
         model name for centrals
@@ -90,12 +91,12 @@ def mc_mah_cenpop(
     Returns
     -------
     cen_mah: ndarray of shape (n_sample*n_m_obs*n_t_obs, n_t)
-        central halo mass assembly histories for all MC realizations,
-        all ``m_obs`` values and all ``t_obs`` values
+        base-10 log of halo mass assembly histories,
+        for all MC realizations, in Msun
 
     t_grid: ndarray of shape (n_sample*n_m_obs*n_t_obs, n_t)
-        time grid for all MC realizations,
-        all ``m_obs`` values and all ``t_obs`` values
+        cosmic time grid on which to compute MAHs,
+        for all MC realizations, in Gyr
 
     cenflow_diffmahparams: namedtuple
         diffmah parameters from normalizing flow,
@@ -336,3 +337,8 @@ def load_diffmahnet_training_data(
 
     isfinite = np.all((jnp.isfinite(x_unbound)), axis=1)
     return x_unbound[isfinite], u[isfinite]
+
+
+def get_available_models():
+    available_names = diffmahnet.pretrained_model_names
+    print(available_names)

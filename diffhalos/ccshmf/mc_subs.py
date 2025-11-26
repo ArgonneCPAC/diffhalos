@@ -79,6 +79,77 @@ def generate_subhalopop(
     return mc_lg_mu, lgmhost_pop, host_halo_indx
 
 
+def generate_subhalopop_in_parts(
+    ran_key,
+    lgmhost_arr,
+    lgmp_min,
+    ccshmf_params=DEFAULT_CCSHMF_PARAMS,
+    cdf_split=0.95,
+    np_split=100,
+):
+    """
+    Generate a population of subhalos with synthetic values of Mpeak
+
+    Parameters
+    ----------
+    ran_key: jax.random.PRNGKey
+        random key
+
+    lgmhost_arr: ndarray of shape (nhosts, )
+        base-10 log of host halo mass, in Msun
+
+    lgmp_min: float
+        base-10 log of the smallest Mpeak value
+        of the synthetic subhalos, in Msun
+
+    cshmf_params: namedtuple
+        CCSHMF parameters named tuple
+
+    Returns
+    -------
+    mc_lg_mu: ndarray of shape (nsubs, )
+        base-10 log of mu=Msub/Mhost of the Monte Carlo subhalo population
+
+    lgmhost_pop: ndarray of shape (nsubs, )
+        base-10 log of Mhost of the Monte Carlo subhalo population, in Msun
+
+    host_halo_indx: ndarray of shape (nsubs, )
+        index of the input host halo of each generated subhalo,
+        so that lgmhost_pop = lgmhost_arr[host_halo_indx];
+        thus all values satisfy 0 <= host_halo_indx < nhosts
+    """
+    mean_counts = _compute_mean_subhalo_counts(lgmhost_arr, lgmp_min)
+    uran_key, counts_key = jran.split(ran_key, 2)
+    subhalo_counts_per_halo = jran.poisson(counts_key, mean_counts)
+    ntot = jnp.sum(subhalo_counts_per_halo)
+    urandoms = jnp.concatenate(
+        [
+            jran.uniform(
+                uran_key,
+                shape=(ntot - np_split,),
+                minval=0.0,
+                maxval=cdf_split,
+            ),
+            jran.uniform(
+                uran_key,
+                shape=(np_split,),
+                minval=cdf_split,
+                maxval=1.0,
+            ),
+        ]
+    )
+    lgmhost_pop = np.repeat(lgmhost_arr, subhalo_counts_per_halo)
+    halo_ids = np.arange(lgmhost_arr.size).astype(int)
+    host_halo_indx = np.repeat(halo_ids, subhalo_counts_per_halo)
+    mc_lg_mu = generate_subhalopop_vmap(
+        urandoms,
+        lgmhost_pop,
+        lgmp_min,
+        ccshmf_params,
+    )
+    return mc_lg_mu, lgmhost_pop, host_halo_indx
+
+
 def generate_subhalopop_hist(
     ran_key,
     lgmhost,
