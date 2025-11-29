@@ -45,6 +45,8 @@ jobs:
             scipy \
             diffsky \
             python-build
+          pip uninstall dsps --yes
+          pip install --no-deps git+https://github.com/ArgonneCPAC/dsps.git
           python -m pip install --no-build-isolation --no-deps -e .
 
       - name: test
