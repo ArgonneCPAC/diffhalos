@@ -19,19 +19,9 @@ _dn_dlgm_kern = jjit(grad(hmf_model._diff_hmf_grad_kern, argnums=1))
 
 
 @jjit
-def _differential_comoving_volume_kern(redshift, Om0, w0, wa, h):
-    dh = flat_wcdm.hubble_distance_mpc(h)
-    da = flat_wcdm.angular_diameter_distance_to_z(redshift, Om0, w0, wa, h)
-    zp1 = 1.0 + redshift
-    ez = flat_wcdm._Ez(redshift, Om0, w0, wa)
-    diff_vol_com = dh * ((zp1 * da) ** 2.0) / ez
-    return diff_vol_com
-
-
-@jjit
 def _dn_dm_dz_kern(lgm, z, hmf_params, cosmo_params):
     dn_dm_dv = _dn_dlgm_kern(hmf_params, lgm, z)
-    dv_dz = _differential_comoving_volume_kern(z, *cosmo_params)
+    dv_dz = flat_wcdm.differential_comoving_volume_at_z(z, *cosmo_params)
     dn_dm_dz = dn_dm_dv * dv_dz
     return dn_dm_dz
 

@@ -1,3 +1,4 @@
 numpy
 jax
 diffmah
+dsps>=0.4.6
