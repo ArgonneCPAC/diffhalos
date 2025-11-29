@@ -19,11 +19,7 @@ DEFAULT_HMF_KERN_PDICT = OrderedDict(ytp=-3.32, x0=14.0, lo=-0.95, hi=-1.8)
 HMF_Params = namedtuple("HMF_Params", DEFAULT_HMF_KERN_PDICT.keys())
 DEFAULT_HMF_KERN_PARAMS = HMF_Params(**DEFAULT_HMF_KERN_PDICT)
 
-__all__ = (
-    "lg_hmf_kern",
-    "hmf_kern",
-    "lg_differential_hmf_kern",
-)
+__all__ = ("lg_hmf_kern", "hmf_kern", "lg_differential_hmf_kern")
 
 
 @jjit
@@ -41,12 +37,7 @@ def hmf_kern(params, lgmu):
     return 10**lg_cuml
 
 
-_differential_hmf_kern = jjit(
-    vmap(
-        grad(hmf_kern, argnums=1),
-        in_axes=(None, 0),
-    )
-)
+_differential_hmf_kern = jjit(vmap(grad(hmf_kern, argnums=1), in_axes=(None, 0)))
 
 
 @jjit
