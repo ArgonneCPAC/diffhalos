@@ -45,7 +45,9 @@ jobs:
             scipy \
             python-build
           python -m pip install --no-build-isolation --no-deps -e .
-          
+          conda install -c conda-forge mpi4py jax
+          pip install --upgrade git+https://github.com/AlanPearl/diffmahnet.git
+
       - name: test
         shell: bash -l {0}
         run: |
