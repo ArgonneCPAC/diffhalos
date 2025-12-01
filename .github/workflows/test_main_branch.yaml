@@ -45,7 +45,7 @@ jobs:
             scipy \
             python-build
           python -m pip install --no-build-isolation --no-deps -e .
-          pip install --upgrade git+https://github.com/AlanPearl/diffmahnet.git
+          python -m pip install --upgrade git+https://github.com/AlanPearl/diffmahnet.git
 
       - name: test
         shell: bash -l {0}
