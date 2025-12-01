@@ -24,13 +24,6 @@ from ..cosmology import flat_wcdm, cosmo_params
 from ..hmf import hmf_model, mc_hosts
 from .utils import spherical_shell_comoving_volume
 
-try:
-    from mpi4py import MPI
-
-    COMM = MPI.COMM_WORLD
-except ImportError:
-    MPI = COMM = None
-
 N_HMF_GRID = 2_000
 DEFAULT_LOGMP_CUTOFF = 10.0
 DEFAULT_LOGMP_HIMASS_CUTOFF = 14.5
@@ -243,7 +236,6 @@ def mc_lightcone_host_halo_diffmah(
     logmp_cutoff=DEFAULT_LOGMP_CUTOFF,
     logmp_cutoff_himass=DEFAULT_LOGMP_HIMASS_CUTOFF,
     lgmp_max=mc_hosts.LGMH_MAX,
-    centrals_model_key="cenflow_v2_0.eqx",
 ):
     """
     Generate halo MAHs for host halos sampled from a lightcone
@@ -280,9 +272,6 @@ def mc_lightcone_host_halo_diffmah(
 
     lgmp_max: float
         base-10 log of maximum host halo mass, in Msun
-
-    centrals_model_key: str
-        model name for centrals
 
     Returns
     -------
@@ -351,7 +340,6 @@ def get_weighted_lightcone_grid_host_halo_diffmah(
     diffmahpop_params=DEFAULT_DIFFMAHPOP_PARAMS,
     logmp_cutoff=DEFAULT_LOGMP_CUTOFF,
     logmp_cutoff_himass=DEFAULT_LOGMP_HIMASS_CUTOFF,
-    centrals_model_key="cenflow_v2_0.eqx",
 ):
     """
     Compute the number of halos on the input grid of halo mass and redshift
@@ -388,9 +376,6 @@ def get_weighted_lightcone_grid_host_halo_diffmah(
     logmp_cutoff_himass: float
         base-10 log of maximum halo mass for which
         DiffmahPop is used to generate MAHs, in Msun
-
-    centrals_model_key: str
-        model name for centrals
 
     Returns
     -------
@@ -635,7 +620,6 @@ def mc_weighted_halo_lightcone(
     diffmahpop_params=DEFAULT_DIFFMAHPOP_PARAMS,
     logmp_cutoff=DEFAULT_LOGMP_CUTOFF,
     logmp_cutoff_himass=DEFAULT_LOGMP_HIMASS_CUTOFF,
-    comm=None,
 ):
     """
     Generate a weighted population of halos, with MAHs,
@@ -681,9 +665,6 @@ def mc_weighted_halo_lightcone(
         base-10 log of maximum halo mass for which
         DiffmahPop is used to generate MAHs, in Msun
 
-    comm: mpi.comm
-        MPI.COMM instance
-
     Returns
     -------
     res: dict with keys:
@@ -705,20 +686,6 @@ def mc_weighted_halo_lightcone(
         nhalos: ndarray of shape (num_halos, )
             weighted number of halos at each grid point
     """
-    if comm is None:
-        try:
-            comm = MPI.COMM_WORLD
-            # ONLY generate the halos necessary on this rank
-            num_halos_on_rank = num_halos // comm.size + (
-                1 if comm.rank < num_halos % comm.size else 0
-            )
-            starting_index = comm.rank * (num_halos // comm.size) + min(
-                comm.rank, num_halos % comm.size
-            )
-        except AttributeError:
-            num_halos_on_rank = num_halos
-            starting_index = 0
-
     ran_key, ran_key_sobol = jran.split(ran_key, 2)
 
     # Generate Sobol sequence for halo masses and redshifts
@@ -728,13 +695,11 @@ def mc_weighted_halo_lightcone(
         # 64-bit sequence required to generate over 2^30 halos
         bits = 64
     sampler = qmc.Sobol(d=2, scramble=True, rng=seed, bits=bits)
-    if starting_index > 0:
-        sampler.fast_forward(starting_index)
 
     with warnings.catch_warnings():
         # Ignore warning about Sobol sequences not being fully balanced
         warnings.filterwarnings("ignore", category=UserWarning)
-        sample = sampler.random(num_halos_on_rank)
+        sample = sampler.random(num_halos)
     z_obs, logmp_obs_mf = qmc.scale(sample, (z_min, lgmp_min), (z_max, lgmp_max)).T
 
     mclh_args = (
