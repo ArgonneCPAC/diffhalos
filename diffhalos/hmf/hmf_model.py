@@ -117,8 +117,8 @@ def _diff_hmf_grad_kern(params, logmp, redshift):
         logmp,
         redshift,
     )
-    cuml_nd_pred = 10**lgcuml_nd_pred
-    return -cuml_nd_pred
+    cuml_nd_pred = -(10**lgcuml_nd_pred)
+    return cuml_nd_pred
 
 
 _A = (None, 0, None)
