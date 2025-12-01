@@ -1,4 +1,5 @@
 numpy
 jax
-diffmah
 dsps
+diffmah
+diffmahnet
