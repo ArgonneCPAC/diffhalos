@@ -30,7 +30,13 @@ __all__ = (
 def lg_hmf_kern(params, lgmp):
     params = HMF_Params(*params)
     lg_hmf = _sig_slope(
-        lgmp, HMF_XTP, params.ytp, params.x0, HMF_K, params.lo, params.hi
+        lgmp,
+        HMF_XTP,
+        params.ytp,
+        params.x0,
+        HMF_K,
+        params.lo,
+        params.hi,
     )
     return lg_hmf
 

@@ -11,7 +11,7 @@ import glob
 import jax
 import jax.numpy as jnp
 
-from diffmah import mah_singlehalo
+from diffmah import mah_halopop
 from diffmah import DEFAULT_MAH_PARAMS
 from diffmah.diffmah_kernels import DEFAULT_MAH_U_PARAMS
 from diffmah.diffmah_kernels import (
@@ -20,6 +20,8 @@ from diffmah.diffmah_kernels import (
 )
 
 import diffmahnet
+
+from .utils import rescale_mah_parameters
 
 DEFAULT_MAH_UPARAMS = get_unbounded_mah_params(DEFAULT_MAH_PARAMS)
 
@@ -32,6 +34,7 @@ __all__ = (
     "get_mean_and_std_of_mah",
     "get_mah_from_unbounded_params",
     "load_diffmahnet_training_data",
+    "get_available_models",
 )
 
 
@@ -39,11 +42,12 @@ def mc_mah_cenpop(
     m_obs,
     t_obs,
     randkey,
-    n_sample=1000,
+    n_sample=1,
     centrals_model_key="cenflow_v2_0.eqx",
     t_min=T_GRID_MIN,
     t_max=T_GRID_MAX,
     n_t=N_T_GRID,
+    return_mah_params=False,
 ):
     """
     Generate MC realiations of central halo populations
@@ -55,60 +59,94 @@ def mc_mah_cenpop(
     Parameters
     ----------
     m_obs: ndarray of shape (n_halo, )
-        grid of base-10 log of mass of the halos at observation
+        grid of base-10 log of mass of the halos at observation, in Msun
 
     t_obs: ndarray of shape (n_halo, )
-        grid of base-10 log of cosmic time at observation
+        grid of base-10 log of cosmic time at observation of each halo, in Gyr
 
     randkey: key
         JAX random key
 
     n_sample: int
-        number of MC samples in the galaxy population
+        number of MC samples per (m_obs,t_obs) pair
 
     centrals_model_key: str
         model name for centrals
 
     t_min: float
-        minimum value for time grid at which to compute mah
+        base-10 log of minimum value for time grid
+        at which to compute mah, in Gyr
 
     t_max: float
-        maximum value for time grid at which to compute mah
+        base-10 log of maximum value for time grid,
+        at which to compute mah, in Gyr
 
     n_t: int
         number of points in time grid
 
+    return_mah_params: bool
+        if True the MAH parameters from the normalizing flow
+        will also be returned
+
     Returns
     -------
     cen_mah: ndarray of shape (n_sample*n_m_obs*n_t_obs, n_t)
-        central halo mass assembly histories for all MC realizations,
-        all ``m_obs`` values and all ``t_obs`` values
+        base-10 log of halo mass assembly histories,
+        for all MC realizations, in Msun
 
     t_grid: ndarray of shape (n_sample*n_m_obs*n_t_obs, n_t)
-        time grid for all MC realizations,
-        all ``m_obs`` values and all ``t_obs`` values
+        cosmic time grid on which to compute MAHs,
+        for all MC realizations, in Gyr
+
+    cenflow_diffmahparams: namedtuple
+        diffmah parameters from normalizing flow,
+        each parameter is a ndarray of shape(n_sample*n_m_obs*n_t_obs, )
     """
     # create diffmahnet model for centrals
     centrals_model = diffmahnet.load_pretrained_model(centrals_model_key)
     mc_diffmahnet_cenpop = centrals_model.make_mc_diffmahnet()
 
-    # get a list of (m_obs, t_obs) for rach MC realization
+    # get a list of (m_obs, t_obs) for each MC realization
     m_vals, t_vals = [
-        jnp.repeat(x.flatten(), n_sample) for x in jnp.meshgrid(m_obs, t_obs)
+        jnp.repeat(x.flatten(), n_sample)
+        for x in jnp.meshgrid(
+            m_obs,
+            t_obs,
+        )
     ]
 
-    # get diffmah parameters from the  normalizing flow
+    # get diffmah parameters from the normalizing flow
     keys = jax.random.split(randkey, 2)
     cenflow_diffmahparams = mc_diffmahnet_cenpop(
         centrals_model.get_params(), m_vals, t_vals, keys[0]
     )
 
+    # construct time grids for each halo, given observation time
     t_grid = jnp.linspace(t_min, t_vals, n_t).T
+
+    # compute the uncorrected predicted observed halo masses
+    logm_obs_uncorrected = diffmahnet.log_mah_kern(
+        cenflow_diffmahparams,
+        t_grid,
+        t_max,
+    )[:, -1]
+
+    # rescale the mah parameters to the correct logm0
+    cenflow_diffmahparams = rescale_mah_parameters(
+        cenflow_diffmahparams,
+        m_vals,
+        logm_obs_uncorrected,
+    )
+
+    # compute mah with corrected parameters
     cen_mah = diffmahnet.log_mah_kern(
         cenflow_diffmahparams,
         t_grid,
         t_max,
     )
+
+    if return_mah_params:
+        return cen_mah, t_grid, cenflow_diffmahparams
 
     return cen_mah, t_grid
 
@@ -153,15 +191,18 @@ def get_mah_from_unbounded_params(
     mah_params_unbound,
     logt0,
     t_grid,
+    logm_obs,
 ):
     """
     Helper function to generate the MAH from
-    a set of training unbounded parameters
+    a set of diffmah unbounded parameters,
+    for a population of halos
 
     Parameters
     ----------
-    mah_params_unbound: ndarray of shape (n_mah_params, )
+    mah_params_unbound: ndarray of shape (n_halo, n_mah_param)
         unbounded ``diffmah`` parameters
+        (logm0, logtc, early_index, late_index, t_peak)
 
     logt0: float
         base-10 log of the age of the Universe at z=0, in Gyr
@@ -169,22 +210,38 @@ def get_mah_from_unbounded_params(
     t_grid: ndarray of shape (n_t, )
         cosmic time grid at which to compute the MAH
 
+    logm_obs: float
+        base-10 log of observed halo mass, in Msun
+
     Returns
     -------
-    log_mah: ndarray of shape (n_t, )
-        base-10 log of MAH
+    log_mah: ndarray of shape (n_halo, n_t)
+        base-10 log of MAH, in Msun
     """
     mah_params_bound = jnp.array(
         [
             *get_bounded_mah_params(
-                DEFAULT_MAH_U_PARAMS._make(mah_params_unbound),
+                DEFAULT_MAH_U_PARAMS._make(mah_params_unbound.T),
             )
         ]
-    ).T
+    )
 
-    mah_params = DEFAULT_MAH_PARAMS._make(mah_params_bound)
+    mah_params_uncorrected = DEFAULT_MAH_PARAMS._make(mah_params_bound)
 
-    _, log_mah = mah_singlehalo(mah_params, t_grid, logt0)
+    _, logm_obs_uncorrected = mah_halopop(
+        mah_params_uncorrected,
+        t_grid,
+        logt0,
+    )
+
+    # rescale the mah parameters to the correct logm0
+    mah_params = rescale_mah_parameters(
+        mah_params_uncorrected,
+        logm_obs,
+        logm_obs_uncorrected[:, -1],
+    )
+
+    _, log_mah = mah_halopop(mah_params, t_grid, logt0)
 
     return log_mah
 
@@ -280,3 +337,8 @@ def load_diffmahnet_training_data(
 
     isfinite = np.all((jnp.isfinite(x_unbound)), axis=1)
     return x_unbound[isfinite], u[isfinite]
+
+
+def get_available_models():
+    available_names = diffmahnet.pretrained_model_names
+    print(available_names)
