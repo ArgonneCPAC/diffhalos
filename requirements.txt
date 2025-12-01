@@ -1,5 +1,4 @@
 numpy
 jax
-mpi4py
 dsps
 diffmah
