@@ -318,14 +318,15 @@ def mc_lightcone_host_halo_diffmah(
 
     logmp_obs_mf_clipped = np.clip(logmp_obs_mf, logmp_cutoff, logmp_cutoff_himass)
 
-    mah_params = mc_mah_cenpop(
-        logmp_obs_mf_clipped,
-        t_obs,
-        ran_key,
-        n_sample=1,
-        centrals_model_key=centrals_model_key,
-        return_mah_params=True,
-    )[2][0]
+    tarr = np.array((10**lgt0,))
+    args = (diffmahpop_params, tarr, logmp_obs_mf_clipped, t_obs, mah_key, lgt0)
+    mah_params_uncorrected = mc_cenpop(*args)[0]  # mah_params, dmhdt, log_mah
+
+    logmp_obs_orig = _log_mah_kern(mah_params_uncorrected, t_obs, lgt0)
+    delta_logmh_clip = logmp_obs_orig - logmp_obs_mf
+    mah_params = mah_params_uncorrected._replace(
+        logm0=mah_params_uncorrected.logm0 - delta_logmh_clip
+    )
 
     logmp0 = _log_mah_kern(mah_params, 10**lgt0, lgt0)
     logmp_obs = _log_mah_kern(mah_params, t_obs, lgt0)
@@ -426,14 +427,15 @@ def get_weighted_lightcone_grid_host_halo_diffmah(
 
     logmp_obs_mf_clipped = np.clip(logmp_obs_mf, logmp_cutoff, logmp_cutoff_himass)
 
-    mah_params = mc_mah_cenpop(
-        logmp_obs_mf_clipped,
-        t_obs,
-        ran_key,
-        n_sample=1,
-        centrals_model_key=centrals_model_key,
-        return_mah_params=True,
-    )[2][0]
+    tarr = np.array((10**lgt0,))
+    args = (diffmahpop_params, tarr, logmp_obs_mf_clipped, t_obs, ran_key, lgt0)
+    mah_params_uncorrected = mc_cenpop(*args)[0]  # mah_params, dmhdt, log_mah
+
+    logmp_obs_orig = _log_mah_kern(mah_params_uncorrected, t_obs, lgt0)
+    delta_logmh_clip = logmp_obs_orig - logmp_obs_mf
+    mah_params = mah_params_uncorrected._replace(
+        logm0=mah_params_uncorrected.logm0 - delta_logmh_clip
+    )
 
     logmp0 = _log_mah_kern(mah_params, 10**lgt0, lgt0)
     logmp_obs = _log_mah_kern(mah_params, t_obs, lgt0)
