@@ -49,6 +49,8 @@ jobs:
           python -m pip install --no-deps git+https://github.com/ArgonneCPAC/dsps.git
           python -m pip install --no-deps git+https://github.com/AlanPearl/diffmahnet.git
           python -m pip install flowjax
+          python -m pip install diffopt
+          python -m pip install tqdm
           python -m pip install --no-build-isolation --no-deps -e .
 
       - name: test
