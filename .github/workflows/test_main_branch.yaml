@@ -47,7 +47,7 @@ jobs:
             python-build
           python -m pip uninstall dsps --yes
           python -m pip install --no-deps git+https://github.com/ArgonneCPAC/dsps.git
-          python -m pip install --upgrade git+https://github.com/AlanPearl/diffmahnet.git
+          python -m pip install --no-deps git+https://github.com/AlanPearl/diffmahnet.git
           python -m pip install --no-build-isolation --no-deps -e .
 
       - name: test
