@@ -20,7 +20,8 @@ from diffmah.diffmahpop_kernels.bimod_censat_params import DEFAULT_DIFFMAHPOP_PA
 from diffmah.diffmahpop_kernels.mc_bimod_cens import mc_cenpop
 
 from ..diffmahpop.diffmahnet_utils import mc_mah_cenpop
-from ..cosmology import flat_wcdm, cosmo_params
+from dsps.cosmology import flat_wcdm
+from dsps.cosmology import DEFAULT_COSMOLOGY
 from ..hmf import hmf_model, mc_hosts
 from .utils import spherical_shell_comoving_volume
 
@@ -48,7 +49,7 @@ def mc_lightcone_host_halo_mass_function(
     z_min,
     z_max,
     sky_area_degsq,
-    cosmo_params=cosmo_params.PLANCK15,
+    cosmo_params=DEFAULT_COSMOLOGY,
     hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
     n_hmf_grid=N_HMF_GRID,
     lgmp_max=mc_hosts.LGMH_MAX,
@@ -176,7 +177,7 @@ def get_nhalo_weighted_lc_grid(
     z_grid,
     sky_area_degsq,
     hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
-    cosmo_params=cosmo_params.PLANCK15,
+    cosmo_params=DEFAULT_COSMOLOGY,
 ):
     """
     Compute the number of halos on the input grid of halo mass and redshift
@@ -229,7 +230,7 @@ def mc_lightcone_host_halo_diffmah(
     z_min,
     z_max,
     sky_area_degsq,
-    cosmo_params=cosmo_params.PLANCK15,
+    cosmo_params=DEFAULT_COSMOLOGY,
     hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
     diffmahpop_params=DEFAULT_DIFFMAHPOP_PARAMS,
     n_hmf_grid=N_HMF_GRID,
@@ -335,7 +336,7 @@ def get_weighted_lightcone_grid_host_halo_diffmah(
     lgmp_grid,
     z_grid,
     sky_area_degsq,
-    cosmo_params=cosmo_params.PLANCK15,
+    cosmo_params=DEFAULT_COSMOLOGY,
     hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
     diffmahpop_params=DEFAULT_DIFFMAHPOP_PARAMS,
     logmp_cutoff=DEFAULT_LOGMP_CUTOFF,
@@ -483,7 +484,7 @@ def get_nhalo_weighted_lc_sobol(
     lgmp_max,
     sky_area_degsq,
     hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
-    cosmo_params=cosmo_params.PLANCK15,
+    cosmo_params=DEFAULT_COSMOLOGY,
     dz=0.01,
 ):
     """
@@ -741,7 +742,7 @@ def get_weighted_lightcone_sobol_host_halo_diffmah(
     lgmp_min,
     lgmp_max,
     sky_area_degsq,
-    cosmo_params=cosmo_params.PLANCK15,
+    cosmo_params=DEFAULT_COSMOLOGY,
     hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
     diffmahpop_params=DEFAULT_DIFFMAHPOP_PARAMS,
     logmp_cutoff=DEFAULT_LOGMP_CUTOFF,
