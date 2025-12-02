@@ -3,4 +3,3 @@ jax
 dsps
 diffmah
 dsps
-flowjax
