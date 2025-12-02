@@ -3,7 +3,7 @@
 import numpy as np
 from jax import random as jran
 
-from ...cosmology import flat_wcdm, cosmo_params
+from dsps.cosmology import flat_wcdm, DEFAULT_COSMOLOGY
 
 from ...hmf import mc_hosts
 from ...calibrations.hmf_cal import hacc_core_hmf_params as hchmf
@@ -39,7 +39,7 @@ def test_mc_lightcone_host_halo_mass_function():
 
         z_med = np.median(redshifts_galpop)
 
-        cosmo = cosmo_params.PLANCK15
+        cosmo = DEFAULT_COSMOLOGY
         vol_lo = (
             (4 / 3)
             * np.pi
@@ -140,7 +140,7 @@ def test_nhalo_weighted_lc_grid():
             z_grid,
             sky_area_degsq,
             hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
-            cosmo_params=cosmo_params.PLANCK15,
+            cosmo_params=DEFAULT_COSMOLOGY,
         )
         assert nhalo_weighted_lc_grid.shape == (n_z, n_m)
 

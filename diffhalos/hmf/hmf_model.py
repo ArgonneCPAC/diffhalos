@@ -11,13 +11,19 @@ from jax import jit as jjit
 from jax import vmap
 from jax import numpy as jnp
 
+from dsps.cosmology import flat_wcdm
+
+from ..lightcone.utils import spherical_shell_comoving_volume
 from ..calibrations.hmf_cal import DEFAULT_HMF_PARAMS, HMF_Params  # noqa
 from .hmf_kernels import lg_hmf_kern
 from ..utils.sigmoid_utils import _sig_slope, _sigmoid
+from ..defaults import FULL_SKY_AREA
 
 YTP_XTP = 3.0
 X0_XTP = 3.0
 HI_XTP = 3.0
+
+N_HMF_GRID = 500
 
 __all__ = (
     "predict_cuml_hmf",
@@ -112,13 +118,9 @@ def _hi_vs_redshift(params, redshift):
 
 @jjit
 def _diff_hmf_grad_kern(params, logmp, redshift):
-    lgcuml_nd_pred = predict_cuml_hmf(
-        params,
-        logmp,
-        redshift,
-    )
-    cuml_nd_pred = -(10**lgcuml_nd_pred)
-    return cuml_nd_pred
+    lgcuml_nd_pred = predict_cuml_hmf(params, logmp, redshift)
+    cuml_nd_pred = 10**lgcuml_nd_pred
+    return -cuml_nd_pred
 
 
 _A = (None, 0, None)
@@ -156,3 +158,86 @@ def predict_differential_hmf(params, logmp, redshift):
     """
     hmf = jnp.log10(_predict_differential_hmf(params, logmp, redshift))
     return hmf
+
+
+_dn_dlgm_kern = jjit(grad(_diff_hmf_grad_kern, argnums=1))
+
+
+@jjit
+def _dn_dm_dz_kern(lgm, z, hmf_params, cosmo_params):
+    dn_dm_dv = _dn_dlgm_kern(hmf_params, lgm, z)
+    dv_dz = flat_wcdm.differential_comoving_volume_at_z(z, *cosmo_params)
+    dn_dm_dz = dn_dm_dv * dv_dz
+    return dn_dm_dz
+
+
+_A = (0, 0, None, None)
+predict_dn_dlgm_dz = jjit(vmap(_dn_dm_dz_kern, in_axes=_A))
+
+
+@jjit
+def halo_lightcone_weights(
+    lgmp,
+    redshift,
+    sky_area_degsq,
+    hmf_params,
+    cosmo_params,
+):
+    """
+    Computes lightcone halo weights using the stratified grid
+    of points so that it can be used with jax.grad
+
+    Parameters
+    ----------
+    lgmp: ndarray of shape (n_halo, )
+        base-10 log of halo mass, in Msun
+
+    redshift: float
+        redshift
+
+    sky_area_degsq: float
+        sky area covered by lightcone, in deg^2
+
+    hmf_params: namedtuple
+        halo mass function parameters
+
+    cosmo_params: namedtuple
+        dsps.cosmology.flat_wcdm cosmology
+        cosmo_params = (Om0, w0, wa, h)
+
+    Returns
+    -------
+    nhalos:
+    """
+    z_min = redshift.min()
+    z_max = redshift.max()
+    lgmp_min = lgmp.min()
+    lgmp_max = lgmp.max()
+
+    # set up a integration grid in redshift
+    z_grid = jnp.linspace(z_min, z_max, N_HMF_GRID)
+
+    # compute the comoving volume of a thin shell at each grid point
+    fsky = sky_area_degsq / FULL_SKY_AREA
+    vol_shell_grid_mpc = fsky * spherical_shell_comoving_volume(
+        z_grid,
+        cosmo_params,
+    )
+
+    # at each grid point, compute <Nhalos> for the shell volume
+    nd_lgmp_min = 10 ** predict_cuml_hmf(hmf_params, lgmp_min, z_grid)
+    nd_lgmp_max = 10 ** predict_cuml_hmf(hmf_params, lgmp_max, z_grid)
+    nhalos_per_mpc3 = nd_lgmp_min - nd_lgmp_max
+    nhalos_per_shell = vol_shell_grid_mpc * nhalos_per_mpc3
+
+    # total number of halos is the sum over shells
+    nhalos_tot = nhalos_per_shell.sum()
+
+    # compute relative abundance of halos via weights ~ ∂n/∂z∂m
+    _weights = predict_dn_dlgm_dz(lgmp, redshift, hmf_params, cosmo_params)
+    weights = _weights / _weights.sum()
+
+    # compute relative number of halos per shell
+    nhalos = nhalos_tot * weights
+
+    return nhalos
