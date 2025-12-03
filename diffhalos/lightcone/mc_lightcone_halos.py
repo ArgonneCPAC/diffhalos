@@ -44,61 +44,6 @@ __all__ = (
 )
 
 
-@jjit
-def get_nhalos_shell_volume(
-    z_grid,
-    lgmp_min,
-    lgmp_max,
-    sky_area_degsq,
-    hmf_params,
-    cosmo_params,
-):
-    """
-    Helper function to compute <Nhalos> for the shell volume,
-    at each grid point
-
-    Parameters
-    ----------
-    z_grid: ndarray of shape (n_z, )
-        grid in redshift
-
-    lgmp_min: float
-        base-10 log of minimum halo mass, in Msun
-
-    lgmp_max: float
-        base-10 log of maximum halo mass, in Msun
-
-    sky_area_degsq: float
-        sky area, in deg^2
-
-    hmf_params: namedtuple
-        halo mass function parameters
-
-    cosmo_params: namedtuple
-        cosmological parameters
-
-    Returns
-    -------
-    mean_nhalos_grid: ndarray of shape (n_z, )
-        mean halo abundance per shell, in Mpc^-3
-    """
-
-    # compute the comoving volume of a thin shell at each grid point
-    fsky = sky_area_degsq / FULL_SKY_AREA
-    vol_shell_grid_mpc = fsky * spherical_shell_comoving_volume(z_grid, cosmo_params)
-
-    # at each grid point, compute <Nhalos> for the shell volume
-    mean_nhalos_grid = mc_hosts._compute_nhalos_tot(
-        hmf_params, lgmp_min, z_grid, vol_shell_grid_mpc
-    )
-    mean_nhalos_lgmp_max = mc_hosts._compute_nhalos_tot(
-        hmf_params, lgmp_max, z_grid, vol_shell_grid_mpc
-    )
-    mean_nhalos_grid = mean_nhalos_grid - mean_nhalos_lgmp_max
-
-    return mean_nhalos_grid
-
-
 def mc_lightcone_host_halo_mass_function(
     ran_key,
     lgmp_min,
@@ -162,15 +107,18 @@ def mc_lightcone_host_halo_mass_function(
     # set up a uniform grid in redshift
     z_grid = jnp.linspace(z_min, z_max, n_hmf_grid)
 
+    # compute the comoving volume of a thin shell at each grid point
+    fsky = sky_area_degsq / FULL_SKY_AREA
+    vol_shell_grid_mpc = fsky * spherical_shell_comoving_volume(z_grid, cosmo_params)
+
     # at each grid point, compute <Nhalos> for the shell volume
-    mean_nhalos_grid = get_nhalos_shell_volume(
-        z_grid,
-        lgmp_min,
-        lgmp_max,
-        sky_area_degsq,
-        hmf_params,
-        cosmo_params,
+    mean_nhalos_grid = mc_hosts._compute_nhalos_tot(
+        hmf_params, lgmp_min, z_grid, vol_shell_grid_mpc
     )
+    mean_nhalos_lgmp_max = mc_hosts._compute_nhalos_tot(
+        hmf_params, lgmp_max, z_grid, vol_shell_grid_mpc
+    )
+    mean_nhalos_grid = mean_nhalos_grid - mean_nhalos_lgmp_max
 
     if nhalos_tot is None:
         # at each grid point, compute a Poisson realization of <Nhalos>
