@@ -207,7 +207,7 @@ def subhalo_lightcone_weights(
 
     Returns
     -------
-    nsubhalos: ndarray of shape (n_m*n_mu, )
+    nsubhalos: ndarray of shape (n_m, n_mu)
         weighted subhalo abundance per (mass, mu) point
     """
     lgmu_min = lgmu.min()

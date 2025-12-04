@@ -66,7 +66,8 @@ def mc_weighted_subhalo_lightcone(
     -------
     halopop: dict
         same as input with the added key
-        ``nsubhalos`` for the subhalo number weights
+        ``nsubhalos`` for the subhalo number weights,
+        as a ndarray of shape (n_halo, n_mu)
     """
 
     # get subhalo weights
