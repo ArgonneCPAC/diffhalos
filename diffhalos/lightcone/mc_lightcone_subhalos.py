@@ -9,6 +9,7 @@ __all__ = ("mc_weighted_subhalo_lightcone",)
 
 
 def mc_weighted_subhalo_lightcone(
+    ran_key,
     halopop,
     lgmu,
     ccshmf_params=DEFAULT_CCSHMF_PARAMS,
@@ -18,6 +19,9 @@ def mc_weighted_subhalo_lightcone(
 
     Parameters
     ----------
+    ran_key: jax.random.PRNGKey
+        random key
+
     halopop: dict
         with keys:
         z_obs: ndarray of shape (n_halo, )
@@ -53,6 +57,7 @@ def mc_weighted_subhalo_lightcone(
 
     # get subhalo weights
     nsubhalo_weights = subhalo_lightcone_weights(
+        ran_key,
         halopop["logmp_obs"],
         lgmu,
         ccshmf_params=ccshmf_params,
