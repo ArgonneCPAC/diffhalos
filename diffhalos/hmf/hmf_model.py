@@ -29,6 +29,7 @@ N_HMF_GRID = 500
 __all__ = (
     "predict_cuml_hmf",
     "predict_differential_hmf",
+    "halo_lightcone_weights",
 )
 
 

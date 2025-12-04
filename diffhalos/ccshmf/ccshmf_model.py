@@ -4,7 +4,9 @@ the Cumulative Conditional Subhalo Mass Function (CCSHMF),
 <Nsub(>mu) | Mhost>, where mu = Msub/Mhost
 """
 
+from jax import vmap
 from jax import jit as jjit
+from jax import random as jran
 
 from ..utils import _sig_slope
 from .ccshmf_kernels import lg_ccshmf_kern, lg_differential_cshmf_kern
@@ -23,15 +25,17 @@ YLO_XTP = 13.0
 __all__ = (
     "predict_ccshmf",
     "predict_differential_cshmf",
+    "subhalo_lightcone_weights",
 )
 
 
 @jjit
-def predict_ccshmf(params, lgmhost, lgmu):
+def _ccshmf_kern(params, lgmhost, lgmu):
     """
     Model for the cumulative conditional subhalo mass function, CCSHMF,
     defined as <Nsub(>mu) | Mhost>, where mu = Msub/Mhost,
-    and both subhalo and host halo masses are peak historical masses
+    and both subhalo and host halo masses are peak historical masses;
+    this works for a single value of Mhost
 
     Parameters
     ----------
@@ -41,7 +45,7 @@ def predict_ccshmf(params, lgmhost, lgmu):
         in detail, params = (ytp_params, ylo_params), where typical values are
         ytp_params = DEFAULT_YTP_PARAMS and ylo_params = DEFAULT_YLO_PARAMS
 
-    lgmhost: float or ndarray of shape (n, )
+    lgmhost:  ndarray of shape (float, )
         base-10 log of host halo mass, in Msun
 
     lgmu: float or ndarray of shape (n, )
@@ -59,12 +63,22 @@ def predict_ccshmf(params, lgmhost, lgmu):
     return lg_ccshmf
 
 
+"""
+Model for the cumulative conditional subhalo mass function,
+for multiple values of Mhost,
+by vmapping ``_ccshmf_kern``,
+returning a ndarray of shape (n_m, n_mu)
+"""
+predict_ccshmf = jjit(vmap(_ccshmf_kern, in_axes=(None, 0, None)))
+
+
 @jjit
-def predict_differential_cshmf(params, lgmhost, lgmu):
+def _differential_cshmf(params, lgmhost, lgmu):
     """
     Model for the differential conditional subhalo mass function, CCSHMF,
     defined as <Nsub(mu) | Mhost>, where mu = Msub/Mhost,
-    and both subhalo and host halo masses are peak historical masses
+    and both subhalo and host halo masses are peak historical masses;
+    this works for a single value of Mhost
 
     Parameters
     ----------
@@ -74,7 +88,7 @@ def predict_differential_cshmf(params, lgmhost, lgmu):
         in detail, params = (ytp_params, ylo_params), where typical values are
         ytp_params = DEFAULT_YTP_PARAMS and ylo_params = DEFAULT_YLO_PARAMS
 
-    lgmhost: float or ndarray of shape (n, )
+    lgmhost: float
         base-10 log of host halo mass, in Msun
 
     lgmu: float or ndarray of shape (n, )
@@ -91,6 +105,17 @@ def predict_differential_cshmf(params, lgmhost, lgmu):
     lg_diff_ccshmf = lg_differential_cshmf_kern((ytp, ylo), lgmu)
 
     return lg_diff_ccshmf
+
+
+"""
+Model for the differential conditional subhalo mass function, CCSHMF,
+for multiple values of Mhost,
+by vmapping ``_differential_cshmf``,
+returning a ndarray of shape (n_m, n_mu)
+"""
+predict_differential_cshmf = jjit(
+    vmap(_differential_cshmf, in_axes=(None, 0, None)),
+)
 
 
 @jjit
@@ -153,3 +178,57 @@ def _ylo_model(ylo_params, lgmhost):
         ylo_params.ylo_yhi,
     )
     return ylo
+
+
+@jjit
+def subhalo_lightcone_weights(
+    ran_key,
+    lgmp,
+    lgmu,
+    ccshmf_params=DEFAULT_CCSHMF_PARAMS,
+):
+    """
+    Computes lightcone halo weights on a grid
+    of redshift and mass from the input
+
+    Parameters
+    ----------
+    ran_key: jax.random.PRNGKey
+        random key
+
+    lgmp: ndarray of shape (n_m, )
+        base-10 log of halo mass, in Msun
+
+    lgmu: ndarray of shape (n_mu, )
+        base-10 log of mu=Msub/Mhost
+
+    ccshmf_params: namedtuple
+        conditional subhalo halo mass function parameters
+
+    Returns
+    -------
+    nsubhalos: ndarray of shape (n_m*n_mu, )
+        weighted subhalo abundance per (mass, mu) point
+    """
+    lgmu_min = lgmu.min()
+    lgmu_max = lgmu.max()
+
+    # at each grid point, compute <Nhalos> for the shell volume
+    nsub_lgmu_min = 10 ** predict_ccshmf(ccshmf_params, lgmp, lgmu_min)
+    nsub_lgmu_max = 10 ** predict_ccshmf(ccshmf_params, lgmp, lgmu_max)
+
+    nsub_per_host = nsub_lgmu_min - nsub_lgmu_max
+
+    # total number of halos is the sum over shells
+    uran_key, counts_key = jran.split(ran_key, 2)
+    subhalo_counts_per_halo = jran.poisson(counts_key, nsub_per_host)
+    nsub_tot = subhalo_counts_per_halo.sum()
+
+    # compute relative abundance of subhalos
+    _weights = 10 ** predict_differential_cshmf(ccshmf_params, lgmp, lgmu)
+    weights = _weights / _weights.sum()
+
+    # compute relative number of subhalos
+    nsubhalos = nsub_tot * weights
+
+    return nsubhalos

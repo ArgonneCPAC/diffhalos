@@ -25,21 +25,18 @@ from ..hmf.hmf_model import halo_lightcone_weights
 from ..hmf import hmf_model, mc_hosts
 from ..diffmahpop.diffmahnet_utils import mc_mah_cenpop
 from .utils import spherical_shell_comoving_volume
+from ..defaults import FULL_SKY_AREA
 
 N_HMF_GRID = 2_000
 DEFAULT_LOGMP_CUTOFF = 10.0
 DEFAULT_LOGMP_HIMASS_CUTOFF = 14.5
-
-FULL_SKY_AREA = (4.0 * jnp.pi) * (180.0 / jnp.pi) ** 2
 
 _AXES = (0, None, None, 0, None)
 mc_logmp_vmap = jjit(vmap(mc_hosts._mc_host_halos_singlez_kern, in_axes=_AXES))
 
 __all__ = (
     "mc_lightcone_host_halo_mass_function",
-    "get_nhalo_weighted_lc_grid",
     "mc_lightcone_host_halo_diffmah",
-    "get_weighted_lightcone_grid_host_halo_diffmah",
     "mc_weighted_halo_lightcone",
 )
 
@@ -58,7 +55,8 @@ def mc_lightcone_host_halo_mass_function(
 ):
     """
     Generate a Monte Carlo realization of a lightcone of
-    host halo mass and redshift, using a linearly spaced grid in redshift
+    host halo masses and redshifts, using a linearly spaced grid
+    in redshift, between a minimum and a maximum halo mass
 
     Parameters
     ----------
@@ -142,93 +140,6 @@ def mc_lightcone_host_halo_mass_function(
     return z_halopop, logmp_halopop
 
 
-@jjit
-def pdf_weighted_lgmp_grid_singlez(hmf_params, lgmp_grid, redshift):
-    """
-    Weights for halos at a single redshift
-
-    Parameters
-    ----------
-    hmf_params: namedtuple
-        halo mass function parameters
-
-    lgmp_grid: ndarray of shape (n_m, )
-        base-10 log of halo masses, in Msun
-
-    redshift: float
-        redshift at which to compute the HMF
-
-    Returns
-    -------
-    weights_grid: ndarray of shape (n_m, )
-        weights PDF value for each halo mass
-    """
-    weights_grid = hmf_model.predict_differential_hmf(hmf_params, lgmp_grid, redshift)
-    weights_grid = weights_grid / weights_grid.sum()
-
-    return weights_grid
-
-
-"""
-Weights for halos at a multiple redshifts,
-by vmapping ``pdf_weighted_lgmp_grid_singlez``
-"""
-_A = (None, None, 0)
-pdf_weighted_lgmp_grid_vmap = jjit(vmap(pdf_weighted_lgmp_grid_singlez, in_axes=_A))
-
-
-@jjit
-def get_nhalo_weighted_lc_grid(
-    lgmp_grid,
-    z_grid,
-    sky_area_degsq,
-    hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
-    cosmo_params=DEFAULT_COSMOLOGY,
-):
-    """
-    Compute the number of halos on the input grid of halo mass and redshift
-
-    Parameters
-    ----------
-    lgmp_grid: ndarray of shape (n_m, )
-        base-10 log halo mass, in Msun
-
-    z_grid: ndarray of shape (n_z, )
-        redshift values on the grid
-
-    sky_area_degsq: float
-        sky area, in deg^2
-
-    cosmo_params: namedtuple
-        dsps.cosmology.flat_wcdm cosmology
-        cosmo_params = (Om0, w0, wa, h)
-
-    Returns
-    -------
-    nhalo_weighted_lc_grid: ndarray of shape (n_z, n_m)
-        weighted halo counts on a grid of redshift and mass
-    """
-    # compute the comoving volume of a thin shell at each grid point
-    fsky = sky_area_degsq / FULL_SKY_AREA
-    vol_shell_grid_mpc = fsky * spherical_shell_comoving_volume(z_grid, cosmo_params)
-
-    # at each grid point, compute <Nhalos> for the shell volume
-    mean_nhalos_grid = mc_hosts._compute_nhalos_tot(
-        hmf_params, lgmp_grid[0], z_grid, vol_shell_grid_mpc
-    )
-    mean_nhalos_lgmp_max = mc_hosts._compute_nhalos_tot(
-        hmf_params, lgmp_grid[-1], z_grid, vol_shell_grid_mpc
-    )
-    mean_nhalos_grid = mean_nhalos_grid - mean_nhalos_lgmp_max
-
-    lgmp_weights = pdf_weighted_lgmp_grid_vmap(hmf_params, lgmp_grid, z_grid)
-
-    n_z = z_grid.size
-    nhalo_weighted_lc_grid = mean_nhalos_grid.reshape((n_z, 1)) * lgmp_weights
-
-    return nhalo_weighted_lc_grid
-
-
 # NOTE: need to fix issues with using diffmahnet
 def mc_lightcone_host_halo_diffmah(
     ran_key,
@@ -245,7 +156,8 @@ def mc_lightcone_host_halo_diffmah(
     lgmp_max=mc_hosts.LGMH_MAX,
 ):
     """
-    Generate halo MAHs for host halos sampled from a lightcone
+    Generate a halo lightcone with MAHs, using a linearly spaced
+    grid in redshift, between a minimum and a maximum halo mass
 
     Parameters
     ----------
@@ -336,31 +248,24 @@ def mc_lightcone_host_halo_diffmah(
     return cenpop_out
 
 
-# NOTE: need to fix issues with using diffmahnet
-def get_weighted_lightcone_grid_host_halo_diffmah(
-    ran_key,
+@jjit
+def get_nhalo_weighted_lc_grid(
     lgmp_grid,
     z_grid,
     sky_area_degsq,
-    cosmo_params=DEFAULT_COSMOLOGY,
     hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
-    diffmahpop_params=DEFAULT_DIFFMAHPOP_PARAMS,
-    logmp_cutoff=DEFAULT_LOGMP_CUTOFF,
-    logmp_cutoff_himass=DEFAULT_LOGMP_HIMASS_CUTOFF,
+    cosmo_params=DEFAULT_COSMOLOGY,
 ):
     """
     Compute the number of halos on the input grid of halo mass and redshift
 
     Parameters
     ----------
-    ran_key: jran.key
-        random key
-
     lgmp_grid: ndarray of shape (n_m, )
-        grid of base-10 log of halo mass, in Msun
+        base-10 log halo mass, in Msun
 
     z_grid: ndarray of shape (n_z, )
-        grid of redshift
+        redshift values on the grid
 
     sky_area_degsq: float
         sky area, in deg^2
@@ -369,85 +274,65 @@ def get_weighted_lightcone_grid_host_halo_diffmah(
         dsps.cosmology.flat_wcdm cosmology
         cosmo_params = (Om0, w0, wa, h)
 
+    Returns
+    -------
+    nhalo_weighted_lc_grid: ndarray of shape (n_z, n_m)
+        weighted halo counts on a grid of redshift and mass
+    """
+    # compute the comoving volume of a thin shell at each grid point
+    fsky = sky_area_degsq / FULL_SKY_AREA
+    vol_shell_grid_mpc = fsky * spherical_shell_comoving_volume(z_grid, cosmo_params)
+
+    # at each grid point, compute <Nhalos> for the shell volume
+    mean_nhalos_grid = mc_hosts._compute_nhalos_tot(
+        hmf_params, lgmp_grid[0], z_grid, vol_shell_grid_mpc
+    )
+    mean_nhalos_lgmp_max = mc_hosts._compute_nhalos_tot(
+        hmf_params, lgmp_grid[-1], z_grid, vol_shell_grid_mpc
+    )
+    mean_nhalos_grid = mean_nhalos_grid - mean_nhalos_lgmp_max
+
+    lgmp_weights = pdf_weighted_lgmp_grid_vmap(hmf_params, lgmp_grid, z_grid)
+
+    n_z = z_grid.size
+    nhalo_weighted_lc_grid = mean_nhalos_grid.reshape((n_z, 1)) * lgmp_weights
+
+    return nhalo_weighted_lc_grid
+
+
+@jjit
+def pdf_weighted_lgmp_grid_singlez(hmf_params, lgmp_grid, redshift):
+    """
+    Weights for halos at a single redshift
+
+    Parameters
+    ----------
     hmf_params: namedtuple
         halo mass function parameters
 
-    diffmahpop_params: namedtuple
-        diffmahpop parameters
+    lgmp_grid: ndarray of shape (n_m, )
+        base-10 log of halo masses, in Msun
 
-    logmp_cutoff: float
-        base-10 log of minimum halo mass for which
-        DiffmahPop is used to generate MAHs, in Msun;
-        for logmp < logmp_cutoff, P(θ_MAH | logmp) = P(θ_MAH | logmp_cutoff)
-
-    logmp_cutoff_himass: float
-        base-10 log of maximum halo mass for which
-        DiffmahPop is used to generate MAHs, in Msun
+    redshift: float
+        redshift at which to compute the HMF
 
     Returns
     -------
-    cenpop: dict with keys:
-        z_obs: ndarray of shape (n_z*n_m, )
-            lightcone redshift
-
-        logmp_obs: ndarray of shape (n_z*n_m, )
-            base-10 log of halo mass at the lightcone redshift, in Msun
-
-        mah_params: namedtuple of ndarray's with shape (n_z*n_m, )
-            diffmah parameters
-
-        logmp0: ndarray of shape (n_z*n_m, )
-            base-10 log of halo mass at z=0, in Msun
-
-        nhalos: ndarray of shape (n_z*n_m, )
-            number of halos of this mass and redshift
+    weights_grid: ndarray of shape (n_m, )
+        weights PDF value for each halo mass
     """
-    # NOTE: replace since it is using regular grid
-    # nhalo_weighted_lc_grid = halo_lightcone_weights(
-    #     lgmp_grid,
-    #     z_grid,
-    #     sky_area_degsq,
-    #     hmf_params=hmf_params,
-    #     cosmo_params=cosmo_params,
-    # )
-    nhalo_weighted_lc_grid = get_nhalo_weighted_lc_grid(
-        lgmp_grid,
-        z_grid,
-        sky_area_degsq,
-        hmf_params=hmf_params,
-        cosmo_params=cosmo_params,
-    )
-    nhalo_weights = nhalo_weighted_lc_grid.flatten()
-    z_obs = np.repeat(z_grid, lgmp_grid.size)
-    logmp_obs_mf = np.tile(lgmp_grid, z_grid.size)
+    weights_grid = hmf_model.predict_differential_hmf(hmf_params, lgmp_grid, redshift)
+    weights_grid = weights_grid / weights_grid.sum()
 
-    t_obs = flat_wcdm.age_at_z(z_obs, *cosmo_params)
-    t_0 = flat_wcdm.age_at_z0(*cosmo_params)
-    lgt0 = jnp.log10(t_0)
+    return weights_grid
 
-    logmp_obs_mf_clipped = np.clip(logmp_obs_mf, logmp_cutoff, logmp_cutoff_himass)
 
-    tarr = np.array((10**lgt0,))
-    args = (diffmahpop_params, tarr, logmp_obs_mf_clipped, t_obs, ran_key, lgt0)
-    mah_params_uncorrected = mc_cenpop(*args)[0]  # mah_params, dmhdt, log_mah
-
-    logmp_obs_orig = _log_mah_kern(mah_params_uncorrected, t_obs, lgt0)
-    delta_logmh_clip = logmp_obs_orig - logmp_obs_mf
-    mah_params = mah_params_uncorrected._replace(
-        logm0=mah_params_uncorrected.logm0 - delta_logmh_clip
-    )
-
-    logmp0 = _log_mah_kern(mah_params, 10**lgt0, lgt0)
-    logmp_obs = _log_mah_kern(mah_params, t_obs, lgt0)
-
-    fields = ("z_obs", "t_obs", "logmp_obs", "mah_params", "logmp0")
-    values = (z_obs, t_obs, logmp_obs, mah_params, logmp0)
-    cenpop_out = dict()
-    for key, value in zip(fields, values):
-        cenpop_out[key] = value
-    cenpop_out["nhalos"] = nhalo_weights
-
-    return cenpop_out
+"""
+Weights for halos at a multiple redshifts,
+by vmapping ``pdf_weighted_lgmp_grid_singlez``
+"""
+_A = (None, None, 0)
+pdf_weighted_lgmp_grid_vmap = jjit(vmap(pdf_weighted_lgmp_grid_singlez, in_axes=_A))
 
 
 def mc_weighted_halo_lightcone(
@@ -634,7 +519,7 @@ def get_weighted_lightcone_host_halo_diffmah(
         nhalos: ndarray of shape (n_halo, )
             weighted number of halos at each grid point
     """
-
+    # get halo weights
     nhalo_weights = halo_lightcone_weights(
         logmp_obs_mf,
         z_obs,
@@ -653,6 +538,113 @@ def get_weighted_lightcone_host_halo_diffmah(
     ran_key, mah_key = jran.split(ran_key, 2)
     args = (diffmahpop_params, tarr, logmp_obs_mf_clipped, t_obs, mah_key, lgt0)
     mah_params_uncorrected = mc_cenpop(*args)[0]
+
+    logmp_obs_orig = _log_mah_kern(mah_params_uncorrected, t_obs, lgt0)
+    delta_logmh_clip = logmp_obs_orig - logmp_obs_mf
+    mah_params = mah_params_uncorrected._replace(
+        logm0=mah_params_uncorrected.logm0 - delta_logmh_clip
+    )
+
+    logmp0 = _log_mah_kern(mah_params, 10**lgt0, lgt0)
+    logmp_obs = _log_mah_kern(mah_params, t_obs, lgt0)
+
+    fields = ("z_obs", "t_obs", "logmp_obs", "mah_params", "logmp0")
+    values = (z_obs, t_obs, logmp_obs, mah_params, logmp0)
+    cenpop_out = dict()
+    for key, value in zip(fields, values):
+        cenpop_out[key] = value
+    cenpop_out["nhalos"] = nhalo_weights
+
+    return cenpop_out
+
+
+# NOTE: need to fix issues with using diffmahnet
+def get_weighted_lightcone_grid_host_halo_diffmah(
+    ran_key,
+    lgmp_grid,
+    z_grid,
+    sky_area_degsq,
+    cosmo_params=DEFAULT_COSMOLOGY,
+    hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
+    diffmahpop_params=DEFAULT_DIFFMAHPOP_PARAMS,
+    logmp_cutoff=DEFAULT_LOGMP_CUTOFF,
+    logmp_cutoff_himass=DEFAULT_LOGMP_HIMASS_CUTOFF,
+):
+    """
+    Compute the number of halos on the input grid of halo mass and redshift
+
+    Parameters
+    ----------
+    ran_key: jran.key
+        random key
+
+    lgmp_grid: ndarray of shape (n_m, )
+        grid of base-10 log of halo mass, in Msun
+
+    z_grid: ndarray of shape (n_z, )
+        grid of redshift
+
+    sky_area_degsq: float
+        sky area, in deg^2
+
+    cosmo_params: namedtuple
+        dsps.cosmology.flat_wcdm cosmology
+        cosmo_params = (Om0, w0, wa, h)
+
+    hmf_params: namedtuple
+        halo mass function parameters
+
+    diffmahpop_params: namedtuple
+        diffmahpop parameters
+
+    logmp_cutoff: float
+        base-10 log of minimum halo mass for which
+        DiffmahPop is used to generate MAHs, in Msun;
+        for logmp < logmp_cutoff, P(θ_MAH | logmp) = P(θ_MAH | logmp_cutoff)
+
+    logmp_cutoff_himass: float
+        base-10 log of maximum halo mass for which
+        DiffmahPop is used to generate MAHs, in Msun
+
+    Returns
+    -------
+    cenpop: dict with keys:
+        z_obs: ndarray of shape (n_z*n_m, )
+            lightcone redshift
+
+        logmp_obs: ndarray of shape (n_z*n_m, )
+            base-10 log of halo mass at the lightcone redshift, in Msun
+
+        mah_params: namedtuple of ndarray's with shape (n_z*n_m, )
+            diffmah parameters
+
+        logmp0: ndarray of shape (n_z*n_m, )
+            base-10 log of halo mass at z=0, in Msun
+
+        nhalos: ndarray of shape (n_z*n_m, )
+            number of halos of this mass and redshift
+    """
+    # get halo weights
+    nhalo_weighted_lc_grid = get_nhalo_weighted_lc_grid(
+        lgmp_grid,
+        z_grid,
+        sky_area_degsq,
+        hmf_params=hmf_params,
+        cosmo_params=cosmo_params,
+    )
+    nhalo_weights = nhalo_weighted_lc_grid.flatten()
+    z_obs = np.repeat(z_grid, lgmp_grid.size)
+    logmp_obs_mf = np.tile(lgmp_grid, z_grid.size)
+
+    t_obs = flat_wcdm.age_at_z(z_obs, *cosmo_params)
+    t_0 = flat_wcdm.age_at_z0(*cosmo_params)
+    lgt0 = jnp.log10(t_0)
+
+    logmp_obs_mf_clipped = np.clip(logmp_obs_mf, logmp_cutoff, logmp_cutoff_himass)
+
+    tarr = np.array((10**lgt0,))
+    args = (diffmahpop_params, tarr, logmp_obs_mf_clipped, t_obs, ran_key, lgt0)
+    mah_params_uncorrected = mc_cenpop(*args)[0]  # mah_params, dmhdt, log_mah
 
     logmp_obs_orig = _log_mah_kern(mah_params_uncorrected, t_obs, lgt0)
     delta_logmh_clip = logmp_obs_orig - logmp_obs_mf
