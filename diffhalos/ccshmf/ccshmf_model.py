@@ -213,7 +213,7 @@ def subhalo_lightcone_weights(
     lgmu_min = lgmu.min()
     lgmu_max = lgmu.max()
 
-    # at each grid point, compute <Nsubhalos> for the shell volume
+    # compute <Nsubhalos> for each host halo
     nsub_lgmu_min = 10 ** predict_ccshmf(ccshmf_params, lgmp, lgmu_min)
     nsub_lgmu_max = 10 ** predict_ccshmf(ccshmf_params, lgmp, lgmu_max)
     nsub_per_host = nsub_lgmu_min - nsub_lgmu_max
