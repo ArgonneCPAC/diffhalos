@@ -213,13 +213,12 @@ def subhalo_lightcone_weights(
     lgmu_min = lgmu.min()
     lgmu_max = lgmu.max()
 
-    # at each grid point, compute <Nhalos> for the shell volume
+    # at each grid point, compute <Nsubhalos> for the shell volume
     nsub_lgmu_min = 10 ** predict_ccshmf(ccshmf_params, lgmp, lgmu_min)
     nsub_lgmu_max = 10 ** predict_ccshmf(ccshmf_params, lgmp, lgmu_max)
-
     nsub_per_host = nsub_lgmu_min - nsub_lgmu_max
 
-    # total number of halos is the sum over shells
+    # total number of subhalos as the sum over hosts
     uran_key, counts_key = jran.split(ran_key, 2)
     subhalo_counts_per_halo = jran.poisson(counts_key, nsub_per_host)
     nsub_tot = subhalo_counts_per_halo.sum()
