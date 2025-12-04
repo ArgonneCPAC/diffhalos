@@ -228,6 +228,7 @@ def mc_lightcone_host_halo_diffmah(
 
     tarr = np.array((10**lgt0,))
     args = (diffmahpop_params, tarr, logmp_obs_mf_clipped, t_obs, mah_key, lgt0)
+    # NOTE: replace mc_cenpop with diffmahnet
     mah_params_uncorrected = mc_cenpop(*args)[0]  # mah_params, dmhdt, log_mah
 
     logmp_obs_orig = _log_mah_kern(mah_params_uncorrected, t_obs, lgt0)
@@ -537,6 +538,7 @@ def get_weighted_lightcone_host_halo_diffmah(
 
     ran_key, mah_key = jran.split(ran_key, 2)
     args = (diffmahpop_params, tarr, logmp_obs_mf_clipped, t_obs, mah_key, lgt0)
+    # NOTE: replace mc_cenpop with diffmahnet
     mah_params_uncorrected = mc_cenpop(*args)[0]
 
     logmp_obs_orig = _log_mah_kern(mah_params_uncorrected, t_obs, lgt0)
@@ -644,6 +646,7 @@ def get_weighted_lightcone_grid_host_halo_diffmah(
 
     tarr = np.array((10**lgt0,))
     args = (diffmahpop_params, tarr, logmp_obs_mf_clipped, t_obs, ran_key, lgt0)
+    # NOTE: replace mc_cenpop with diffmahnet
     mah_params_uncorrected = mc_cenpop(*args)[0]  # mah_params, dmhdt, log_mah
 
     logmp_obs_orig = _log_mah_kern(mah_params_uncorrected, t_obs, lgt0)

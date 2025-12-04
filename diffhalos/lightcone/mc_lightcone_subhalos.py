@@ -5,7 +5,21 @@ from ..ccshmf.ccshmf_model import (
     subhalo_lightcone_weights,
 )
 
-__all__ = ("mc_weighted_subhalo_lightcone",)
+__all__ = (
+    "mc_lightcone_subhalo_mass_function",
+    "mc_lightcone_subhalo_diffmah",
+    "mc_weighted_subhalo_lightcone",
+)
+
+
+def mc_lightcone_subhalo_mass_function():
+
+    return
+
+
+def mc_lightcone_subhalo_diffmah():
+
+    return
 
 
 def mc_weighted_subhalo_lightcone(
