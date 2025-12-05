@@ -1,8 +1,9 @@
 """Functions to generate Monte Carlo realizations of subhalos in a lightcone"""
 
+from ..ccshmf.ccshmf_model import N_LGMU_TABLE  # noqa
 from ..ccshmf.ccshmf_model import (
-    DEFAULT_CCSHMF_PARAMS,
     subhalo_lightcone_weights,
+    DEFAULT_CCSHMF_PARAMS,
 )
 
 __all__ = (
@@ -23,9 +24,8 @@ def mc_lightcone_subhalo_diffmah():
 
 
 def mc_weighted_subhalo_lightcone(
-    ran_key,
     halopop,
-    lgmu,
+    lgmp_min,
     ccshmf_params=DEFAULT_CCSHMF_PARAMS,
 ):
     """
@@ -33,9 +33,6 @@ def mc_weighted_subhalo_lightcone(
 
     Parameters
     ----------
-    ran_key: jax.random.PRNGKey
-        random key
-
     halopop: dict
         with keys:
         z_obs: ndarray of shape (n_halo, )
@@ -56,8 +53,8 @@ def mc_weighted_subhalo_lightcone(
         nhalos: ndarray of shape (n_halo, )
             weighted number of halos at each grid point
 
-    lgmu: ndarray of shape (n_mu, )
-        base-10 log of mu=Msub/Mhost values to consider
+    lgmp_min: float
+        base-10 log of the minimum mass, in Msun
 
     cshmf_params: namedtuple
         CCSHMF parameters named tuple
@@ -67,15 +64,14 @@ def mc_weighted_subhalo_lightcone(
     halopop: dict
         same as input with the added key
         ``nsubhalos`` for the subhalo number weights,
-        as a ndarray of shape (n_halo, n_mu)
+        as a ndarray of shape (n_halo, N_LGMU_TABLE)
     """
 
     # get subhalo weights
     nsubhalo_weights = subhalo_lightcone_weights(
-        ran_key,
         halopop["logmp_obs"],
-        lgmu,
-        ccshmf_params=ccshmf_params,
+        lgmp_min,
+        ccshmf_params,
     )
 
     # add subhalo weights to the dictionary

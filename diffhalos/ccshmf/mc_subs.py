@@ -12,7 +12,12 @@ from jax import numpy as jnp
 from jax import random as jran
 from jax import vmap
 
-from .ccshmf_model import DEFAULT_CCSHMF_PARAMS, predict_ccshmf
+from .ccshmf_model import (
+    DEFAULT_CCSHMF_PARAMS,
+    predict_ccshmf,
+    get_lgmu_cutoff,
+    compute_mean_subhalo_counts,
+)
 from .ccshmf_kernels import DEFAULT_CCSHMF_KERN_PARAMS, lg_ccshmf_kern
 
 N_LGMU_TABLE = 100
@@ -216,15 +221,6 @@ def generate_subhalopop_hist_out_of_core(
     return dnsub_bins, dlogmu_bins
 
 
-def get_lgmu_cutoff(lgmhost, lgmp_sim, nptcl_cut):
-    """
-    Get the cutoff mu value for a simulation
-    """
-    lgmp_cutoff = lgmp_sim + np.log10(nptcl_cut)
-    lgmu_cutoff = lgmp_cutoff - lgmhost
-    return lgmu_cutoff
-
-
 def mc_generate_subhalopop_singlehalo(
     ran_key,
     lgmu_table,
@@ -311,34 +307,3 @@ def generate_subhalopop_kern(
 for vectorized computations for multiple host halos simultaneously"""
 _A = (0, 0, None, None)
 generate_subhalopop_vmap = jjit(vmap(generate_subhalopop_kern, in_axes=_A))
-
-
-def _compute_mean_subhalo_counts(
-    lgmhost,
-    lgmp_min,
-    ccshmf_params=DEFAULT_CCSHMF_PARAMS,
-):
-    """
-    Computes the mean counts of subhalos,
-    given the mass of the host halos
-
-    Parameters
-    ----------
-    lgmhost: ndarray of shape (n_host, )
-        base-10 log of the host halo masses, in Msun
-
-    lgmp_min: float
-        base-10 log of the minimum mass, in Msun
-
-    ccshmf_params: namedtuple
-        cumulative conditional subhalo mass function parameters
-
-    Returns
-    -------
-    mean_counts: ndarray of shape (n_host, )
-        mean subhalo counts per host halo
-    """
-    lgmu_cutoff = get_lgmu_cutoff(lgmhost, lgmp_min, 1)
-    mean_counts = 10 ** predict_ccshmf(ccshmf_params, lgmhost, lgmu_cutoff)
-
-    return mean_counts

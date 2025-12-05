@@ -1,11 +1,20 @@
-"""
-"""
+""" """
+
 import os
 from glob import glob
 
 import numpy as np
 
-from ..ccshmf_model import DEFAULT_CCSHMF_PARAMS, predict_ccshmf
+from ..ccshmf_model import (
+    DEFAULT_CCSHMF_PARAMS,
+    predict_ccshmf,
+    predict_ccshmf_halopop,
+    predict_differential_cshmf,
+    predict_differential_cshmf_halopop,
+    compute_mean_subhalo_counts,
+    subhalo_lightcone_weights,
+    N_LGMU_TABLE,
+)
 
 _THIS_DRNAME = os.path.dirname(os.path.abspath(__file__))
 TESTING_DATA_DRN = os.path.join(_THIS_DRNAME, "testing_data")
@@ -58,6 +67,33 @@ def test_predict_ccshmf_returns_finite_valued_expected_shape():
     assert np.all(np.isfinite(pred))
 
 
+def test_predict_ccshmf_halopop_returns_expected_shape():
+    lgmhost = np.array([11.0, 13.0, 9.0])
+    nsubs = 100
+    lgmuarr = np.linspace(-5, 0, nsubs)
+    pred = predict_ccshmf_halopop(DEFAULT_CCSHMF_PARAMS, lgmhost, lgmuarr)
+    assert pred.shape == (lgmhost.size, nsubs)
+    assert np.all(np.isfinite(pred))
+
+
+def test_predict_differential_cshmf_returns_expected_shape():
+    lgmhost = 11.0
+    nsubs = 100
+    lgmuarr = np.linspace(-5, 0, nsubs)
+    pred = predict_differential_cshmf(DEFAULT_CCSHMF_PARAMS, lgmhost, lgmuarr)
+    assert pred.shape == lgmuarr.shape
+    assert np.all(np.isfinite(pred))
+
+
+def test_predict_differential_cshmf_halopop_returns_expected_shape():
+    lgmhost = np.array([11.0, 13.0, 9.0])
+    nsubs = 100
+    lgmuarr = np.linspace(-5, 0, nsubs)
+    pred = predict_differential_cshmf_halopop(DEFAULT_CCSHMF_PARAMS, lgmhost, lgmuarr)
+    assert pred.shape == (lgmhost.size, nsubs)
+    assert np.all(np.isfinite(pred))
+
+
 def test_predict_ccshmf_accurately_approximates_simulation_data():
     """This test loads some pretabulated CCSHMF data computed from SMPDL
     and compares the simulation results to the predict_ccshmf function"""
@@ -90,3 +126,26 @@ def test_predict_ccshmf_accurately_approximates_simulation_data():
 
             loss_mae = _mae(pred_lg_ccshmf, target_lg_ccshmf)
             assert loss_mae < 0.06
+
+
+def test_compute_mean_subhalo_counts():
+    lgmhost = np.array([11.0, 13.0, 9.0])
+    lgmp_min = 12.0
+    nsubs = compute_mean_subhalo_counts(
+        lgmhost,
+        lgmp_min,
+        ccshmf_params=DEFAULT_CCSHMF_PARAMS,
+    )
+    assert np.all(np.isfinite(nsubs))
+
+
+def test_subhalo_lightcone_weights():
+    lgmhost = np.array([11.0, 13.0, 9.0])
+    lgmp_min = 12.0
+    weights = subhalo_lightcone_weights(
+        lgmhost,
+        lgmp_min,
+        DEFAULT_CCSHMF_PARAMS,
+    )
+    assert weights.shape == (lgmhost.size, N_LGMU_TABLE)
+    assert np.all(np.isfinite(weights))
