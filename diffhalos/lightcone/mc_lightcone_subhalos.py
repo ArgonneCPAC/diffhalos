@@ -62,13 +62,16 @@ def mc_weighted_subhalo_lightcone(
     Returns
     -------
     halopop: dict
-        same as input with the added key
-        ``nsubhalos`` for the subhalo number weights,
-        as a ndarray of shape (n_halo, N_LGMU_TABLE)
+        same as input with the added keys:
+            nsubhalos: ndarray of shape (n_halo, N_LGMU_TABLE)
+                subhalo number weights
+
+            logmu_subs: ndarray of shape (n_halo, N_LGMU_TABLE)
+                base-10 log of mu values per host halo
     """
 
     # get subhalo weights
-    nsubhalo_weights = subhalo_lightcone_weights(
+    nsubhalo_weights, lgmu = subhalo_lightcone_weights(
         halopop["logmp_obs"],
         lgmp_min,
         ccshmf_params,
@@ -76,5 +79,6 @@ def mc_weighted_subhalo_lightcone(
 
     # add subhalo weights to the dictionary
     halopop["nsubhalos"] = nsubhalo_weights
+    halopop["logmu_subs"] = lgmu
 
     return halopop

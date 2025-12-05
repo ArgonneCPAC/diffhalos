@@ -142,10 +142,13 @@ def test_compute_mean_subhalo_counts():
 def test_subhalo_lightcone_weights():
     lgmhost = np.array([11.0, 13.0, 9.0])
     lgmp_min = 12.0
-    weights = subhalo_lightcone_weights(
+    weights, lgmu = subhalo_lightcone_weights(
         lgmhost,
         lgmp_min,
         DEFAULT_CCSHMF_PARAMS,
     )
     assert weights.shape == (lgmhost.size, N_LGMU_TABLE)
     assert np.all(np.isfinite(weights))
+
+    assert lgmu.shape == (lgmhost.size, N_LGMU_TABLE)
+    assert np.all(np.isfinite(lgmu))

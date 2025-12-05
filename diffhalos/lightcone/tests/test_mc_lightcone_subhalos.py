@@ -58,3 +58,9 @@ def test_mc_weighted_halo_lightcone():
             satpop["logmp_obs"].size,
             mclsh.N_LGMU_TABLE,
         )
+
+        assert np.all(np.isfinite(satpop["logmu_subs"]))
+        assert satpop["logmu_subs"].shape == (
+            satpop["logmp_obs"].size,
+            mclsh.N_LGMU_TABLE,
+        )

@@ -270,7 +270,7 @@ def subhalo_lightcone_weights_kern(
     # compute relative number of subhalos
     nsubhalos_in_host = subhalo_counts_per_halo * weights
 
-    return nsubhalos_in_host
+    return nsubhalos_in_host, lgmu
 
 
 """"
