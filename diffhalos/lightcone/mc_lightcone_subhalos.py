@@ -1,6 +1,7 @@
 """Functions to generate Monte Carlo realizations of subhalos in a lightcone"""
 
 from ..ccshmf.ccshmf_model import N_LGMU_TABLE  # noqa
+from ..ccshmf.mc_subs import generate_subhalopop
 from ..ccshmf.ccshmf_model import (
     subhalo_lightcone_weights,
     DEFAULT_CCSHMF_PARAMS,
@@ -13,9 +14,20 @@ __all__ = (
 )
 
 
-def mc_lightcone_subhalo_mass_function():
+def mc_lightcone_subhalo_mass_function(
+    ran_key,
+    lgmhost_arr,
+    lgmp_min,
+    ccshmf_params=DEFAULT_CCSHMF_PARAMS,
+):
+    mc_lg_mu, lgmhost_pop, host_halo_indx = generate_subhalopop(
+        ran_key,
+        lgmhost_arr,
+        lgmp_min,
+        ccshmf_params=ccshmf_params,
+    )
 
-    return
+    return mc_lg_mu, lgmhost_pop, host_halo_indx
 
 
 def mc_lightcone_subhalo_diffmah():
