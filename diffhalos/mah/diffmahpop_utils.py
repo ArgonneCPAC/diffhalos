@@ -3,6 +3,7 @@ Useful diffmahnet functions
 See https://github.com/ArgonneCPAC/diffmah/tree/main/diffmah/diffmahpop_kernels
 """
 
+import numpy as np
 import jax.numpy as jnp
 from jax import jit as jjit
 from jax import vmap
@@ -34,17 +35,17 @@ def mc_mah_cenpop(
     t_min=T_GRID_MIN,
     t_max=T_GRID_MAX,
     n_t=N_T_GRID,
-    return_mah_params_and_der=False,
+    return_mah_params=False,
 ):
     """
     Diffmahpop predictions for populations of halo MAHs
 
     Parameters
     ----------
-    m_obs: ndarray of shape (n_halo, )
+    m_obs: ndarray of shape (n_cens, )
         grid of base-10 log of mass of the halos at observation, in Msun
 
-    t_obs: ndarray of shape (n_halo, )
+    t_obs: ndarray of shape (n_cens, )
         grid of base-10 log of cosmic time at observation of each halo, in Gyr
 
     randkey: key
@@ -54,7 +55,7 @@ def mc_mah_cenpop(
         base-10 log of the age of the Universe at z=0, in Gyr
 
     n_sample: int
-        number of MC samples per (m_obs,t_obs) pair
+        number of MC samples per (m_obs, t_obs) pair
 
     params: namedtuple
         diffmah parameters
@@ -70,28 +71,27 @@ def mc_mah_cenpop(
     n_t: int
         number of points in time grid
 
-    return_mah_params_and_der: bool
-        if True the MAH parameters and MAH gradients
-        will also be returned
+    return_mah_params: bool
+        if True the MAH parameters will also be returned
 
     Returns
     -------
-    log_mah: ndarray of shape (n_halo, n_t)
+    log_mah: ndarray of shape (n_cens, n_t)
         base-10 log of mah for each halo, in Msun
 
     t_grid: ndarray of shape (n_t, )
         cosmic time grid on which to compute MAHs, in Gyr
 
-    mah_params: namedtuple of ndarrays of shape (n_halo,)
+    mah_params: namedtuple of ndarrays of shape (n_cens,)
         mah parameters for all halos in the population
     """
     # get a list of (m_obs, t_obs) for each MC realization
     m_vals, t_vals = [
         jnp.repeat(x.flatten(), n_sample)
-        for x in jnp.meshgrid(
-            m_obs,
-            t_obs,
-        )
+        for x in np.stack(
+            [m_obs, t_obs],
+            axis=-1,
+        ).T
     ]
 
     # construct time grids for each halo, given observation time
@@ -117,7 +117,7 @@ def mc_mah_cenpop(
     # get the corrected MAHs
     log_mah = log_mah_kern_vmap(mah_params, t_grid, logt0)
 
-    if return_mah_params_and_der:
+    if return_mah_params:
         return log_mah, t_grid, mah_params
 
     return log_mah, t_grid

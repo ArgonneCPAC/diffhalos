@@ -23,7 +23,7 @@ from dsps.cosmology import DEFAULT_COSMOLOGY
 
 from ..hmf.hmf_model import halo_lightcone_weights
 from ..hmf import hmf_model, mc_hosts
-from ..diffmahpop.diffmahnet_utils import mc_mah_cenpop
+from ..mah.diffmahnet_utils import mc_mah_cenpop
 from .utils import spherical_shell_comoving_volume
 from ..defaults import FULL_SKY_AREA
 

@@ -58,17 +58,17 @@ def mc_mah_cenpop(
 
     Parameters
     ----------
-    m_obs: ndarray of shape (n_halo, )
+    m_obs: ndarray of shape (n_cens, )
         grid of base-10 log of mass of the halos at observation, in Msun
 
-    t_obs: ndarray of shape (n_halo, )
+    t_obs: ndarray of shape (n_cens, )
         grid of base-10 log of cosmic time at observation of each halo, in Gyr
 
     randkey: key
         JAX random key
 
     n_sample: int
-        number of MC samples per (m_obs,t_obs) pair
+        number of MC samples per (m_obs, t_obs) pair
 
     centrals_model_key: str
         model name for centrals
@@ -90,17 +90,17 @@ def mc_mah_cenpop(
 
     Returns
     -------
-    cen_mah: ndarray of shape (n_sample*n_m_obs*n_t_obs, n_t)
+    cen_mah: ndarray of shape (n_sample*n_cens, n_t)
         base-10 log of halo mass assembly histories,
         for all MC realizations, in Msun
 
-    t_grid: ndarray of shape (n_sample*n_m_obs*n_t_obs, n_t)
+    t_grid: ndarray of shape (n_sample*n_cens, n_t)
         cosmic time grid on which to compute MAHs,
         for all MC realizations, in Gyr
 
     cenflow_diffmahparams: namedtuple
         diffmah parameters from normalizing flow,
-        each parameter is a ndarray of shape(n_sample*n_m_obs*n_t_obs, )
+        each parameter is a ndarray of shape(n_sample*n_cens, )
     """
     # create diffmahnet model for centrals
     centrals_model = diffmahnet.load_pretrained_model(centrals_model_key)
@@ -109,10 +109,10 @@ def mc_mah_cenpop(
     # get a list of (m_obs, t_obs) for each MC realization
     m_vals, t_vals = [
         jnp.repeat(x.flatten(), n_sample)
-        for x in jnp.meshgrid(
-            m_obs,
-            t_obs,
-        )
+        for x in np.stack(
+            [m_obs, t_obs],
+            axis=-1,
+        ).T
     ]
 
     # get diffmah parameters from the normalizing flow
