@@ -16,25 +16,19 @@ from diffmah.diffmahpop_kernels.bimod_censat_params import (
 
 from .utils import rescale_mah_parameters
 
-T_GRID_MIN = 0.5
-T_GRID_MAX = 13.8
-N_T_GRID = 100
-
 __all__ = ("mc_mah_cenpop",)
 
 log_mah_kern_vmap = jjit(vmap(_log_mah_kern, in_axes=(0, None, None)))
 
 
 def mc_mah_cenpop(
+    randkey,
     m_obs,
     t_obs,
-    randkey,
+    t_grid,
     logt0,
     n_sample=1,
     params=DEFAULT_DIFFMAHPOP_PARAMS,
-    t_min=T_GRID_MIN,
-    t_max=T_GRID_MAX,
-    n_t=N_T_GRID,
     return_mah_params=False,
 ):
     """
@@ -42,14 +36,18 @@ def mc_mah_cenpop(
 
     Parameters
     ----------
+    randkey: key
+        JAX random key
+
     m_obs: ndarray of shape (n_cens, )
         grid of base-10 log of mass of the halos at observation, in Msun
 
     t_obs: ndarray of shape (n_cens, )
         grid of base-10 log of cosmic time at observation of each halo, in Gyr
 
-    randkey: key
-        JAX random key
+    t_grid: ndarray of shape (n_t, )
+        base-10 log cosmic time grid
+        at which to compute mah, in Gyr
 
     logt0: float
         base-10 log of the age of the Universe at z=0, in Gyr
@@ -93,9 +91,6 @@ def mc_mah_cenpop(
             axis=-1,
         ).T
     ]
-
-    # construct time grids for each halo, given observation time
-    t_grid = jnp.linspace(t_min, t_max, n_t)
 
     # predict uncorrected MAHs
     mah_params_uncorrected, _, log_mah_uncorrected = mc_cenpop(

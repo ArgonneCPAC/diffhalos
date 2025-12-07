@@ -25,10 +25,6 @@ from .utils import rescale_mah_parameters
 
 DEFAULT_MAH_UPARAMS = get_unbounded_mah_params(DEFAULT_MAH_PARAMS)
 
-T_GRID_MIN = 0.5
-T_GRID_MAX = jnp.log10(13.8)
-N_T_GRID = 100
-
 __all__ = (
     "mc_mah_cenpop",
     "get_mean_and_std_of_mah",
@@ -39,14 +35,12 @@ __all__ = (
 
 
 def mc_mah_cenpop(
+    randkey,
     m_obs,
     t_obs,
-    randkey,
+    t_grid,
     n_sample=1,
     centrals_model_key="cenflow_v2_0.eqx",
-    t_min=T_GRID_MIN,
-    t_max=T_GRID_MAX,
-    n_t=N_T_GRID,
     return_mah_params=False,
 ):
     """
@@ -58,31 +52,24 @@ def mc_mah_cenpop(
 
     Parameters
     ----------
+    randkey: key
+        JAX random key
+
     m_obs: ndarray of shape (n_cens, )
         grid of base-10 log of mass of the halos at observation, in Msun
 
     t_obs: ndarray of shape (n_cens, )
         grid of base-10 log of cosmic time at observation of each halo, in Gyr
 
-    randkey: key
-        JAX random key
+    t_grid: ndarray of shape (n_t, )
+        base-10 log cosmic time grid
+        at which to compute mah, in Gyr
 
     n_sample: int
         number of MC samples per (m_obs, t_obs) pair
 
     centrals_model_key: str
         model name for centrals
-
-    t_min: float
-        base-10 log of minimum value for time grid
-        at which to compute mah, in Gyr
-
-    t_max: float
-        base-10 log of maximum value for time grid,
-        at which to compute mah, in Gyr
-
-    n_t: int
-        number of points in time grid
 
     return_mah_params: bool
         if True the MAH parameters from the normalizing flow
@@ -121,14 +108,11 @@ def mc_mah_cenpop(
         centrals_model.get_params(), m_vals, t_vals, keys[0]
     )
 
-    # construct time grids for each halo, given observation time
-    t_grid = jnp.linspace(t_min, t_vals, n_t).T
-
     # compute the uncorrected predicted observed halo masses
     logm_obs_uncorrected = diffmahnet.log_mah_kern(
         cenflow_diffmahparams,
         t_grid,
-        t_max,
+        t_grid[-1],
     )[:, -1]
 
     # rescale the mah parameters to the correct logm0
@@ -142,7 +126,7 @@ def mc_mah_cenpop(
     cen_mah = diffmahnet.log_mah_kern(
         cenflow_diffmahparams,
         t_grid,
-        t_max,
+        t_grid[-1],
     )
 
     if return_mah_params:

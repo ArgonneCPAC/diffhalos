@@ -16,13 +16,14 @@ def test_mc_mah_cenpop_behaves_as_expected():
 
     n_sample = 1000
     n_t = 100
-
+    t_grid = np.linspace(0.5, 13.5, n_t)
     logt0 = jnp.log10(13.8)
 
     log_mah, t_grid = mc_mah_cenpop(
+        ran_key,
         m_obs,
         t_obs,
-        ran_key,
+        t_grid,
         logt0,
         n_sample=n_sample,
         params=DEFAULT_DIFFMAHPOP_PARAMS,

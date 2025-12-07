@@ -154,6 +154,7 @@ def mc_lightcone_host_halo_diffmah(
     logmp_cutoff=DEFAULT_LOGMP_CUTOFF,
     logmp_cutoff_himass=DEFAULT_LOGMP_HIMASS_CUTOFF,
     lgmp_max=mc_hosts.LGMH_MAX,
+    centrals_model_key="cenflow_v2_0.eqx",
 ):
     """
     Generate a halo lightcone with MAHs, using a linearly spaced
@@ -192,6 +193,9 @@ def mc_lightcone_host_halo_diffmah(
     lgmp_max: float
         base-10 log of maximum host halo mass, in Msun
 
+    centrals_model_key: str
+        model name for centrals
+
     Returns
     -------
     cenpop: dict with keys:
@@ -227,9 +231,20 @@ def mc_lightcone_host_halo_diffmah(
     logmp_obs_mf_clipped = np.clip(logmp_obs_mf, logmp_cutoff, logmp_cutoff_himass)
 
     tarr = np.array((10**lgt0,))
-    args = (diffmahpop_params, tarr, logmp_obs_mf_clipped, t_obs, mah_key, lgt0)
     # NOTE: replace mc_cenpop with diffmahnet
+    args = (diffmahpop_params, tarr, logmp_obs_mf_clipped, t_obs, mah_key, lgt0)
     mah_params_uncorrected = mc_cenpop(*args)[0]  # mah_params, dmhdt, log_mah
+    # mah_params_uncorrected = mc_mah_cenpop(
+    #     logmp_obs_mf_clipped,
+    #     t_obs,
+    #     mah_key,
+    #     n_sample=1,
+    #     centrals_model_key="cenflow_v2_0.eqx",
+    #     t_min=tarr[0],
+    #     t_max=tarr[-1],
+    #     n_t=tarr.size,
+    #     return_mah_params=False,
+    # )[0]
 
     logmp_obs_orig = _log_mah_kern(mah_params_uncorrected, t_obs, lgt0)
     delta_logmh_clip = logmp_obs_orig - logmp_obs_mf
