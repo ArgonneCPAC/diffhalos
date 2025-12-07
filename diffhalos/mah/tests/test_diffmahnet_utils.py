@@ -16,13 +16,11 @@ def test_mc_mah_cenpop_behaves_as_expected():
 
     n_sample = 1000
     n_t = 100
-    t_grid = np.linspace(0.5, 13.5, n_t)
 
     cen_mah, tgrid = mc_mah_cenpop(
-        ran_key,
         m_obs,
         t_obs,
-        t_grid,
+        ran_key,
         n_sample=n_sample,
         n_t=n_t,
         centrals_model_key="cenflow_v1_0train_float64.eqx",
