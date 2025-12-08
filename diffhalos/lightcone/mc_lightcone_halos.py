@@ -149,12 +149,11 @@ def mc_lightcone_host_halo_diffmah(
     sky_area_degsq,
     cosmo_params=DEFAULT_COSMOLOGY,
     hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
-    diffmahpop_params=DEFAULT_DIFFMAHPOP_PARAMS,
     n_hmf_grid=N_HMF_GRID,
     logmp_cutoff=DEFAULT_LOGMP_CUTOFF,
     logmp_cutoff_himass=DEFAULT_LOGMP_HIMASS_CUTOFF,
     lgmp_max=mc_hosts.LGMH_MAX,
-    # centrals_model_key="cenflow_v2_0.eqx",
+    centrals_model_key="cenflow_v1_0train_float64.eqx",
 ):
     """
     Generate a halo lightcone with MAHs, using a linearly spaced
@@ -227,32 +226,29 @@ def mc_lightcone_host_halo_diffmah(
     t_obs = flat_wcdm.age_at_z(z_obs, *cosmo_params)
     t_0 = flat_wcdm.age_at_z0(*cosmo_params)
     lgt0 = jnp.log10(t_0)
-
     logmp_obs_mf_clipped = np.clip(logmp_obs_mf, logmp_cutoff, logmp_cutoff_himass)
+    num_halos = t_obs.size
 
     # NOTE: replace mc_cenpop with diffmahnet
-    tarr = np.array((10**lgt0,))
-    args = (diffmahpop_params, tarr, logmp_obs_mf_clipped, t_obs, mah_key, lgt0)
-    mah_params_uncorrected = mc_cenpop(*args)[0]  # mah_params, dmhdt, log_mah
+    # tarr = np.array((10**lgt0,))
+    # args = (diffmahpop_params, tarr, logmp_obs_mf_clipped, t_obs, mah_key, lgt0)
+    # mah_params_uncorrected = mc_cenpop(*args)[0]  # mah_params, dmhdt, log_mah
     #
-    # t_val = 10**lgt0
-    # mah_params_uncorrected = mc_mah_cenpop(
-    #     logmp_obs_mf_clipped,
-    #     t_obs,
-    #     mah_key,
-    #     n_sample=1,
-    #     centrals_model_key=centrals_model_key,
-    #     t_min=t_val,
-    #     t_max=t_val,
-    #     n_t=1,
-    #     return_mah_params=True,
-    # )[0]
+    tarr = (np.ones(num_halos) * lgt0).reshape(num_halos, 1)
+    mah_params = mc_mah_cenpop(
+        logmp_obs_mf_clipped,
+        t_obs,
+        mah_key,
+        tarr,
+        centrals_model_key=centrals_model_key,
+        logt0=lgt0,
+    )[2]
 
-    logmp_obs_orig = _log_mah_kern(mah_params_uncorrected, t_obs, lgt0)
-    delta_logmh_clip = logmp_obs_orig - logmp_obs_mf
-    mah_params = mah_params_uncorrected._replace(
-        logm0=mah_params_uncorrected.logm0 - delta_logmh_clip
-    )
+    # logmp_obs_orig = _log_mah_kern(mah_params_uncorrected, t_obs, lgt0)
+    # delta_logmh_clip = logmp_obs_orig - logmp_obs_mf
+    # mah_params = mah_params_uncorrected._replace(
+    #     logm0=mah_params_uncorrected.logm0 - delta_logmh_clip
+    # )
 
     logmp0 = _log_mah_kern(mah_params, 10**lgt0, lgt0)
     logmp_obs = _log_mah_kern(mah_params, t_obs, lgt0)

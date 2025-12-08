@@ -2,6 +2,7 @@
 
 import numpy as np
 from jax import random as jran
+from jax import numpy as jnp
 
 from ..diffmahnet_utils import mc_mah_cenpop
 
@@ -16,14 +17,28 @@ def test_mc_mah_cenpop_behaves_as_expected():
 
     n_sample = 1000
     n_t = 100
+    t_min = 0.5
+    logt0 = np.log10(13.8)
 
-    cen_mah, tgrid = mc_mah_cenpop(
-        m_obs,
-        t_obs,
+    # get a list of (m_obs, t_obs) for each MC realization
+    m_vals, t_vals = [
+        jnp.repeat(x.flatten(), n_sample)
+        for x in np.stack(
+            [m_obs, t_obs],
+            axis=-1,
+        ).T
+    ]
+
+    # construct time grids for each halo, given observation time
+    t_grid = jnp.linspace(t_min, t_vals, n_t).T
+
+    cen_mah, tgrid, _ = mc_mah_cenpop(
+        m_vals,
+        t_vals,
         ran_key,
-        n_sample=n_sample,
-        n_t=n_t,
+        t_grid,
         centrals_model_key="cenflow_v1_0train_float64.eqx",
+        logt0=logt0,
     )
 
     assert np.all(np.isfinite(cen_mah))
