@@ -61,8 +61,7 @@ def mc_mah_cenpop(
         JAX random key
 
     t_grid: ndarray of shape (n_cens, n_t)
-        base-10 log of cosmic time in time grid
-        for each negerated MAH, in Gyr
+        cosmic time in time grid for each negerated MAH, in Gyr
 
     n_sample: int
         number of MC samples per (m_obs, t_obs) pair
@@ -78,10 +77,6 @@ def mc_mah_cenpop(
     cen_mah: ndarray of shape (n_sample*n_cens, n_t)
         base-10 log of halo mass assembly histories,
         for all MC realizations, in Msun
-
-    t_grid: ndarray of shape (n_sample*n_cens, n_t)
-        cosmic time grid on which to compute MAHs,
-        for all MC realizations, in Gyr
 
     mah_params_corrected: namedtuple
         diffmah parameters from normalizing flow,
@@ -115,7 +110,7 @@ def mc_mah_cenpop(
         logt0,
     )
 
-    return cen_mah, t_grid, mah_params_corrected
+    return cen_mah, mah_params_corrected
 
 
 def _mc_mah_cenpop_uncorrected(
@@ -144,8 +139,7 @@ def _mc_mah_cenpop_uncorrected(
         JAX random key
 
     t_grid: ndarray of shape (n_cens, n_t)
-        base-10 log of cosmic time in time grid
-        for each negerated MAH, in Gyr
+        cosmic time in time grid for each negerated MAH, in Gyr
 
     logt0: float
         base-10 log of cosmic time today, in Gyr

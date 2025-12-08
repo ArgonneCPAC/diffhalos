@@ -9,7 +9,7 @@ from ...calibrations.ccshmf_cal import DEFAULT_CCSHMF_PARAMS  # noqa
 from ...ccshmf import mc_subs
 
 
-def test_mc_weighted_halo_lightcone_behaves_as_expected():
+def test_mc_weighted_subhalo_lightcone_behaves_as_expected():
     """
     Enforce mc_lightcone_host_halo_diffmah
     returns reasonable results when passed
@@ -60,7 +60,7 @@ def test_mc_weighted_halo_lightcone_behaves_as_expected():
         )
 
 
-def test_mc_weighted_halo_lightcone_agrees_with_mc_subhalopop():
+def test_mc_weighted_subhalo_lightcone_agrees_with_mc_subhalopop():
 
     ran_key = jran.key(0)
     num_halos = 500

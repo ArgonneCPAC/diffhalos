@@ -32,7 +32,7 @@ def test_mc_mah_cenpop_behaves_as_expected():
     # construct time grids for each halo, given observation time
     t_grid = jnp.linspace(t_min, t_vals, n_t).T
 
-    cen_mah, tgrid, _ = mc_mah_cenpop(
+    cen_mah, _ = mc_mah_cenpop(
         m_vals,
         t_vals,
         ran_key,
@@ -42,5 +42,4 @@ def test_mc_mah_cenpop_behaves_as_expected():
     )
 
     assert np.all(np.isfinite(cen_mah))
-    assert np.all(np.isfinite(tgrid))
-    assert cen_mah.shape == tgrid.shape == (n_cens * n_sample, n_t)
+    assert cen_mah.shape == t_grid.shape == (n_cens * n_sample, n_t)

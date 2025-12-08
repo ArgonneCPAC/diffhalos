@@ -16,20 +16,22 @@ from jax import vmap
 
 from diffmah.diffmah_kernels import _log_mah_kern
 from diffmah.diffmahpop_kernels.bimod_censat_params import DEFAULT_DIFFMAHPOP_PARAMS
-from diffmah.diffmahpop_kernels.mc_bimod_cens import mc_cenpop
+from diffmah.diffmahpop_kernels.mc_bimod_cens import mc_cenpop as mc_cenpop_diffmahpop
 
 from dsps.cosmology import flat_wcdm
 from dsps.cosmology import DEFAULT_COSMOLOGY
 
 from ..hmf.hmf_model import halo_lightcone_weights
 from ..hmf import hmf_model, mc_hosts
-from ..mah.diffmahnet_utils import mc_mah_cenpop
+from ..mah.diffmahnet_utils import mc_mah_cenpop as mc_mah_cenpop_diffmahnet
 from .utils import spherical_shell_comoving_volume
 from ..defaults import FULL_SKY_AREA
 
 N_HMF_GRID = 2_000
 DEFAULT_LOGMP_CUTOFF = 10.0
 DEFAULT_LOGMP_HIMASS_CUTOFF = 14.5
+
+DEFAULT_DIFFMAHNET_CEN_MODEL = "cenflow_v1_0train_float64.eqx"
 
 _AXES = (0, None, None, 0, None)
 mc_logmp_vmap = jjit(vmap(mc_hosts._mc_host_halos_singlez_kern, in_axes=_AXES))
@@ -140,7 +142,6 @@ def mc_lightcone_host_halo_mass_function(
     return z_halopop, logmp_halopop
 
 
-# NOTE: need to fix issues with using diffmahnet
 def mc_lightcone_host_halo_diffmah(
     ran_key,
     lgmp_min,
@@ -153,7 +154,7 @@ def mc_lightcone_host_halo_diffmah(
     logmp_cutoff=DEFAULT_LOGMP_CUTOFF,
     logmp_cutoff_himass=DEFAULT_LOGMP_HIMASS_CUTOFF,
     lgmp_max=mc_hosts.LGMH_MAX,
-    centrals_model_key="cenflow_v1_0train_float64.eqx",
+    centrals_model_key=DEFAULT_DIFFMAHNET_CEN_MODEL,
 ):
     """
     Generate a halo lightcone with MAHs, using a linearly spaced
@@ -193,7 +194,7 @@ def mc_lightcone_host_halo_diffmah(
         base-10 log of maximum host halo mass, in Msun
 
     centrals_model_key: str
-        model name for centrals
+        diffmahnet model to use for centrals
 
     Returns
     -------
@@ -211,6 +212,7 @@ def mc_lightcone_host_halo_diffmah(
             base-10 log of halo mass at z=0, in Msun
     """
 
+    # generate mc realization of the halo mass function
     lc_hmf_key, mah_key = jran.split(ran_key, 2)
     z_obs, logmp_obs_mf = mc_lightcone_host_halo_mass_function(
         lc_hmf_key,
@@ -227,32 +229,143 @@ def mc_lightcone_host_halo_diffmah(
     t_0 = flat_wcdm.age_at_z0(*cosmo_params)
     lgt0 = jnp.log10(t_0)
     logmp_obs_mf_clipped = np.clip(logmp_obs_mf, logmp_cutoff, logmp_cutoff_himass)
-    num_halos = t_obs.size
 
-    # NOTE: replace mc_cenpop with diffmahnet
-    # tarr = np.array((10**lgt0,))
-    # args = (diffmahpop_params, tarr, logmp_obs_mf_clipped, t_obs, mah_key, lgt0)
-    # mah_params_uncorrected = mc_cenpop(*args)[0]  # mah_params, dmhdt, log_mah
-    #
+    # get the MAH parameters for the halos
+    num_halos = t_obs.size
     tarr = (np.ones(num_halos) * lgt0).reshape(num_halos, 1)
-    mah_params = mc_mah_cenpop(
+    logmp_obs, mah_params = mc_mah_cenpop_diffmahnet(
         logmp_obs_mf_clipped,
         t_obs,
         mah_key,
         tarr,
         centrals_model_key=centrals_model_key,
         logt0=lgt0,
-    )[2]
+    )
+    logmp_obs = np.concatenate(logmp_obs)
 
-    # logmp_obs_orig = _log_mah_kern(mah_params_uncorrected, t_obs, lgt0)
-    # delta_logmh_clip = logmp_obs_orig - logmp_obs_mf
-    # mah_params = mah_params_uncorrected._replace(
-    #     logm0=mah_params_uncorrected.logm0 - delta_logmh_clip
-    # )
+    # compute MAH values today
+    logmp0 = _log_mah_kern(mah_params, 10**lgt0, lgt0)
 
+    # create output dictionary
+    fields = ("z_obs", "t_obs", "logmp_obs", "mah_params", "logmp0")
+    values = (z_obs, t_obs, logmp_obs, mah_params, logmp0)
+    cenpop_out = dict()
+    for key, value in zip(fields, values):
+        cenpop_out[key] = value
+
+    return cenpop_out
+
+
+def mc_lightcone_host_halo_diffmah_diffmahpop(
+    ran_key,
+    lgmp_min,
+    z_min,
+    z_max,
+    sky_area_degsq,
+    cosmo_params=DEFAULT_COSMOLOGY,
+    hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
+    n_hmf_grid=N_HMF_GRID,
+    logmp_cutoff=DEFAULT_LOGMP_CUTOFF,
+    logmp_cutoff_himass=DEFAULT_LOGMP_HIMASS_CUTOFF,
+    lgmp_max=mc_hosts.LGMH_MAX,
+    diffmahpop_params=DEFAULT_DIFFMAHPOP_PARAMS,
+):
+    """
+    Generate a halo lightcone with MAHs, using a linearly spaced
+    grid in redshift, between a minimum and a maximum halo mass;
+    this is the same as ``mc_lightcone_host_halo_diffmah``
+    but uses diffmahpop instead of diffmahnet,
+    to be used for testing purposes
+
+    Parameters
+    ----------
+    ran_key: jran.key
+        random key
+
+    lgmp_min: float
+        minimum halo mass, in Msun
+
+    z_min: float
+        minimum redshift value
+
+    z_max: float
+        maximum redshift value
+
+    sky_area_degsq: float
+        sky area, in deg^2
+
+    cosmo_params: namedtuple
+        dsps.cosmology.flat_wcdm cosmology
+        cosmo_params = (Om0, w0, wa, h)
+
+    logmp_cutoff: float
+        base-10 log of minimum halo mass for which
+        DiffmahPop is used to generate MAHs, in Msun;
+        for logmp < logmp_cutoff, P(θ_MAH | logmp) = P(θ_MAH | logmp_cutoff)
+
+    logmp_cutoff_himass: float
+        base-10 log of maximum halo mass for which
+        DiffmahPop is used to generate MAHs, in Msun
+
+    lgmp_max: float
+        base-10 log of maximum host halo mass, in Msun
+
+    diffmahpop_params: namedtuple
+        diffmahpop parameters
+
+    Returns
+    -------
+    cenpop: dict with keys:
+        z_obs: ndarray of shape (n_halos, )
+            lightcone redshift
+
+        logmp_obs: ndarray of shape (n_halos, )
+            halo mass at the lightcone redshift, in Msun
+
+        mah_params: namedtuple of ndarray's with shape (n_halos, )
+            diffmah parameters
+
+        logmp0: narray, shape (n_halos, )
+            base-10 log of halo mass at z=0, in Msun
+    """
+
+    # generate mc realization of the halo mass function
+    lc_hmf_key, mah_key = jran.split(ran_key, 2)
+    z_obs, logmp_obs_mf = mc_lightcone_host_halo_mass_function(
+        lc_hmf_key,
+        lgmp_min,
+        z_min,
+        z_max,
+        sky_area_degsq,
+        cosmo_params=cosmo_params,
+        hmf_params=hmf_params,
+        n_hmf_grid=n_hmf_grid,
+        lgmp_max=lgmp_max,
+    )
+    t_obs = flat_wcdm.age_at_z(z_obs, *cosmo_params)
+    t_0 = flat_wcdm.age_at_z0(*cosmo_params)
+    lgt0 = jnp.log10(t_0)
+    logmp_obs_mf_clipped = np.clip(logmp_obs_mf, logmp_cutoff, logmp_cutoff_himass)
+
+    # get the MAH parameters for the halos
+    tarr = np.array((10**lgt0,))
+    args = (diffmahpop_params, tarr, logmp_obs_mf_clipped, t_obs, mah_key, lgt0)
+    mah_params_uncorrected = mc_cenpop_diffmahpop(*args)[
+        0
+    ]  # mah_params, dmhdt, log_mah
+
+    # rescale logm0 to the proper observed mass
+    logmp_obs_orig = _log_mah_kern(mah_params_uncorrected, t_obs, lgt0)
+    delta_logmh_clip = logmp_obs_orig - logmp_obs_mf
+    mah_params = mah_params_uncorrected._replace(
+        logm0=mah_params_uncorrected.logm0 - delta_logmh_clip
+    )
+
+    # compute MAHs at today and at t_obs
     logmp0 = _log_mah_kern(mah_params, 10**lgt0, lgt0)
     logmp_obs = _log_mah_kern(mah_params, t_obs, lgt0)
 
+    # create output dictionary
     fields = ("z_obs", "t_obs", "logmp_obs", "mah_params", "logmp0")
     values = (z_obs, t_obs, logmp_obs, mah_params, logmp0)
     cenpop_out = dict()
@@ -358,9 +471,9 @@ def mc_weighted_halo_lightcone(
     lgmp_max,
     sky_area_degsq,
     hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
-    diffmahpop_params=DEFAULT_DIFFMAHPOP_PARAMS,
     logmp_cutoff=DEFAULT_LOGMP_CUTOFF,
     logmp_cutoff_himass=DEFAULT_LOGMP_HIMASS_CUTOFF,
+    centrals_model_key=DEFAULT_DIFFMAHNET_CEN_MODEL,
 ):
     """
     Generate a weighted population of halos, with MAHs,
@@ -393,9 +506,6 @@ def mc_weighted_halo_lightcone(
 
     hmf_params: namedtuple
         halo mass function parameters
-
-    diffmahpop_params: namedtuple
-        diffmahpop parameters
 
     logmp_cutoff: float
         base-10 log of minimum halo mass for which
@@ -451,7 +561,7 @@ def mc_weighted_halo_lightcone(
     )
     mclh_kwargs = dict(
         hmf_params=hmf_params,
-        diffmahpop_params=diffmahpop_params,
+        centrals_model_key=centrals_model_key,
         logmp_cutoff=logmp_cutoff,
         logmp_cutoff_himass=logmp_cutoff_himass,
     )
@@ -471,9 +581,9 @@ def get_weighted_lightcone_host_halo_diffmah(
     sky_area_degsq,
     cosmo_params=DEFAULT_COSMOLOGY,
     hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
-    diffmahpop_params=DEFAULT_DIFFMAHPOP_PARAMS,
     logmp_cutoff=DEFAULT_LOGMP_CUTOFF,
     logmp_cutoff_himass=DEFAULT_LOGMP_HIMASS_CUTOFF,
+    centrals_model_key=DEFAULT_DIFFMAHNET_CEN_MODEL,
 ):
     """
     Generates a weighted lightcone population of halos with MAHs,
@@ -499,9 +609,6 @@ def get_weighted_lightcone_host_halo_diffmah(
     hmf_params: namedtuple
         halo mass function parameters
 
-    diffmahpop_params: namedtuple
-        diffmahpop parameters
-
     logmp_cutoff: float
         base-10 log of minimum halo mass for which
         DiffmahPop is used to generate MAHs, in Msun;
@@ -510,6 +617,9 @@ def get_weighted_lightcone_host_halo_diffmah(
     logmp_cutoff_himass: float
         base-10 log of maximum halo mass for which
         DiffmahPop is used to generate MAHs, in Msun
+
+    centrals_model_key: str
+        diffmahnet model to use for centrals
 
     Returns
     -------
@@ -549,20 +659,24 @@ def get_weighted_lightcone_host_halo_diffmah(
 
     tarr = np.array((10**lgt0,))
 
+    # get the MAH parameters for the halos
+    num_halos = t_obs.size
     ran_key, mah_key = jran.split(ran_key, 2)
-    args = (diffmahpop_params, tarr, logmp_obs_mf_clipped, t_obs, mah_key, lgt0)
-    # NOTE: replace mc_cenpop with diffmahnet
-    mah_params_uncorrected = mc_cenpop(*args)[0]
-
-    logmp_obs_orig = _log_mah_kern(mah_params_uncorrected, t_obs, lgt0)
-    delta_logmh_clip = logmp_obs_orig - logmp_obs_mf
-    mah_params = mah_params_uncorrected._replace(
-        logm0=mah_params_uncorrected.logm0 - delta_logmh_clip
+    tarr = (np.ones(num_halos) * lgt0).reshape(num_halos, 1)
+    logmp_obs, mah_params = mc_mah_cenpop_diffmahnet(
+        logmp_obs_mf_clipped,
+        t_obs,
+        mah_key,
+        tarr,
+        centrals_model_key=centrals_model_key,
+        logt0=lgt0,
     )
+    logmp_obs = np.concatenate(logmp_obs)
 
+    # compute MAH values today
     logmp0 = _log_mah_kern(mah_params, 10**lgt0, lgt0)
-    logmp_obs = _log_mah_kern(mah_params, t_obs, lgt0)
 
+    # create output dictionary
     fields = ("z_obs", "t_obs", "logmp_obs", "mah_params", "logmp0")
     values = (z_obs, t_obs, logmp_obs, mah_params, logmp0)
     cenpop_out = dict()
@@ -573,7 +687,6 @@ def get_weighted_lightcone_host_halo_diffmah(
     return cenpop_out
 
 
-# NOTE: need to fix issues with using diffmahnet
 def get_weighted_lightcone_grid_host_halo_diffmah(
     ran_key,
     lgmp_grid,
@@ -581,9 +694,9 @@ def get_weighted_lightcone_grid_host_halo_diffmah(
     sky_area_degsq,
     cosmo_params=DEFAULT_COSMOLOGY,
     hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
-    diffmahpop_params=DEFAULT_DIFFMAHPOP_PARAMS,
     logmp_cutoff=DEFAULT_LOGMP_CUTOFF,
     logmp_cutoff_himass=DEFAULT_LOGMP_HIMASS_CUTOFF,
+    centrals_model_key=DEFAULT_DIFFMAHNET_CEN_MODEL,
 ):
     """
     Compute the number of halos on the input grid of halo mass and redshift
@@ -609,9 +722,6 @@ def get_weighted_lightcone_grid_host_halo_diffmah(
     hmf_params: namedtuple
         halo mass function parameters
 
-    diffmahpop_params: namedtuple
-        diffmahpop parameters
-
     logmp_cutoff: float
         base-10 log of minimum halo mass for which
         DiffmahPop is used to generate MAHs, in Msun;
@@ -620,6 +730,9 @@ def get_weighted_lightcone_grid_host_halo_diffmah(
     logmp_cutoff_himass: float
         base-10 log of maximum halo mass for which
         DiffmahPop is used to generate MAHs, in Msun
+
+    centrals_model_key: str
+        diffmahnet model to use for centrals
 
     Returns
     -------
@@ -654,23 +767,25 @@ def get_weighted_lightcone_grid_host_halo_diffmah(
     t_obs = flat_wcdm.age_at_z(z_obs, *cosmo_params)
     t_0 = flat_wcdm.age_at_z0(*cosmo_params)
     lgt0 = jnp.log10(t_0)
-
     logmp_obs_mf_clipped = np.clip(logmp_obs_mf, logmp_cutoff, logmp_cutoff_himass)
 
-    tarr = np.array((10**lgt0,))
-    args = (diffmahpop_params, tarr, logmp_obs_mf_clipped, t_obs, ran_key, lgt0)
-    # NOTE: replace mc_cenpop with diffmahnet
-    mah_params_uncorrected = mc_cenpop(*args)[0]  # mah_params, dmhdt, log_mah
-
-    logmp_obs_orig = _log_mah_kern(mah_params_uncorrected, t_obs, lgt0)
-    delta_logmh_clip = logmp_obs_orig - logmp_obs_mf
-    mah_params = mah_params_uncorrected._replace(
-        logm0=mah_params_uncorrected.logm0 - delta_logmh_clip
+    # get the MAH parameters for the halos
+    num_halos = t_obs.size
+    tarr = (np.ones(num_halos) * lgt0).reshape(num_halos, 1)
+    logmp_obs, mah_params = mc_mah_cenpop_diffmahnet(
+        logmp_obs_mf_clipped,
+        t_obs,
+        ran_key,
+        tarr,
+        centrals_model_key=centrals_model_key,
+        logt0=lgt0,
     )
+    logmp_obs = np.concatenate(logmp_obs)
 
+    # compute MAH values today
     logmp0 = _log_mah_kern(mah_params, 10**lgt0, lgt0)
-    logmp_obs = _log_mah_kern(mah_params, t_obs, lgt0)
 
+    # create output dictionary
     fields = ("z_obs", "t_obs", "logmp_obs", "mah_params", "logmp0")
     values = (z_obs, t_obs, logmp_obs, mah_params, logmp0)
     cenpop_out = dict()
