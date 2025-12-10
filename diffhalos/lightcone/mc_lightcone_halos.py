@@ -1,5 +1,5 @@
 # flake8: noqa: E402
-"""Functions to generate Monte Carlo realizations of host halos in a lightcone"""
+"""Functions to generate host halo lightcones"""
 
 from jax import config
 

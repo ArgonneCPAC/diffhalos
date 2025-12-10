@@ -1,4 +1,9 @@
-"""Functions to generate Monte Carlo realizations of subhalos in a lightcone"""
+# flake8: noqa: E402
+"""Functions to generate subhalo lightcones"""
+
+from jax import config
+
+config.update("jax_enable_x64", True)
 
 from ..ccshmf.ccshmf_model import N_LGMU_TABLE  # noqa
 from ..ccshmf.mc_subs import generate_subhalopop
