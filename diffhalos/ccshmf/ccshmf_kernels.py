@@ -44,12 +44,12 @@ def lg_ccshmf_kern(params, lgmu):
         in detail, params = (ytp_params, ylo_params), where typical values are
         ytp_params = DEFAULT_YTP_PARAMS and ylo_params = DEFAULT_YLO_PARAMS
 
-    lgmu: float
+    lgmu: ndarray of shape (n, )
         base-10 log of subhalo-to-host-halo mass
 
     Returns
     -------
-    lg_ccshmf: float
+    lg_ccshmf: ndarray of shape (n, )
         base-10 log of the ccshmf
     """
     params = CCSHMF_Params(*params)
@@ -71,12 +71,12 @@ def ccshmf_kern(params, lgmu):
         in detail, params = (ytp_params, ylo_params), where typical values are
         ytp_params = DEFAULT_YTP_PARAMS and ylo_params = DEFAULT_YLO_PARAMS
 
-    lgmu: float
+    lgmu: flondarray of shape (n, )at
         base-10 log of subhalo-to-host-halo mass
 
     Returns
     -------
-    ccshmf: float
+    ccshmf: ndarray of shape (n, )
         value of the ccshmf
     """
     lg_cuml = lg_ccshmf_kern(params, lgmu)

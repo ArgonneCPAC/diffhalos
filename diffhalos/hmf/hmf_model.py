@@ -12,6 +12,7 @@ from jax import vmap
 from jax import numpy as jnp
 
 from dsps.cosmology import flat_wcdm
+from dsps.cosmology import DEFAULT_COSMOLOGY
 
 from ..lightcone.utils import spherical_shell_comoving_volume
 from ..calibrations.hmf_cal import DEFAULT_HMF_PARAMS, HMF_Params  # noqa
@@ -28,6 +29,7 @@ N_HMF_GRID = 500
 __all__ = (
     "predict_cuml_hmf",
     "predict_differential_hmf",
+    "halo_lightcone_weights",
 )
 
 
@@ -180,19 +182,19 @@ def halo_lightcone_weights(
     lgmp,
     redshift,
     sky_area_degsq,
-    hmf_params,
-    cosmo_params,
+    hmf_params=DEFAULT_HMF_PARAMS,
+    cosmo_params=DEFAULT_COSMOLOGY,
 ):
     """
-    Computes lightcone halo weights using the stratified grid
-    of points so that it can be used with jax.grad
+    Computes lightcone halo weights on a grid
+    of redshift and mass from the input
 
     Parameters
     ----------
-    lgmp: ndarray of shape (n_halo, )
+    lgmp: ndarray of shape (n_m, )
         base-10 log of halo mass, in Msun
 
-    redshift: float
+    redshift: ndarray of shape (n_z, )
         redshift
 
     sky_area_degsq: float
@@ -207,7 +209,8 @@ def halo_lightcone_weights(
 
     Returns
     -------
-    nhalos:
+    nhalos: ndarray of shape (n_m*n_z, )
+        weighted halo abundance per (mass, redshift) cell
     """
     z_min = redshift.min()
     z_max = redshift.max()
