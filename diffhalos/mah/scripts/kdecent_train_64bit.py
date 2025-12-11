@@ -10,7 +10,7 @@ import jax
 import jax.numpy as jnp
 import equinox as eqx
 
-from diffopt import kdescent
+import kdescent
 import diffmahnet
 from diffmahnet import datatools
 
