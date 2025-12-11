@@ -5,6 +5,11 @@ from jax import config
 
 config.update("jax_enable_x64", True)
 
+import numpy as np
+
+from ..mah.diffmahnet_utils import mc_mah_satpop as mc_mah_satpop_diffmahnet
+from diffmah.diffmah_kernels import _log_mah_kern
+
 from ..ccshmf.ccshmf_model import N_LGMU_TABLE  # noqa
 from ..ccshmf.mc_subs import generate_subhalopop
 from ..ccshmf.ccshmf_model import (
@@ -18,12 +23,14 @@ __all__ = (
     "mc_weighted_subhalo_lightcone",
 )
 
+DEFAULT_DIFFMAHNET_SAT_MODEL = "satflow_v1_0train_float64.eqx"
+
 
 def mc_lightcone_subhalo_mass_function(
     ran_key,
     lgmhost_arr,
     lgmp_min,
-    ccshmf_params=DEFAULT_CCSHMF_PARAMS,
+    ccshmf_params=DEFAULT_DIFFMAHNET_SAT_MODEL,
 ):
     mc_lg_mu, lgmhost_pop, host_halo_indx = generate_subhalopop(
         ran_key,
@@ -35,7 +42,53 @@ def mc_lightcone_subhalo_mass_function(
     return mc_lg_mu, lgmhost_pop, host_halo_indx
 
 
-def mc_lightcone_subhalo_diffmah():
+def mc_lightcone_subhalo_diffmah(
+    ran_key,
+    logm_obs,
+    t_obs,
+    lgt0,
+    subhalo_model_key=DEFAULT_DIFFMAHNET_SAT_MODEL,
+):
+    """
+    Computes MAHs for subhalo populations,
+    based on the ``diffmahnet`` model
+
+    Parameters
+    ----------
+    ran_key: jran.key
+        random key
+
+    logm_obs: ndarray of shape (n_subs, )
+        base-10 log of subhalo mass, in Msun
+
+    t_obs: ndarray of shape (n_subs, )
+        cosmic time at observation, in Gyr
+
+    lgt0: float
+        base-10 log of cosmic time today, in Gyr
+
+    subhalo_model_key: str
+        diffmahnet model to use for satellites
+
+    Returns
+    -------
+    """
+
+    # get the MAH parameters for the halos
+    num_halos = t_obs.size
+    tarr = (np.ones(num_halos) * lgt0).reshape(num_halos, 1)
+    logm_obs, mah_params = mc_mah_satpop_diffmahnet(
+        logm_obs,
+        t_obs,
+        ran_key,
+        tarr,
+        subhalo_model_key=subhalo_model_key,
+        logt0=lgt0,
+    )
+    logm_obs = np.concatenate(logm_obs)
+
+    # compute MAH values today
+    logm0 = _log_mah_kern(mah_params, 10**lgt0, lgt0)
 
     return
 
@@ -51,7 +104,7 @@ def mc_weighted_subhalo_lightcone(
     Parameters
     ----------
     halopop: dict
-        with keys:
+        halo population, with keys:
         z_obs: ndarray of shape (n_halo, )
             redshift values
 
@@ -74,7 +127,7 @@ def mc_weighted_subhalo_lightcone(
         base-10 log of the minimum mass, in Msun
 
     cshmf_params: namedtuple
-        CCSHMF parameters named tuple
+        CCSHMF parameters
 
     Returns
     -------

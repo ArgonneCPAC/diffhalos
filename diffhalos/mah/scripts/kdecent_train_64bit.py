@@ -10,7 +10,7 @@ import jax
 import jax.numpy as jnp
 import equinox as eqx
 
-import kdescent
+from diffopt import kdescent
 import diffmahnet
 from diffmahnet import datatools
 
@@ -23,8 +23,8 @@ NN_DEPTH = 2
 NN_WIDTH = 50
 FLOW_LAYERS = 8
 SAMPLE_FRAC = 1.0
-NUM_KERNELS = 20
-NUM_FOURIER_KERNELS = 0
+NUM_EVAL_KERNELS = 20
+NUM_EVAL_FOURIER_POSITIONS = 0
 LEARNING_RATE = 1e-4
 
 
@@ -38,8 +38,8 @@ class KDescentLoss:
         train_data,
         sample_size=None,
         randkey=None,
-        num_kernels=20,
-        num_fourier_kernels=0,
+        num_eval_kernels=20,
+        num_eval_fourier_positions=0,
     ):
         randkey = jax.random.key(0) if randkey is None else randkey
         # t0 = 13.8
@@ -80,8 +80,8 @@ class KDescentLoss:
         )
         self.kde = kdescent.KCalc(
             self.training_combined,
-            num_kernels=num_kernels,
-            num_fourier_kernels=num_fourier_kernels,
+            num_eval_kernels=num_eval_kernels,
+            num_eval_fourier_positions=num_eval_fourier_positions,
         )
 
     def tile(self, arr):
@@ -117,7 +117,7 @@ class KDescentLoss:
             .T
         )
 
-        if self.kde.num_fourier_kernels:
+        if self.kde.num_eval_fourier_positions:
             counts_model, counts_truth = self.kde.compare_fourier_counts(
                 key2, model_combined
             )
@@ -133,7 +133,7 @@ class KDescentLoss:
         loss += jnp.sum((pdf_model - pdf_truth) ** 2)
 
         # Optionally divide by total number of kernels to get MSE loss
-        # loss /= (self.kde.num_kernels + self.kde.num_fourier_kernels)
+        # loss /= (self.kde.num_eval_kernels + self.kde.num_eval_fourier_positions)
         jax.debug.print("loss = {loss}", loss=loss)
 
         return loss
@@ -182,12 +182,15 @@ parser.add_argument(
     help="Initial adam learning rate.",
 )
 parser.add_argument(
-    "--num-kernels", type=int, default=NUM_KERNELS, help="Number of kdescent kernels."
+    "--num-eval-kernels",
+    type=int,
+    default=NUM_EVAL_KERNELS,
+    help="Number of kdescent kernels.",
 )
 parser.add_argument(
-    "--num-fourier-kernels",
+    "--num-eval-fourier-positions",
     type=int,
-    default=NUM_FOURIER_KERNELS,
+    default=NUM_EVAL_FOURIER_POSITIONS,
     help="Number of kdescent fourier kernels.",
 )
 parser.add_argument(
@@ -249,8 +252,8 @@ if __name__ == "__main__":
     if steps > 0:
         loss_func = KDescentLoss(
             train_data,
-            num_kernels=args.num_kernels,
-            num_fourier_kernels=args.num_fourier_kernels,
+            num_eval_kernels=args.num_eval_kernels,
+            num_eval_fourier_positions=args.num_eval_fourier_positions,
         )
         params, losses = flow.adam_fit(
             loss_func, randkey=key2, nsteps=steps, learning_rate=args.learning_rate
