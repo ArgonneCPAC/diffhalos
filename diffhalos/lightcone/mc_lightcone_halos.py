@@ -31,7 +31,7 @@ N_HMF_GRID = 2_000
 DEFAULT_LOGMP_CUTOFF = 10.0
 DEFAULT_LOGMP_HIMASS_CUTOFF = 14.5
 
-DEFAULT_DIFFMAHNET_CEN_MODEL = "cenflow_v1_0train_float64.eqx"
+DEFAULT_DIFFMAHNET_CEN_MODEL = "cenflow_v1_0train_64bit.eqx"
 
 _AXES = (0, None, None, 0, None)
 mc_logmp_vmap = jjit(vmap(mc_hosts._mc_host_halos_singlez_kern, in_axes=_AXES))

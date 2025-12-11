@@ -37,7 +37,6 @@ def test_mc_mah_cenpop_behaves_as_expected():
         t_vals,
         ran_key,
         t_grid,
-        centrals_model_key="cenflow_v1_0train_float64.eqx",
         logt0=logt0,
     )
 

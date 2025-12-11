@@ -23,7 +23,7 @@ __all__ = (
     "mc_weighted_subhalo_lightcone",
 )
 
-DEFAULT_DIFFMAHNET_SAT_MODEL = "satflow_v1_0train_float64.eqx"
+DEFAULT_DIFFMAHNET_SAT_MODEL = "satflow_v1_0train_64bit.eqx"
 
 
 def mc_lightcone_subhalo_mass_function(

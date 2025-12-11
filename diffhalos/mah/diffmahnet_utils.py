@@ -36,13 +36,16 @@ __all__ = (
     "get_available_models",
 )
 
+DEFAULT_DIFFMAHNET_CEN_MODEL = "cenflow_v1_0train_64bit.eqx"
+DEFAULT_DIFFMAHNET_SAT_MODEL = "satflow_v1_0train_64bit.eqx"
+
 
 def mc_mah_cenpop(
     m_obs,
     t_obs,
     ran_key,
     t_grid,
-    centrals_model_key="cenflow_v2_0.eqx",
+    centrals_model_key=DEFAULT_DIFFMAHNET_CEN_MODEL,
     logt0=LOGT0,
 ):
     """
@@ -183,7 +186,7 @@ def mc_mah_satpop(
     t_obs,
     ran_key,
     t_grid,
-    subhalo_model_key="satflow_v2_0.eqx",
+    subhalo_model_key=DEFAULT_DIFFMAHNET_SAT_MODEL,
     logt0=LOGT0,
 ):
     """
