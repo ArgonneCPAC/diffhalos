@@ -1,6 +1,6 @@
 "Scripts to train diffmahnet using float64, modifying Alan's original scripts"
 
-- 2025/11/17: Modified to use float64.
+- Finished v2 models. Trained using v1 as the initial model, and performing kdescent fitting to the 4D space {log(M(t)), t, log(M_obs), t_obs}.
     - Model names:
         cenflow_v2_0_float64.eqx
         satflow_v2_0_float64.eqx
@@ -9,22 +9,19 @@
 
         mpiexec -n 1 $watchmemory python -W ignore ~/local/diffhalos/diffmahpop/scripts/kdescent_train_float64.py satflow_v2_0_float64.eqx --num-kernels 20 --num-fourier-kernels 20 --plot-loss-curve --seed 2 --include-test --initial-model satflow_v1_0-kde_20_20train.eqx --steps 1200 --learning-rate 3e-5 --sats
 
-- 2025/05/15: Finished v2 models. Trained using v1 as the initial model, and
-performing kdescent fitting to the 4D space {log(M(t)), t, log(M_obs), t_obs}.
-- 2025/04/27: Finished v1 models, using full training data. Trained using the
-flowjax fitter only.
+- Finished v1 models, using full training data. Trained using the flowjax fitter only.
     - Model names:
-        cenflow_v1_0_float64.eqx
+        cenflow_v1_0_float64.eqx (DONE)
         satflow_v1_0_float64.eqx
     - Respective creation scripts:
         mpiexec -n 1 $watchmemory python -W ignore ~/local/diffmahnet/scripts/flowjax_train_float64.py cenflow_v1_0_float64.eqx --max-epochs 200 --max-patience 25 --learning-rate 8e-5 --nn-depth 8 --nn-width 48 --seed 111 --include-test --initial-model cenflow_v1_0train_float64.eqx
 
-        mpiexec -n 1 $watchmemory python -W ignore ~/local/diffmahnet/scripts/flowjax_train_float64.py satflow_v1_0_float64.eqx --max-epochs 200 --max-patience 25 --learning-rate 8e-5 --nn-depth 8 --nn-width 48 --seed 111 --include-test --initial-model cenflow_v1_0train_float64.eqx --sats
+        mpiexec -n 1 $watchmemory python -W ignore ~/local/diffmahnet/scripts/flowjax_train_float64.py satflow_v1_0_float64.eqx --max-epochs 200 --max-patience 25 --learning-rate 8e-5 --nn-depth 8 --nn-width 48 --seed 111 --include-test --initial-model satflow_v1_0train_float64.eqx --sats
 
 - Preliminary versions of v1 models, from the "train split" (~70% of the full training data) only. Trained using the flowjax fitter only.
     - Model names:
-        cenflow_v1_0train_float64.eqx
-        satflow_v1_0train_float64.eqx
+        cenflow_v1_0train_float64.eqx (DONE)
+        satflow_v1_0train_float64.eqx (DONE)
     - Respective creation scripts:
         mpiexec -n 1 $watchmemory python -W ignore ~/local/diffmahnet/scripts/flowjax_train_float64.py cenflow_v1_0train_float64.eqx --max-epochs 400 --max-patience 30 --learning-rate 8e-5 --nn-depth 8 --nn-width 48 --seed 110
 
