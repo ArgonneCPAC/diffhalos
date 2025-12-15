@@ -5,9 +5,9 @@
         cenflow_v2_0_64bit.eqx
         satflow_v2_0_64bit.eqx
     - Respective creation scripts:
-        mpiexec -n 1 $watchmemory python -W ignore ~/local/diffhalos/mah/scripts/kdescent_train_64bit.py cenflow_v2_0_64bit.eqx --num-eval-kernels 20 --num-eval-fourier-positions 20 --plot-loss-curve --seed 2 --include-test --initial-model cenflow_v1_064bit.eqx --steps 1200 --learning-rate 3e-5
+        mpiexec -n 1 $watchmemory python -W ignore ~/local/diffhalos/mah/scripts/kdescent_train_64bit.py cenflow_v2_0_64bit.eqx --num-kernels 20 --num-fourier-kernels 20 --plot-loss-curve --seed 2 --include-test --initial-model cenflow_v1_064bit.eqx --steps 1200 --learning-rate 3e-5
 
-        mpiexec -n 1 $watchmemory python -W ignore ~/local/diffhalos/mah/scripts/kdescent_train_64bit.py satflow_v2_0_64bit.eqx --num-eval-kernels 20 --num-eval-fourier-positions 20 --plot-loss-curve --seed 2 --include-test --initial-model satflow_v1_0.eqx --steps 1200 --learning-rate 3e-5 --sats
+        mpiexec -n 1 $watchmemory python -W ignore ~/local/diffhalos/mah/scripts/kdescent_train_64bit.py satflow_v2_0_64bit.eqx --num-kernels 20 --num-fourier-kernels 20 --plot-loss-curve --seed 2 --include-test --initial-model satflow_v1_0.eqx --steps 1200 --learning-rate 3e-5 --sats
 
 - Finished v1 models, using full training data. Trained using the flowjax fitter only.
     - Model names:

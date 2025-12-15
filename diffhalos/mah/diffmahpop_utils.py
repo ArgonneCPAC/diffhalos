@@ -3,12 +3,12 @@ Useful diffmahnet functions
 See https://github.com/ArgonneCPAC/diffmah/tree/main/diffmah/diffmahpop_kernels
 """
 
-import numpy as np
 import jax.numpy as jnp
 from jax import jit as jjit
 from jax import vmap
 
 from diffmah.diffmahpop_kernels.mc_bimod_cens import mc_cenpop
+from diffmah.diffmahpop_kernels.mc_bimod_sats import mc_satpop
 from diffmah.diffmah_kernels import _log_mah_kern
 from diffmah.diffmahpop_kernels.bimod_censat_params import (
     DEFAULT_DIFFMAHPOP_PARAMS,
@@ -16,11 +16,12 @@ from diffmah.diffmahpop_kernels.bimod_censat_params import (
 
 from .utils import rescale_mah_parameters
 
-T_GRID_MIN = 0.5
-T_GRID_MAX = 13.8
-N_T_GRID = 100
+LOGT0 = jnp.log10(13.8)
 
-__all__ = ("mc_mah_cenpop",)
+__all__ = (
+    "mc_mah_cenpop",
+    "mc_mah_satpop",
+)
 
 log_mah_kern_vmap = jjit(vmap(_log_mah_kern, in_axes=(0, None, None)))
 
@@ -28,17 +29,15 @@ log_mah_kern_vmap = jjit(vmap(_log_mah_kern, in_axes=(0, None, None)))
 def mc_mah_cenpop(
     m_obs,
     t_obs,
-    randkey,
-    logt0,
-    n_sample=1,
+    ran_key,
+    t_grid,
     params=DEFAULT_DIFFMAHPOP_PARAMS,
-    t_min=T_GRID_MIN,
-    t_max=T_GRID_MAX,
-    n_t=N_T_GRID,
-    return_mah_params=False,
+    logt0=LOGT0,
 ):
     """
-    Diffmahpop predictions for populations of halo MAHs
+    Generate populations of central halo MAHs using``diffmahpop``.
+    This function gnerates MAH parameters that are 'corrected', so that
+    logm0 is rescaled to match the true observed mass at time of observation.
 
     Parameters
     ----------
@@ -48,76 +47,114 @@ def mc_mah_cenpop(
     t_obs: ndarray of shape (n_cens, )
         grid of base-10 log of cosmic time at observation of each halo, in Gyr
 
-    randkey: key
+    ran_key: key
         JAX random key
 
-    logt0: float
-        base-10 log of the age of the Universe at z=0, in Gyr
-
-    n_sample: int
-        number of MC samples per (m_obs, t_obs) pair
+    t_grid: ndarray of shape (n_cens, n_t)
+        cosmic time in time grid for each negerated MAH, in Gyr
 
     params: namedtuple
-        diffmah parameters
+        diffmahpop parameters for centrals
 
-    t_min: float
-        base-10 log of minimum value for time grid
-        at which to compute mah, in Gyr
-
-    t_max: float
-        base-10 log of maximum value for time grid,
-        at which to compute mah, in Gyr
-
-    n_t: int
-        number of points in time grid
-
-    return_mah_params: bool
-        if True the MAH parameters will also be returned
+    logt0: float
+        base-10 log of cosmic time today, in Gyr
 
     Returns
     -------
-    log_mah: ndarray of shape (n_cens, n_t)
-        base-10 log of mah for each halo, in Msun
+    cen_mah: ndarray of shape (n_cens, n_t)
+        base-10 log of halo mass assembly histories,
+        for all MC realizations, in Msun
 
-    t_grid: ndarray of shape (n_t, )
-        cosmic time grid on which to compute MAHs, in Gyr
-
-    mah_params: namedtuple of ndarrays of shape (n_cens,)
-        mah parameters for all halos in the population
+    mah_params_corrected: namedtuple
+        diffmah parameters from normalizing flow,
+        each parameter is a ndarray of shape(n_cens, )
     """
-    # get a list of (m_obs, t_obs) for each MC realization
-    m_vals, t_vals = [
-        jnp.repeat(x.flatten(), n_sample)
-        for x in np.stack(
-            [m_obs, t_obs],
-            axis=-1,
-        ).T
-    ]
-
-    # construct time grids for each halo, given observation time
-    t_grid = jnp.linspace(t_min, t_max, n_t)
 
     # predict uncorrected MAHs
-    mah_params_uncorrected, _, log_mah_uncorrected = mc_cenpop(
+    mah_params_uncorrected, _, logm_obs_uncorrected = mc_cenpop(
         params,
         t_grid,
-        m_vals,
-        t_vals,
-        randkey,
+        m_obs,
+        t_obs,
+        ran_key,
         logt0,
     )
 
     # rescale the mah parameters to the correct logm0
-    mah_params = rescale_mah_parameters(
+    mah_params_corrected = rescale_mah_parameters(
         mah_params_uncorrected,
-        m_vals,
-        log_mah_uncorrected[:, -1],
+        m_obs,
+        logm_obs_uncorrected[:, -1],
     )
 
     # get the corrected MAHs
-    log_mah = log_mah_kern_vmap(mah_params, t_grid, logt0)
+    cen_mah = log_mah_kern_vmap(mah_params_corrected, t_grid, logt0)
 
-    if return_mah_params:
-        return log_mah, t_grid, mah_params
+    return cen_mah, mah_params_corrected
 
-    return log_mah, t_grid
+
+def mc_mah_satpop(
+    m_obs,
+    t_obs,
+    ran_key,
+    t_grid,
+    params=DEFAULT_DIFFMAHPOP_PARAMS,
+    logt0=LOGT0,
+):
+    """
+    Generate populations of subhalo MAHs using``diffmahpop``.
+    This function generates MAH parameters that are 'corrected', so that
+    logm0 is rescaled to match the true observed mass at time of observation.
+
+    Parameters
+    ----------
+    m_obs: ndarray of shape (n_cens, )
+        grid of base-10 log of mass of the halos at observation, in Msun
+
+    t_obs: ndarray of shape (n_cens, )
+        grid of base-10 log of cosmic time at observation of each halo, in Gyr
+
+    ran_key: key
+        JAX random key
+
+    t_grid: ndarray of shape (n_cens, n_t)
+        cosmic time in time grid for each negerated MAH, in Gyr
+
+    params: namedtuple
+        diffmahpop parameters for satellites
+
+    logt0: float
+        base-10 log of cosmic time today, in Gyr
+
+    Returns
+    -------
+    sat_mah: ndarray of shape (n_subs, n_t)
+        base-10 log of halo mass assembly histories,
+        for all MC realizations, in Msun
+
+    mah_params_corrected: namedtuple
+        diffmah parameters from normalizing flow,
+        each parameter is a ndarray of shape(n_subs, )
+    """
+
+    # predict uncorrected MAHs
+    mah_params_uncorrected, _, logm_obs_uncorrected = mc_satpop(
+        params,
+        t_grid,
+        m_obs,
+        t_obs,
+        ran_key,
+        logt0,
+    )
+
+    # rescale the mah parameters to the correct logm0
+    mah_params_corrected = rescale_mah_parameters(
+        mah_params_uncorrected,
+        m_obs,
+        logm_obs_uncorrected[:, -1],
+    )
+
+    # get the corrected MAHs
+    sat_mah = log_mah_kern_vmap(mah_params_corrected, t_grid, logt0)
+
+    return sat_mah, mah_params_corrected

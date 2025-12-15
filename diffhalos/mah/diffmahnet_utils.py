@@ -36,8 +36,8 @@ __all__ = (
     "get_available_models",
 )
 
-DEFAULT_DIFFMAHNET_CEN_MODEL = "cenflow_v1_0train_64bit.eqx"
-DEFAULT_DIFFMAHNET_SAT_MODEL = "satflow_v1_0train_64bit.eqx"
+DEFAULT_DIFFMAHNET_CEN_MODEL = "cenflow_v1_0_64bit.eqx"
+DEFAULT_DIFFMAHNET_SAT_MODEL = "satflow_v1_0_64bit.eqx"
 
 
 def mc_mah_cenpop(
@@ -50,7 +50,7 @@ def mc_mah_cenpop(
 ):
     """
     Generate populations of central halo MAHs using``diffmahnet``.
-    This function gnerates MAH parameters that are 'corrected', so that
+    This function generates MAH parameters that are 'corrected', so that
     logm0 is rescaled to match the true observed mass at time of observation.
 
     Parameters
@@ -67,9 +67,6 @@ def mc_mah_cenpop(
     t_grid: ndarray of shape (n_cens, n_t)
         cosmic time in time grid for each negerated MAH, in Gyr
 
-    n_sample: int
-        number of MC samples per (m_obs, t_obs) pair
-
     centrals_model_key: str
         model name for centrals
 
@@ -78,13 +75,13 @@ def mc_mah_cenpop(
 
     Returns
     -------
-    cen_mah: ndarray of shape (n_sample*n_cens, n_t)
+    cen_mah: ndarray of shape (n_cens, n_t)
         base-10 log of halo mass assembly histories,
         for all MC realizations, in Msun
 
     mah_params_corrected: namedtuple
         diffmah parameters from normalizing flow,
-        each parameter is a ndarray of shape(n_sample*n_cens, )
+        each parameter is a ndarray of shape(n_cens, )
     """
 
     # compute the uncorrected MAHs and MAH parameters
@@ -127,7 +124,7 @@ def _mc_mah_cenpop_uncorrected(
 ):
     """
     Generate populations of central halo MAHs using``diffmahnet``.
-    This function gnerates MAH parameters that are 'uncorrected',
+    This function generates MAH parameters that are 'uncorrected',
     i.e. not corrected so that logm0 is rescaled to match
     the true observed mass at time of observation.
 
@@ -191,7 +188,7 @@ def mc_mah_satpop(
 ):
     """
     Generate populations of subhalo MAHs using``diffmahnet``.
-    This function gnerates MAH parameters that are 'corrected', so that
+    This function generates MAH parameters that are 'corrected', so that
     logm0 is rescaled to match the true observed mass at time of observation.
 
     Parameters
@@ -208,9 +205,6 @@ def mc_mah_satpop(
     t_grid: ndarray of shape (n_subs, n_t)
         cosmic time in time grid for each negerated MAH, in Gyr
 
-    n_sample: int
-        number of MC samples per (m_obs, t_obs) pair
-
     subhalo_model_key: str
         model name for subhalos
 
@@ -219,13 +213,13 @@ def mc_mah_satpop(
 
     Returns
     -------
-    sat_mah: ndarray of shape (n_sample*n_subs, n_t)
+    sat_mah: ndarray of shape (n_subs, n_t)
         base-10 log of halo mass assembly histories,
         for all MC realizations, in Msun
 
     mah_params_corrected: namedtuple
         diffmah parameters from normalizing flow,
-        each parameter is a ndarray of shape(n_sample*n_subs, )
+        each parameter is a ndarray of shape(n_subs, )
     """
 
     # compute the uncorrected MAHs and MAH parameters
@@ -268,7 +262,7 @@ def _mc_mah_satpop_uncorrected(
 ):
     """
     Generate populations of subhalo MAHs using``diffmahnet``.
-    This function gnerates MAH parameters that are 'uncorrected',
+    This function generates MAH parameters that are 'uncorrected',
     i.e. not corrected so that logm0 is rescaled to match
     the true observed mass at time of observation.
 
