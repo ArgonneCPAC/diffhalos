@@ -36,8 +36,8 @@ __all__ = (
     "get_available_models",
 )
 
-DEFAULT_DIFFMAHNET_CEN_MODEL = "cenflow_v1_0_64bit.eqx"
-DEFAULT_DIFFMAHNET_SAT_MODEL = "satflow_v1_0_64bit.eqx"
+DEFAULT_DIFFMAHNET_CEN_MODEL = "cenflow_v2_0_64bit.eqx"
+DEFAULT_DIFFMAHNET_SAT_MODEL = "satflow_v2_0_64bit.eqx"
 
 
 def mc_mah_cenpop(
