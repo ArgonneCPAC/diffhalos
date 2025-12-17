@@ -6,6 +6,8 @@ from jax import jit as jjit
 from jax import numpy as jnp
 from jax import random as jran
 
+from .math import map_intervals
+
 __all__ = ("stratified_xy_grid",)
 
 
@@ -77,12 +79,3 @@ def stratified_grid_scaled(n_per_dim, ran_key, zmin, zmax, mmin, mmax):
     m_grid = map_intervals(xy_grid[:, 1], 0, 1, mmin, mmax)
 
     return z_grid, m_grid
-
-
-@jjit
-def map_intervals(values, oldMin, oldMax, newMin, newMax):
-    """
-    Helper function to map values in the interval [oldMin, oldMax]
-    to the new interval [newMin, newMax]
-    """
-    return ((values - oldMin) / (oldMax - oldMin)) * (newMax - newMin) + newMin

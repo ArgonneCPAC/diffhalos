@@ -190,7 +190,6 @@ def test_mc_weighted_halo_lightcone_sobol():
 
         assert np.all(np.isfinite(cenpop["nhalos"]))
         assert cenpop["logmp_obs"].size == num_halos
-        assert np.sum(cenpop["mp_is_sub"]) == 0
 
         assert np.all(cenpop["z_obs"] >= z_min)
         assert np.all(cenpop["z_obs"] <= z_max)
@@ -233,7 +232,6 @@ def test_mc_weighted_halo_lightcone_stratified():
 
         assert np.all(np.isfinite(cenpop["nhalos"]))
         assert cenpop["logmp_obs"].size == num_halos
-        assert np.sum(cenpop["mp_is_sub"]) == 0
 
         assert np.all(cenpop["z_obs"] >= z_min)
         assert np.all(cenpop["z_obs"] <= z_max)
@@ -278,7 +276,6 @@ def test_mc_weighted_halo_lightcone_input_grid():
 
         assert np.all(np.isfinite(cenpop["nhalos"]))
         assert cenpop["logmp_obs"].size == num_halos
-        assert np.sum(cenpop["mp_is_sub"]) == 0
 
         assert np.all(cenpop["z_obs"] >= z_min)
         assert np.all(cenpop["z_obs"] <= z_max)
@@ -315,8 +312,6 @@ def test_mc_lightcone_host_halo_diffmah():
         assert np.all(cenpop["z_obs"] >= z_min)
         assert np.all(cenpop["z_obs"] <= z_max)
 
-        assert np.sum(cenpop["mp_is_sub"] == 0)
-
         # some halos with logmp_obs<lgmp_min is ok,
         # but too many indicates an issue with diffmahnet replicating logmp_obs
         assert np.mean(cenpop["logmp_obs"] < lgmp_min) < 0.2, f"z_min={z_min:.2f}"
@@ -347,7 +342,6 @@ def test_get_weighted_lightcone_grid_host_halo_diffmah():
         )
         assert np.all(np.isfinite(cenpop["nhalos"]))
         assert cenpop["logmp_obs"].size == n_z * n_m
-        assert np.sum(cenpop["mp_is_sub"]) == 0
 
         assert np.all(cenpop["z_obs"] >= z_min)
         assert np.all(cenpop["z_obs"] <= z_max)
@@ -387,8 +381,6 @@ def test_mc_lightcone_host_halo_diffmah_alt_mf_params():
 
         assert np.all(cenpop["z_obs"] >= z_min)
         assert np.all(cenpop["z_obs"] <= z_max)
-
-        assert np.sum(cenpop["mp_is_sub"] == 0)
 
         # Some halos with logmp_obs<lgmp_min is ok,
         # but too many indicates an issue with diffmahnet replicating logmp_obs

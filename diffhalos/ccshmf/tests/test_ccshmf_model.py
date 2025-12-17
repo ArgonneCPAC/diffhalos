@@ -13,7 +13,6 @@ from ..ccshmf_model import (
     predict_differential_cshmf_halopop,
     compute_mean_subhalo_counts,
     subhalo_lightcone_weights,
-    N_LGMU_TABLE,
 )
 
 _THIS_DRNAME = os.path.dirname(os.path.abspath(__file__))
@@ -142,13 +141,17 @@ def test_compute_mean_subhalo_counts():
 def test_subhalo_lightcone_weights():
     lgmhost = np.array([11.0, 13.0, 9.0])
     lgmp_min = 12.0
+    n_mu_per_host = 5
+
     weights, lgmu = subhalo_lightcone_weights(
         lgmhost,
         lgmp_min,
+        n_mu_per_host,
         DEFAULT_CCSHMF_PARAMS,
     )
-    assert weights.shape == (lgmhost.size, N_LGMU_TABLE)
+
+    assert weights.shape == (lgmhost.size, n_mu_per_host)
     assert np.all(np.isfinite(weights))
 
-    assert lgmu.shape == (lgmhost.size, N_LGMU_TABLE)
+    assert lgmu.shape == (lgmhost.size, n_mu_per_host)
     assert np.all(np.isfinite(lgmu))

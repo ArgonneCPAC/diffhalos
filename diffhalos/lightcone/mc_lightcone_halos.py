@@ -192,14 +192,11 @@ def mc_lightcone_host_halo_diffmah(
         logmp_obs: ndarray of shape (n_halos, )
             halo mass at the lightcone redshift, in Msun
 
-        mah_params: namedtuple of ndarray's with shape (n_halos, )
-            diffmah parameters
+        mah_params: namedtuple of ndarray's with shape (n_halos, n_mah_params)
+            diffmah parameters for each host halo in the lightcone
 
         logmp0: narray of shape (n_halos, )
             base-10 log of halo mass at z=0, in Msun
-
-        mp_is_sub: ndarray(bool) of shape (n_halos, )
-            False for host halos
     """
 
     # generate mc realization of the halo mass function
@@ -234,12 +231,9 @@ def mc_lightcone_host_halo_diffmah(
     # compute MAH values today
     logmp0 = _log_mah_kern(mah_params, 10**lgt0, lgt0)
 
-    # add information about the halo being a central
-    mp_is_sub = np.zeros(z_obs.size).astype(bool)
-
     # create output dictionary
-    fields = ("z_obs", "t_obs", "logmp_obs", "mah_params", "logmp0", "mp_is_sub")
-    values = (z_obs, t_obs, logmp_obs, mah_params, logmp0, mp_is_sub)
+    fields = ("z_obs", "t_obs", "logmp_obs", "mah_params", "logmp0")
+    values = (z_obs, t_obs, logmp_obs, mah_params, logmp0)
     cenpop_out = dict()
     for key, value in zip(fields, values):
         cenpop_out[key] = value
@@ -436,12 +430,9 @@ def get_weighted_lightcone_grid_host_halo_diffmah(
     # compute MAH values today
     logmp0 = _log_mah_kern(mah_params, 10**lgt0, lgt0)
 
-    # add information about the halo being a central
-    mp_is_sub = np.zeros(z_obs.size).astype(bool)
-
     # create output dictionary
-    fields = ("z_obs", "t_obs", "logmp_obs", "mah_params", "logmp0", "mp_is_sub")
-    values = (z_obs, t_obs, logmp_obs, mah_params, logmp0, mp_is_sub)
+    fields = ("z_obs", "t_obs", "logmp_obs", "mah_params", "logmp0")
+    values = (z_obs, t_obs, logmp_obs, mah_params, logmp0)
     cenpop_out = dict()
     for key, value in zip(fields, values):
         cenpop_out[key] = value
@@ -711,12 +702,9 @@ def get_weighted_lightcone_host_halo_diffmah(
     # compute MAH values today
     logmp0 = _log_mah_kern(mah_params, 10**lgt0, lgt0)
 
-    # add information about the halo being a central
-    mp_is_sub = np.zeros(z_obs.size).astype(bool)
-
     # create output dictionary
-    fields = ("z_obs", "t_obs", "logmp_obs", "mah_params", "logmp0", "mp_is_sub")
-    values = (z_obs, t_obs, logmp_obs, mah_params, logmp0, mp_is_sub)
+    fields = ("z_obs", "t_obs", "logmp_obs", "mah_params", "logmp0")
+    values = (z_obs, t_obs, logmp_obs, mah_params, logmp0)
     cenpop_out = dict()
     for key, value in zip(fields, values):
         cenpop_out[key] = value

@@ -8,9 +8,9 @@ config.update("jax_enable_x64", True)
 import numpy as np
 
 from ..mah.diffmahnet_utils import mc_mah_satpop as mc_mah_satpop_diffmahnet
-from diffmah.diffmah_kernels import _log_mah_kern
 
-from ..ccshmf.ccshmf_model import N_LGMU_TABLE
+# from diffmah.diffmah_kernels import _log_mah_kern
+
 from ..ccshmf.mc_subs import generate_subhalopop
 from ..ccshmf.ccshmf_model import (
     subhalo_lightcone_weights,
@@ -24,6 +24,7 @@ __all__ = (
 )
 
 DEFAULT_DIFFMAHNET_SAT_MODEL = "satflow_v2_0_64bit.eqx"
+N_LGMU_TABLE = 5
 
 
 def mc_lightcone_subhalo_mass_function(
@@ -76,6 +77,8 @@ def mc_lightcone_subhalo_diffmah(
     ran_key,
     halopop,
     lgt0,
+    lgmu,
+    n_mu_per_host,
     subhalo_model_key=DEFAULT_DIFFMAHNET_SAT_MODEL,
 ):
     """
@@ -89,14 +92,20 @@ def mc_lightcone_subhalo_diffmah(
 
     halopop: dict
         halo population, with necessary keys:
-            logmp_obs: ndarray of shape (n_halo, )
+            logmp_obs: ndarray of shape (n_host, )
                 base-10 log of halo mass at observation, in Msun
 
-            t_obs: ndarray of shape (n_halo, )
+            t_obs: ndarray of shape (n_host, )
                 cosmic time at observation, in Gyr
 
     lgt0: float
         base-10 log of cosmic time today, in Gyr
+
+    lgmu: ndarray of shape (n_sub, )
+        values of mu=Msub/Mhost for all subhalos in the lightcone
+
+    n_mu_per_host: float
+        number of mu=Msub/Mhost values to use per host halo
 
     subhalo_model_key: str
         diffmahnet model to use for satellites
@@ -105,31 +114,30 @@ def mc_lightcone_subhalo_diffmah(
     -------
     halopop: dict
         same as input with added keys:
-            key: type
-                describe
+            mah_params: namedtuple of ndarray's with shape (n_subs, n_mah_params)
+                diffmah parameters for each subhalo in the lightcone
     """
 
-    # get the MAH parameters for the halos
-    num_halos = halopop["t_obs"].size
-    tarr = (np.ones(num_halos) * lgt0).reshape(num_halos, 1)
-    logm_sub, mah_params_sub = mc_mah_satpop_diffmahnet(
-        halopop["logm_obs"],
-        halopop["t_obs"],
+    n_host = halopop["logmp_obs"].size
+    n_sub = lgmu.size
+
+    # match host index with subhalos
+    host_index_for_sub = np.repeat(np.arange(n_host), n_mu_per_host)
+    halopop["host_index_for_sub"] = host_index_for_sub
+
+    # get the MAH parameters for the subhalos
+    tarr = (np.ones(n_sub) * lgt0).reshape(n_sub, 1)
+    _, mah_params_sub = mc_mah_satpop_diffmahnet(
+        np.repeat(halopop["logmp_obs"], n_mu_per_host) * lgmu,
+        np.repeat(halopop["t_obs"], n_mu_per_host),
         ran_key,
         tarr,
         subhalo_model_key=subhalo_model_key,
         logt0=lgt0,
     )
-    logm_sub = np.concatenate(logm_sub)
+    halopop["mah_params_sub"] = mah_params_sub
 
-    # compute MAH values today
-    logm0_sub = _log_mah_kern(mah_params_sub, 10**lgt0, lgt0)
-
-    # generate index the shows what host halo
-    # each subhalo resides in
-    host_index = np.repeat(halopop["logm_obs"], N_LGMU_TABLE)
-
-    return
+    return halopop
 
 
 def mc_weighted_subhalo_lightcone(
@@ -137,6 +145,7 @@ def mc_weighted_subhalo_lightcone(
     ran_key,
     lgmp_min,
     lgt0,
+    n_mu_per_host=N_LGMU_TABLE,
     ccshmf_params=DEFAULT_CCSHMF_PARAMS,
     subhalo_model_key=DEFAULT_DIFFMAHNET_SAT_MODEL,
 ):
@@ -147,10 +156,10 @@ def mc_weighted_subhalo_lightcone(
     ----------
     halopop: dict
         halo population, with necessary keys:
-            logmp_obs: ndarray of shape (n_halo, )
+            logmp_obs: ndarray of shape (n_host, )
                 base-10 log of halo mass at observation, in Msun
 
-            t_obs: ndarray of shape (n_halo, )
+            t_obs: ndarray of shape (n_host, )
                 cosmic time at observation, in Gyr
 
     lgmp_min: float
@@ -158,6 +167,9 @@ def mc_weighted_subhalo_lightcone(
 
     lgt0: float
         base-10 log of cosmic time today, in Gyr
+
+    n_mu_per_host: float
+        number of mu=Msub/Mhost values to use per host halo
 
     cshmf_params: namedtuple
         CCSHMF parameters
@@ -169,30 +181,37 @@ def mc_weighted_subhalo_lightcone(
     -------
     halopop: dict
         same as input with added keys:
-            nsubhalos: ndarray of shape (n_halo, N_LGMU_TABLE)
+            nsubhalos: ndarray of shape (n_host*n_mu, )
                 subhalo number weights
 
-            logmu_subs: ndarray of shape (n_halo, N_LGMU_TABLE)
+            logmu_subs: ndarray of shape (n_host*n_mu, )
                 base-10 log of mu values per host halo
     """
+
+    n_host = halopop["logmp_obs"].size
 
     # get subhalo weights
     nsubhalo_weights, lgmu = subhalo_lightcone_weights(
         halopop["logmp_obs"],
         lgmp_min,
+        n_mu_per_host,
         ccshmf_params,
     )
-
-    # add subhalo weights to the dictionary
-    halopop["nsubhalos"] = nsubhalo_weights
-    halopop["logmu_subs"] = lgmu
+    nsubhalo_weights = nsubhalo_weights.reshape(n_host * n_mu_per_host)
+    lgmu = lgmu.reshape(n_host * n_mu_per_host)
 
     # generate diffmah subhalo populations
     halopop = mc_lightcone_subhalo_diffmah(
         ran_key,
         halopop,
         lgt0,
+        lgmu,
+        n_mu_per_host,
         subhalo_model_key=subhalo_model_key,
     )
+
+    # add subhalo weights to the dictionary
+    halopop["nsubhalos"] = nsubhalo_weights
+    halopop["logmu_subs"] = lgmu
 
     return halopop
