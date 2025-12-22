@@ -1,4 +1,4 @@
-name: test with optional dependencies
+name: test with latest releases of minimal dependences
 
 on:
   workflow_dispatch: null
@@ -12,7 +12,7 @@ on:
 
 jobs:
   tests:
-    name: pytest with AlanPearl/diffmahnet and diffopt
+    name: pytest with only requirements.txt
     runs-on: "ubuntu-latest"
 
     steps:
@@ -42,15 +42,8 @@ jobs:
             pip \
             setuptools \
             "setuptools_scm>=7,<8" \
-            scipy \
-            diffsky \
             python-build
-          python -m pip uninstall dsps --yes
-          python -m pip install --no-deps git+https://github.com/ArgonneCPAC/dsps.git
-          python -m pip install --no-deps git+https://github.com/AlanPearl/diffmahnet@train_64bit
           python -m pip install flowjax
-          python -m pip install diffopt
-          python -m pip install tqdm
           python -m pip install --no-build-isolation --no-deps -e .
 
       - name: test
