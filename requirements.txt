@@ -1,5 +1,8 @@
 numpy
+scipy
 jax
 dsps
 diffmah
 dsps
+diffsky
+tqdm
