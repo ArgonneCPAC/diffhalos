@@ -1,5 +1,7 @@
 diffhalos
 ============
+Diffhalos is a python library for generating cosmological volumes of dark matter halos.
+
 
 Installation
 ------------
