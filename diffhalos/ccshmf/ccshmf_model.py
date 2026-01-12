@@ -183,6 +183,7 @@ def _ylo_model(ylo_params, lgmhost):
     return ylo
 
 
+@jjit
 def get_lgmu_cutoff(lgmhost, lgmp_sim, nptcl_cut):
     """
     Get the cutoff mu value for a simulation
@@ -192,6 +193,7 @@ def get_lgmu_cutoff(lgmhost, lgmp_sim, nptcl_cut):
     return lgmu_cutoff
 
 
+@jjit
 def compute_mean_subhalo_counts(
     lgmhost,
     lgmp_min,
@@ -245,7 +247,7 @@ def subhalo_lightcone_weights_kern(
     ccshmf_params: namedtuple
         cumulative conditional subhalo mass function parameters
 
-    n_mu: int
+    n_logmu: int
         number of mu=Msub/Mhost values to use
 
     Returns

@@ -8,6 +8,9 @@ import os
 import pathlib
 import glob
 
+from functools import partial
+from jax import jit as jjit
+
 import jax
 import jax.numpy as jnp
 
@@ -40,6 +43,7 @@ DEFAULT_DIFFMAHNET_CEN_MODEL = "cenflow_v2_0_64bit.eqx"
 DEFAULT_DIFFMAHNET_SAT_MODEL = "satflow_v2_0_64bit.eqx"
 
 
+@partial(jjit, static_argnames=["centrals_model_key"])
 def mc_mah_cenpop(
     m_obs,
     t_obs,
@@ -114,6 +118,7 @@ def mc_mah_cenpop(
     return cen_mah, mah_params_corrected
 
 
+@partial(jjit, static_argnames=["centrals_model_key"])
 def _mc_mah_cenpop_uncorrected(
     m_obs,
     t_obs,
@@ -178,6 +183,7 @@ def _mc_mah_cenpop_uncorrected(
     return cen_mah_uncorrected, mah_params_uncorrected
 
 
+@partial(jjit, static_argnames=["subhalo_model_key"])
 def mc_mah_satpop(
     m_obs,
     t_obs,
@@ -252,6 +258,7 @@ def mc_mah_satpop(
     return sat_mah, mah_params_corrected
 
 
+@partial(jjit, static_argnames=["subhalo_model_key"])
 def _mc_mah_satpop_uncorrected(
     m_obs,
     t_obs,

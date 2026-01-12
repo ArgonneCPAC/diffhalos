@@ -14,9 +14,12 @@ from jax import numpy as jnp
 from dsps.cosmology import flat_wcdm
 from dsps.cosmology import DEFAULT_COSMOLOGY
 
-from ..lightcone.utils import spherical_shell_comoving_volume
-from ..calibrations.hmf_cal import DEFAULT_HMF_PARAMS, HMF_Params  # noqa
 from .hmf_kernels import lg_hmf_kern
+from ..calibrations.hmf_cal import DEFAULT_HMF_PARAMS, HMF_Params  # noqa
+from ..utils.geometry_utils import (
+    spherical_shell_comoving_volume,
+    compute_volume_from_sky_area,
+)
 from ..utils.sigmoid_utils import _sig_slope, _sigmoid
 from ..defaults import FULL_SKY_AREA
 
@@ -30,6 +33,8 @@ __all__ = (
     "predict_cuml_hmf",
     "predict_differential_hmf",
     "halo_lightcone_weights",
+    "get_mean_nhalos_from_volume",
+    "get_mean_nhalos_from_sky_area",
 )
 
 
@@ -244,3 +249,148 @@ def halo_lightcone_weights(
     nhalos = nhalos_tot * weights
 
     return nhalos
+
+
+@jjit
+def get_mean_nhalos_from_volume(
+    redshift,
+    volume_com_mpc,
+    hmf_params,
+    lgmp_min,
+    lgmp_max,
+):
+    """
+    Compute the mean number of halos at a single redshift,
+    for masses between two values, given the volume
+
+    Parameters
+    ----------
+    redshift: ndarray of shape (n_z, )
+        redshift value
+
+    volume_com_mpc: float
+        comoving volume of the generated population, in Mpc^3
+
+    hmf_params: namedtuple
+        halo mass function parameters
+
+    lgmp_min: float
+        base-10 log of minimum halo mass, in Msun
+
+    lgmp_max: float
+        base-10 log of maximum halo mass, in Msun
+
+    Returns
+    -------
+    mean_nhalos: ndarray of shape (n_z, )
+        mean halo counts
+    """
+    mean_nhalos_lgmin = _compute_nhalos_tot(
+        hmf_params,
+        lgmp_min,
+        redshift,
+        volume_com_mpc,
+    )
+    mean_nhalos_lgmax = _compute_nhalos_tot(
+        hmf_params,
+        lgmp_max,
+        redshift,
+        volume_com_mpc,
+    )
+    mean_nhalos = mean_nhalos_lgmin - mean_nhalos_lgmax
+
+    return mean_nhalos
+
+
+@jjit
+def get_mean_nhalos_from_sky_area(
+    redshift,
+    sky_area_degsq,
+    cosmo_params,
+    hmf_params,
+    lgmp_min,
+    lgmp_max,
+):
+    """
+    Compute the mean number of halos at a single redshift,
+    for masses between two values, given the sky area
+
+    Parameters
+    ----------
+    redshift: ndarray of shape (n_z, )
+        redshift value
+
+    sky_area_degsq: float
+        sky area, in deg^2
+
+    cosmo_params: namedtuple
+        dsps.cosmology.flat_wcdm cosmology
+        cosmo_params = (Om0, w0, wa, h)
+
+    hmf_params: namedtuple
+        halo mass function parameters
+
+    lgmp_min: float
+        base-10 log of minimum halo mass, in Msun
+
+    lgmp_max: float
+        base-10 log of maximum halo mass, in Msun
+
+    Returns
+    -------
+    mean_nhalos: ndarray of shape (n_z, )
+        mean halo counts
+    """
+    volume_com_mpc = compute_volume_from_sky_area(
+        redshift,
+        sky_area_degsq,
+        cosmo_params,
+    )
+
+    mean_nhalos = get_mean_nhalos_from_volume(
+        redshift,
+        volume_com_mpc,
+        hmf_params,
+        lgmp_min,
+        lgmp_max,
+    )
+
+    return mean_nhalos
+
+
+@jjit
+def _compute_nhalos_tot(
+    hmf_params,
+    lgmp_min,
+    redshift,
+    volume_com_mpc,
+):
+    """
+    Computes the total number of halos that are expected
+    to be found at requested redshift within the input volume,
+    and with a provided minimum particle mass
+
+    Parameters
+    ----------
+    hmf_params: namedtuple
+        HMF parameters named tuple
+
+    lgmp_min: float
+        base-10 log of the minimum mass
+
+    redshift: float
+        redshift value
+
+    volume_com_mpc: float
+        comoving volume, in comoving Mpc^3
+
+    Returns
+    -------
+    nhalos_tot: float
+        halo abundance at input redshift and within the input volume,
+        considering the minimum mass cut
+    """
+    nhalos_per_mpc3 = 10 ** predict_cuml_hmf(hmf_params, lgmp_min, redshift)
+    nhalos_tot = nhalos_per_mpc3 * volume_com_mpc
+
+    return nhalos_tot

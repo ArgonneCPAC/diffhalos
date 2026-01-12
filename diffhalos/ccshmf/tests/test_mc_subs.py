@@ -5,6 +5,7 @@ from jax import random as jran
 
 from ..mc_subs import (
     generate_subhalopop_kern,
+    get_mean_subhalo_counts_poisson,
     generate_subhalopop,
     DEFAULT_CCSHMF_PARAMS,
     get_lgmu_cutoff,
@@ -38,20 +39,29 @@ def test_generate_subhalopop_kern_behaves_as_expected():
 def test_generate_subhalopop_behaves_as_expected():
 
     ran_key = jran.key(0)
+    uran_key, counts_key = jran.split(ran_key, 2)
 
     lgmp_min = 8.0
 
     nhost = 100
     lgmhost_arr = np.linspace(10.0, 12.0, nhost)
 
-    mc_lg_mu, lgmhost_pop, host_halo_indx = generate_subhalopop(
-        ran_key,
+    subhalo_counts_per_halo, ntot = get_mean_subhalo_counts_poisson(
+        counts_key,
         lgmhost_arr,
         lgmp_min,
+    )
+
+    mc_lg_mu, lgmhost_pop, host_halo_indx = generate_subhalopop(
+        uran_key,
+        lgmhost_arr,
+        lgmp_min,
+        subhalo_counts_per_halo,
+        int(ntot),
         ccshmf_params=DEFAULT_CCSHMF_PARAMS,
     )
 
     assert np.all(np.isfinite(mc_lg_mu))
     assert np.all(np.isfinite(lgmhost_pop))
-    assert mc_lg_mu.size == lgmhost_pop.size == host_halo_indx.size
+    assert mc_lg_mu.size == lgmhost_pop.size == host_halo_indx.size == ntot
     assert host_halo_indx[-1] == lgmhost_arr.size - 1

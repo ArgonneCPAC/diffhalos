@@ -6,16 +6,17 @@ from jax import jit as jjit
 from jax import numpy as jnp
 from jax import vmap
 
-N_Z_GRID = 2_000
-FULL_SKY_AREA = (4 * jnp.pi) * (180 / jnp.pi) ** 2
-
+from ..defaults import FULL_SKY_AREA
 
 _Z = (0, None, None, None, None)
 d_Rcom_dz_func = jjit(
     vmap(grad(flat_wcdm.comoving_distance_to_z, argnums=0), in_axes=_Z)
 )
 
-__all__ = ("spherical_shell_comoving_volume",)
+__all__ = (
+    "spherical_shell_comoving_volume",
+    "compute_volume_from_sky_area",
+)
 
 
 @jjit
@@ -49,3 +50,38 @@ def spherical_shell_comoving_volume(z_grid, cosmo_params):
     vol_shell_grid = 4 * jnp.pi * r_grid * r_grid * d_r_grid
 
     return vol_shell_grid
+
+
+@jjit
+def compute_volume_from_sky_area(
+    redshift,
+    sky_area_degsq,
+    cosmo_params,
+):
+    """
+    Helper function to compute the comoving volume
+    at given redshift from the given sky area
+
+    Parameters
+    ----------
+    redshift: ndarray of shape (n_z, )
+        redshift value
+
+    sky_area_degsq: float
+        sky area, in deg^2
+
+    cosmo_params: namedtuple
+        cosmological paramters
+
+    Returns
+    -------
+    vol_shell_grid_mpc: ndarray of shape (n_z, )
+        comoving volume, in Mpc^3
+    """
+    fsky = sky_area_degsq / FULL_SKY_AREA
+    vol_shell_grid_mpc = fsky * spherical_shell_comoving_volume(
+        redshift,
+        cosmo_params,
+    )
+
+    return vol_shell_grid_mpc
