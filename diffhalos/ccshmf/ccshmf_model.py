@@ -4,6 +4,8 @@ the Cumulative Conditional Subhalo Mass Function (CCSHMF),
 <Nsub(>mu) | Mhost>, where mu = Msub/Mhost
 """
 
+from functools import partial
+
 from jax import vmap
 from jax import jit as jjit
 from jax import numpy as jnp
@@ -19,9 +21,6 @@ from ..calibrations.ccshmf_cal import (
 
 YTP_XTP = 13.0
 YLO_XTP = 13.0
-
-N_LGMU_TABLE = 3
-U_TABLE = jnp.linspace(1, 0, N_LGMU_TABLE)
 
 __all__ = (
     "predict_ccshmf",
@@ -184,6 +183,7 @@ def _ylo_model(ylo_params, lgmhost):
     return ylo
 
 
+@jjit
 def get_lgmu_cutoff(lgmhost, lgmp_sim, nptcl_cut):
     """
     Get the cutoff mu value for a simulation
@@ -193,6 +193,7 @@ def get_lgmu_cutoff(lgmhost, lgmp_sim, nptcl_cut):
     return lgmu_cutoff
 
 
+@jjit
 def compute_mean_subhalo_counts(
     lgmhost,
     lgmp_min,
@@ -224,10 +225,11 @@ def compute_mean_subhalo_counts(
     return mean_counts
 
 
-@jjit
+@partial(jjit, static_argnames=["n_logmu"])
 def subhalo_lightcone_weights_kern(
     lgmhost,
     lgmp_min,
+    n_logmu,
     ccshmf_params,
 ):
     """
@@ -245,13 +247,19 @@ def subhalo_lightcone_weights_kern(
     ccshmf_params: namedtuple
         cumulative conditional subhalo mass function parameters
 
+    n_logmu: int
+        number of mu=Msub/Mhost values to use
+
     Returns
     -------
-    nsubhalos_in_host: ndarray of shape (n, )
-        subhalo counts for ``N_LGMU_TABLE`` values of mu
+    nsubhalos_in_host: ndarray of shape (n_mu, )
+        subhalo counts each mu value
     """
-    # compute minumum allowed mu value, mu_min=mp_min/Mhost
+    # compute minumum allowed mu value
     lgmu_cutoff = get_lgmu_cutoff(lgmhost, lgmp_min, 1)
+
+    # calcumate array of mu values, given lgmp_min
+    lgmu = jnp.linspace(lgmu_cutoff, 0, n_logmu)
 
     # compute <Nsubhalos> for a single host halo
     subhalo_counts_per_halo = 10 ** predict_ccshmf(
@@ -259,9 +267,6 @@ def subhalo_lightcone_weights_kern(
         lgmhost,
         lgmu_cutoff,
     )
-
-    # calcumate array of mu values, given a lgmp_min
-    lgmu = U_TABLE * lgmu_cutoff
 
     # compute relative abundance of subhalos
     _weights = 10 ** predict_differential_cshmf(ccshmf_params, lgmhost, lgmu)
@@ -275,8 +280,10 @@ def subhalo_lightcone_weights_kern(
 
 """"
 Computes the weighted subhalo counts that reside in multiple host halos,
-by vmapping ``subhalo_lightcone_weights_kern``
+by vmapping ``subhalo_lightcone_weights_kern``,
+with output being a ndarray of shape (n_host, n_mu)
 """
 subhalo_lightcone_weights = jjit(
-    vmap(subhalo_lightcone_weights_kern, in_axes=(0, None, None))
+    vmap(subhalo_lightcone_weights_kern, in_axes=(0, None, None, None)),
+    static_argnames=["n_logmu"],
 )
