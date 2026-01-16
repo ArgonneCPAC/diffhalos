@@ -59,3 +59,40 @@ def test_halo_lightcone_weights():
 
     assert np.all(np.isfinite(nhalos))
     assert nhalos.size == cenpop["logmp_obs"].size
+
+
+def test_get_mean_nhalos_from_volume_and_from_sky_area():
+
+    lgmp_min = 11.0
+    lgmp_max = 13.0
+
+    sky_area_degsq = 10.0
+
+    redshift = np.linspace(0.1, 3.0, 10)
+
+    volume_com_mpc = hmf_model.compute_volume_from_sky_area(
+        redshift,
+        sky_area_degsq,
+        DEFAULT_COSMOLOGY,
+    )
+
+    nhalos_from_vol = hmf_model.get_mean_nhalos_from_volume(
+        redshift,
+        volume_com_mpc,
+        hmf_model.DEFAULT_HMF_PARAMS,
+        lgmp_min,
+        lgmp_max,
+    )
+
+    nhalos_from_area = hmf_model.get_mean_nhalos_from_sky_area(
+        redshift,
+        sky_area_degsq,
+        DEFAULT_COSMOLOGY,
+        hmf_model.DEFAULT_HMF_PARAMS,
+        lgmp_min,
+        lgmp_max,
+    )
+
+    assert np.all(np.isfinite(nhalos_from_vol))
+    assert np.all(np.isfinite(nhalos_from_area))
+    assert np.allclose(nhalos_from_vol, nhalos_from_area)
