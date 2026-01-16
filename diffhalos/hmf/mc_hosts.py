@@ -1,17 +1,13 @@
 """Generate MC realizations of the host dark matter halo mass function"""
 
-import numpy as np
 from functools import partial
 
+import numpy as np
 from jax import jit as jjit
 from jax import numpy as jnp
 from jax import random as jran
 
-from .hmf_model import (
-    DEFAULT_HMF_PARAMS,
-    predict_cuml_hmf,
-    _compute_nhalos_tot,
-)
+from .hmf_model import DEFAULT_HMF_PARAMS, _compute_nhalos_tot, predict_cuml_hmf
 
 N_LGMU_TABLE = 200
 U_TABLE = jnp.linspace(0, 1, N_LGMU_TABLE)

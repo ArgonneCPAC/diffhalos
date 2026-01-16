@@ -3,16 +3,12 @@
 import numpy as np
 from jax import random as jran
 
-
 from ..hmf_model import (
     DEFAULT_HMF_PARAMS,
-    predict_differential_hmf,
     get_mean_nhalos_from_volume,
+    predict_differential_hmf,
 )
-from ..mc_hosts import (
-    LGMH_MAX,
-    mc_host_halos_singlez,
-)
+from ..mc_hosts import LGMH_MAX, mc_host_halos_singlez
 
 
 def test_mc_host_halo_logmp_behaves_as_expected():

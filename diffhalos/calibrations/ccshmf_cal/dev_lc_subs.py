@@ -2,14 +2,13 @@
 Optimization tools for the conditional subhalo mass function
 """
 
-from ...ccshmf import ccshmf_model as ccshmfm
-from ...hmf.hmf_model import hmf_model, mc_hosts
-from ...calibrations.fitting_utils.fitting_helpers import (
-    jax_adam_wrapper,
-)
 from jax import jit as jjit
 from jax import numpy as jnp
 from jax import value_and_grad, vmap
+
+from ...calibrations.fitting_utils.fitting_helpers import jax_adam_wrapper
+from ...ccshmf import ccshmf_model as ccshmfm
+from ...hmf.hmf_model import hmf_model, mc_hosts
 
 N_GRID_HMF = 200
 LGMP_GRID_HMF = jnp.linspace(0, 1, N_GRID_HMF)

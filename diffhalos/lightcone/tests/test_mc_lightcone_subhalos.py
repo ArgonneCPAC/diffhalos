@@ -1,12 +1,13 @@
 """ """
 
-import numpy as np
-from jax import random as jran
 from collections import namedtuple
 
+import numpy as np
+from jax import random as jran
+
+from ...ccshmf import mc_subs
 from .. import mc_lightcone_halos as mclh
 from .. import mc_lightcone_subhalos as mclsh
-from ...ccshmf import mc_subs
 
 
 def test_mc_lightcone_subhalo_mass_function_works_as_expected():

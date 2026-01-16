@@ -6,22 +6,20 @@ These are both functions of mp,
 the peak historical mass of the main progenitor halo.
 """
 
+from dsps.cosmology import DEFAULT_COSMOLOGY, flat_wcdm
 from jax import grad
 from jax import jit as jjit
-from jax import vmap
 from jax import numpy as jnp
+from jax import vmap
 
-from dsps.cosmology import flat_wcdm
-from dsps.cosmology import DEFAULT_COSMOLOGY
-
-from .hmf_kernels import lg_hmf_kern
 from ..calibrations.hmf_cal import DEFAULT_HMF_PARAMS, HMF_Params  # noqa
+from ..defaults import FULL_SKY_AREA
 from ..utils.geometry_utils import (
-    spherical_shell_comoving_volume,
     compute_volume_from_sky_area,
+    spherical_shell_comoving_volume,
 )
 from ..utils.sigmoid_utils import _sig_slope, _sigmoid
-from ..defaults import FULL_SKY_AREA
+from .hmf_kernels import lg_hmf_kern
 
 YTP_XTP = 3.0
 X0_XTP = 3.0

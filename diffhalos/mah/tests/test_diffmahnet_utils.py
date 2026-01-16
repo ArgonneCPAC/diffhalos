@@ -1,10 +1,10 @@
 """ """
 
 import numpy as np
-from jax import random as jran
 from jax import numpy as jnp
+from jax import random as jran
 
-from ..diffmahnet_utils import mc_mah_cenpop, mc_mah_satpop, get_mean_and_std_of_mah
+from ..diffmahnet_utils import get_mean_and_std_of_mah, mc_mah_cenpop, mc_mah_satpop
 from ..diffmahpop_utils import mc_mah_cenpop as mc_mah_cenpop_diffmahpop
 
 

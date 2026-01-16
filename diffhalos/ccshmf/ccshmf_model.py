@@ -6,18 +6,18 @@ the Cumulative Conditional Subhalo Mass Function (CCSHMF),
 
 from functools import partial
 
-from jax import vmap
 from jax import jit as jjit
 from jax import numpy as jnp
+from jax import vmap
 
-from ..utils import _sig_slope
-from .ccshmf_kernels import lg_ccshmf_kern, lg_differential_cshmf_kern
 from ..calibrations.ccshmf_cal import (
     DEFAULT_CCSHMF_PARAMS,
-    YTP_Params,
-    YLO_Params,
     CCSHMF_Params,
+    YLO_Params,
+    YTP_Params,
 )
+from ..utils import _sig_slope
+from .ccshmf_kernels import lg_ccshmf_kern, lg_differential_cshmf_kern
 
 YTP_XTP = 13.0
 YLO_XTP = 13.0

@@ -1,14 +1,13 @@
-import pathlib
 import argparse
+import pathlib
 
+import corner
+import diffmahnet
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
 import tqdm
-import corner
-
-import diffmahnet
 from diffmahnet import datatools
 
 TRAIN_DATA_DIR = pathlib.Path(

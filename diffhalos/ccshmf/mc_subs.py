@@ -6,9 +6,9 @@ Starting with a simulated snapshot or lightcone with only host halos,
 generate_subhalopop can be used to add subhalos with synthetic values of Mpeak.
 """
 
-import numpy as np
 from functools import partial
 
+import numpy as np
 from jax import jit as jjit
 from jax import numpy as jnp
 from jax import random as jran
@@ -16,9 +16,9 @@ from jax import vmap
 
 from .ccshmf_model import (
     DEFAULT_CCSHMF_PARAMS,
-    predict_ccshmf,
-    get_lgmu_cutoff,
     compute_mean_subhalo_counts,
+    get_lgmu_cutoff,
+    predict_ccshmf,
 )
 
 N_LGMU_TABLE = 100

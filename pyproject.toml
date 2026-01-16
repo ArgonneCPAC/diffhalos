@@ -13,7 +13,7 @@ write_to_template = "__version__ = '{version}'\n"
 [tool.setuptools]
 include-package-data = true
 packages = {find = {exclude=["tests*", "scripts*", "docs*", "notebooks*"]}}
-package-data = {diffhalos = ["data/*.txt", "tests/testing_data/*.npy"]}
+package-data = {diffhalos = ["diffmahnet/pretrained_models/*.eqx"]}
 package-dir = {diffhalos = "diffhalos"}
 
 [project.urls]
