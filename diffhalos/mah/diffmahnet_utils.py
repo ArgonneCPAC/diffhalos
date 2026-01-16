@@ -22,7 +22,7 @@ from diffmah.diffmah_kernels import (
     get_bounded_mah_params,
 )
 
-import diffmahnet
+from . import diffmahnet
 
 from .utils import rescale_mah_parameters
 
