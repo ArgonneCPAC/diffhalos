@@ -13,7 +13,12 @@ import flowjax.train
 import equinox as eqx
 import paramax
 
-from diffopt import kdescent
+try:
+    from diffopt import kdescent
+
+    HAS_DIFFOPT = True
+except ImportError:
+    HAS_DIFFOPT = False
 
 import diffmah
 from diffmah import DEFAULT_MAH_PARAMS
@@ -326,6 +331,10 @@ class DiffMahFlow:
         jnp.array[float]
             Loss value at each step of the descent
         """
+        if not HAS_DIFFOPT:
+            msg = "Must have diffopt installed to use adam_fit"
+            raise ImportError(msg)
+
         if randkey is None:
             randkey, self.randkey = jax.random.split(self.randkey, 2)
 
