@@ -17,7 +17,7 @@ MSG_HAS_SCIPY = "Must have scipy installed to run this test"
 
 
 @pytest.mark.skipif(not HAS_SCIPY, reason=MSG_HAS_SCIPY)
-def test_cumtrapz():
+def test_cumtrapz_vs_scipy():
     ran_key = jran.PRNGKey(0)
     n_x = 100
     n_tests = 10
@@ -31,8 +31,18 @@ def test_cumtrapz():
         assert np.allclose(jax_result[-1], trapezoid(yarr, x=xarr), rtol=1e-4)
 
 
+def test_cumtrapz():
+    n_x = 100
+    xarr = np.linspace(0.0, 10.0, n_x)
+    yarr = xarr**2
+    jax_result = cumtrapz(xarr, yarr)
+    exact_result = xarr[-1] ** 3 / 3
+    assert np.all(np.isfinite(jax_result))
+    assert np.allclose(jax_result[-1], exact_result, rtol=1e-4)
+
+
 @pytest.mark.skipif(not HAS_SCIPY, reason=MSG_HAS_SCIPY)
-def test_trapz():
+def test_trapz_vs_scipy():
     ran_key = jran.PRNGKey(0)
     n_x = 100
     n_tests = 10
@@ -43,3 +53,12 @@ def test_trapz():
         jax_result = trapz(xarr, yarr)
         np_result = trapezoid(yarr, x=xarr)
         assert np.allclose(jax_result, np_result, rtol=1e-4)
+
+
+def test_trapz():
+    n_x = 100
+    xarr = np.linspace(0.0, 10.0, n_x)
+    yarr = xarr**2
+    jax_result = trapz(xarr, yarr)
+    exact_result = xarr[-1] ** 3 / 3
+    assert np.allclose(jax_result, exact_result, rtol=1e-4)

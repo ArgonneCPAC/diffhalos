@@ -1,11 +1,13 @@
 """Utility functions for lightcone calculations"""
 
-from dsps.cosmology import flat_wcdm
 from jax import grad
 from jax import jit as jjit
 from jax import numpy as jnp
 from jax import vmap
 
+from dsps.cosmology import flat_wcdm
+
+from ..cosmology.cosmo_conversion import jaxcosmo_to_dsps_cosmology
 from ..defaults import FULL_SKY_AREA
 
 _Z = (0, None, None, None, None)
@@ -29,8 +31,8 @@ def spherical_shell_comoving_volume(z_grid, cosmo_params):
     z_grid: ndarray of shape (n_z, )
         grid of redshift values
 
-    cosmo_params: namedtuple
-        cosmological parameters
+    cosmo_params: jax-cosmo parameters object
+        cosmological paramteters parameters
 
     Returns
     -------
@@ -39,10 +41,11 @@ def spherical_shell_comoving_volume(z_grid, cosmo_params):
     """
 
     # Compute comoving distance to each grid point
-    r_grid = flat_wcdm.comoving_distance(z_grid, *cosmo_params)
+    dsps_cosmo = jaxcosmo_to_dsps_cosmology(cosmo_params)
+    r_grid = flat_wcdm.comoving_distance(z_grid, *dsps_cosmo)
 
     # Compute ΔR = (∂R/∂z)*Δz
-    d_r_grid_dz = d_Rcom_dz_func(z_grid, *cosmo_params)
+    d_r_grid_dz = d_Rcom_dz_func(z_grid, *dsps_cosmo)
     d_z_grid = z_grid[1] - z_grid[0]
     d_r_grid = d_r_grid_dz * d_z_grid
 
@@ -70,8 +73,8 @@ def compute_volume_from_sky_area(
     sky_area_degsq: float
         sky area, in deg^2
 
-    cosmo_params: namedtuple
-        cosmological paramters
+    cosmo_params: jax-cosmo parameters object
+        cosmological paramteters parameters
 
     Returns
     -------

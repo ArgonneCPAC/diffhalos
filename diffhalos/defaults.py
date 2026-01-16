@@ -15,3 +15,6 @@ FULL_SKY_AREA = (4 * jnp.pi) * (180 / jnp.pi) ** 2
 
 # age of the Universe at z=0
 TODAY = flat_wcdm.age_at_z0(*DEFAULT_COSMOLOGY)
+
+# default overdensity threshold
+DELTA_C = 200.0
