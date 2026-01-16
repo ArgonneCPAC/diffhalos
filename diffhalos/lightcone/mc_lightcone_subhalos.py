@@ -5,17 +5,14 @@ from jax import config
 
 config.update("jax_enable_x64", True)
 
+from functools import partial
+
 from jax import jit as jjit
 from jax import numpy as jnp
 
-from functools import partial
-
-from ..mah.diffmahnet_utils import mc_mah_satpop as mc_mah_satpop_diffmahnet
+from ..ccshmf.ccshmf_model import DEFAULT_CCSHMF_PARAMS, subhalo_lightcone_weights
 from ..ccshmf.mc_subs import generate_subhalopop
-from ..ccshmf.ccshmf_model import (
-    subhalo_lightcone_weights,
-    DEFAULT_CCSHMF_PARAMS,
-)
+from ..mah.diffmahnet_utils import mc_mah_satpop as mc_mah_satpop_diffmahnet
 from ..utils.namedtuple_utils import add_field_to_namedtuple
 
 __all__ = (

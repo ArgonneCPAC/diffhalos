@@ -1,13 +1,12 @@
-import pathlib
 import argparse
+import pathlib
 
+import diffmahnet
+import equinox as eqx
 import jax
 import jax.numpy as jnp
-import equinox as eqx
-
-from diffopt import kdescent
-import diffmahnet
 from diffmahnet import datatools
+from diffopt import kdescent
 
 SAVE_DIR = pathlib.Path("./data/")
 TRAIN_DATA_DIR = pathlib.Path(

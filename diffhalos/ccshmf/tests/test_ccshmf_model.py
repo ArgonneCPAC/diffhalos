@@ -7,11 +7,11 @@ import numpy as np
 
 from ..ccshmf_model import (
     DEFAULT_CCSHMF_PARAMS,
+    compute_mean_subhalo_counts,
     predict_ccshmf,
     predict_ccshmf_halopop,
     predict_differential_cshmf,
     predict_differential_cshmf_halopop,
-    compute_mean_subhalo_counts,
     subhalo_lightcone_weights,
 )
 

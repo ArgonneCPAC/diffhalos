@@ -4,11 +4,11 @@ import numpy as np
 from jax import random as jran
 
 from ..mc_subs import (
-    generate_subhalopop_kern,
-    get_mean_subhalo_counts_poisson,
-    generate_subhalopop,
     DEFAULT_CCSHMF_PARAMS,
+    generate_subhalopop,
+    generate_subhalopop_kern,
     get_lgmu_cutoff,
+    get_mean_subhalo_counts_poisson,
 )
 
 

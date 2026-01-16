@@ -3,27 +3,23 @@ Useful diffmahnet functions
 See https://diffmahnet.readthedocs.io/en/latest/installation.html
 """
 
-import numpy as np
+import glob
 import os
 import pathlib
-import glob
-
 from functools import partial
-from jax import jit as jjit
 
 import jax
 import jax.numpy as jnp
-
-from diffmah import mah_halopop
-from diffmah import DEFAULT_MAH_PARAMS
-from diffmah.diffmah_kernels import DEFAULT_MAH_U_PARAMS
+import numpy as np
+from diffmah import DEFAULT_MAH_PARAMS, mah_halopop
 from diffmah.diffmah_kernels import (
-    get_unbounded_mah_params,
+    DEFAULT_MAH_U_PARAMS,
     get_bounded_mah_params,
+    get_unbounded_mah_params,
 )
+from jax import jit as jjit
 
 from . import diffmahnet
-
 from .utils import rescale_mah_parameters
 
 DEFAULT_MAH_UPARAMS = get_unbounded_mah_params(DEFAULT_MAH_PARAMS)

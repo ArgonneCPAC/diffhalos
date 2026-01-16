@@ -1,8 +1,8 @@
-import pathlib
 import argparse
+import pathlib
 
-import jax
 import diffmahnet
+import jax
 from diffmahnet import datatools
 
 SAVE_DIR = pathlib.Path("./data/")

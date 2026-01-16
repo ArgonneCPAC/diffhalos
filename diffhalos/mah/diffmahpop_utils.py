@@ -4,15 +4,12 @@ See https://github.com/ArgonneCPAC/diffmah/tree/main/diffmah/diffmahpop_kernels
 """
 
 import jax.numpy as jnp
-from jax import jit as jjit
-from jax import vmap
-
+from diffmah.diffmah_kernels import _log_mah_kern
+from diffmah.diffmahpop_kernels.bimod_censat_params import DEFAULT_DIFFMAHPOP_PARAMS
 from diffmah.diffmahpop_kernels.mc_bimod_cens import mc_cenpop
 from diffmah.diffmahpop_kernels.mc_bimod_sats import mc_satpop
-from diffmah.diffmah_kernels import _log_mah_kern
-from diffmah.diffmahpop_kernels.bimod_censat_params import (
-    DEFAULT_DIFFMAHPOP_PARAMS,
-)
+from jax import jit as jjit
+from jax import vmap
 
 from .utils import rescale_mah_parameters
 

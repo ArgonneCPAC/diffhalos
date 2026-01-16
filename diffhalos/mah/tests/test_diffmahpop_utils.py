@@ -4,11 +4,7 @@ import numpy as np
 from jax import numpy as jnp
 from jax import random as jran
 
-from ..diffmahpop_utils import (
-    mc_mah_cenpop,
-    mc_mah_satpop,
-    DEFAULT_DIFFMAHPOP_PARAMS,
-)
+from ..diffmahpop_utils import DEFAULT_DIFFMAHPOP_PARAMS, mc_mah_cenpop, mc_mah_satpop
 
 
 def test_mc_mah_cenpop_behaves_as_expected():
