@@ -2,7 +2,7 @@ diffhalos
 ============
 
 Installation
------------
+------------
 To install diffhalos into your environment from the source code::
 
     $ cd /path/to/root/diffhalos
