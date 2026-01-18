@@ -1,4 +1,4 @@
-0.0.2 (unreleased)
+0.0.2 (2026-01-18)
 -------------------
 - Include diffmahnet (https://github.com/ArgonneCPAC/diffhalos/pull/19)
 - Introduce readthedocs (https://github.com/ArgonneCPAC/diffhalos/pull/20)
