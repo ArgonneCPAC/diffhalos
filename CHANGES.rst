@@ -1,4 +1,4 @@
-0.0.3 (unreleased)
+0.0.4 (2026-01-18)
 -------------------
 - Fix bug in README.rst (https://github.com/ArgonneCPAC/diffhalos/pull/21)
 
