@@ -11,7 +11,7 @@ To install diffhalos into your environment from the source code::
 
 Documentation
 ------------
-Online documentation is available at [diffhalos.readthedocs.io](https://diffhalos.readthedocs.io/en/latest/)
+Online documentation is available at `diffhalos.readthedocs.io <https://diffhalos.readthedocs.io/en/latest/>`_
 
 
 Testing
@@ -25,4 +25,3 @@ To build html of test coverage::
 
     $ pytest -v --cov --cov-report html
     $ open htmlcov/index.html
-
