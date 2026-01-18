@@ -1,0 +1,17 @@
+version: 2
+
+sphinx:
+  configuration: docs/source/conf.py
+
+build:
+  os: "ubuntu-22.04"
+  tools:
+    python: "miniconda-latest"
+
+conda:
+  environment: docs/source/rtd_environment.yaml
+
+python:
+  install:
+    - method: pip
+      path: .
