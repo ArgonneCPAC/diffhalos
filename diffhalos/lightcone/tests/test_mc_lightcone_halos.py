@@ -338,3 +338,20 @@ def test_mc_lightcone_host_halo_alt_mf_params():
         # Some halos with logmp_obs<lgmp_min is ok,
         # but too many indicates an issue with diffmahnet replicating logmp_obs
         assert np.mean(cenpop.logmp_obs < lgmp_min) < 0.2, f"z_min={z_min:.2f}"
+
+
+def test_mc_lightcone_host_halo_lgmp_max():
+    """Regression test enforcing that mc_lightcone_host_halo returns some halos with
+    mass that is close to lgmp_max.
+    """
+    nhalos_tot = 2_000
+    z_min, z_max = 0.4, 2.0
+    lgmp_min, lgmp_max = 10.5, 15.5
+
+    z_grid = np.linspace(z_min, z_max, 100)
+    ran_key = jran.key(0)
+
+    sky_area_degsq = 100.0
+    args = (ran_key, lgmp_min, z_grid, sky_area_degsq, nhalos_tot)
+    cenpop = mclh.mc_lightcone_host_halo(*args, lgmp_max=lgmp_max)
+    assert np.any(cenpop.logmp_obs.max() > lgmp_max - 0.5)
