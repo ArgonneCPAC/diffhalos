@@ -108,6 +108,8 @@ def _cuml_hmf_interp(
     cosmo_params,
     redshift,
     logmp,
+    logmp_min,
+    logmp_max,
     delta_c,
 ):
 
@@ -122,11 +124,11 @@ def _cuml_hmf_interp(
     # compute the cumulative HMF n(<logm)
     cuml_hmf_table = cumtrapz(LOGMP_TABLE, diff_hmf_table)
 
-    # convert to the cumulative n(>logm)
-    cuml_hmf_table = cuml_hmf_table[-1] - cuml_hmf_table
-
-    # interpolate at the requested mass
-    cuml_hmf = jnp.interp(logmp, LOGMP_TABLE, cuml_hmf_table)
+    # get the cumulative n(>logm)
+    cuml_hmf_min = jnp.interp(logmp_min, LOGMP_TABLE, cuml_hmf_table)
+    cuml_hmf_max = jnp.interp(logmp_max, LOGMP_TABLE, cuml_hmf_table)
+    cuml_hmf_tot = cuml_hmf_min - cuml_hmf_max
+    cuml_hmf = cuml_hmf_tot - jnp.interp(logmp, LOGMP_TABLE, cuml_hmf_table)
 
     return cuml_hmf
 
@@ -171,9 +173,19 @@ def predict_cuml_hmf(
         Note that both number density and halo mass are defined in
         physical units (not h=1 units)
     """
+    logmp_min = logmp.min()
+    logmp_max = logmp.max()
+
     # compute the cumulative HMF at requested
     # redshift and mass via interpolation using a fixed table
-    cuml_hmf = _cuml_hmf_interp(cosmo_params, redshift, logmp, delta_c)
+    cuml_hmf = _cuml_hmf_interp(
+        cosmo_params,
+        redshift,
+        logmp,
+        logmp_min,
+        logmp_max,
+        delta_c,
+    )
 
     # take the log10 of the cumulative HMF
     lg_cuml_hmf = jnp.log10(cuml_hmf)
