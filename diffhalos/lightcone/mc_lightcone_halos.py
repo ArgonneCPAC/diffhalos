@@ -34,6 +34,18 @@ __all__ = (
 )
 
 
+def mc_lc_hmf(ran_key, lgmp_min, lgmp_max, z_min, z_max, sky_area_degsq):
+    return z_halopop, logmp_halopop
+
+
+def mc_lc_halos(ran_key, lgmp_min, lgmp_max, z_min, z_max, sky_area_degsq):
+    z_halopop, logmp_halopop = mc_lc_hmf(
+        ran_key, lgmp_min, lgmp_max, z_min, z_max, sky_area_degsq
+    )
+    cenpop = mc_lightcone_host_halo(*args)
+    return cenpop
+
+
 @partial(jjit, static_argnames=("nhalos_tot",))
 def mc_lightcone_host_halo_mass_function(
     ran_key,

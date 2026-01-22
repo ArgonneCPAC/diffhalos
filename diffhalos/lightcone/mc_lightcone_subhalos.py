@@ -25,6 +25,18 @@ DEFAULT_DIFFMAHNET_SAT_MODEL = "satflow_v2_0_64bit.eqx"
 N_LGMU_PER_HOST = 5
 
 
+def mc_lc_shmf(ran_key, lgmp_min, lgmhost, z_min, z_max, sky_area_degsq):
+    return mc_lg_mu, lgmhost_pop, host_halo_indx
+
+
+def mc_lc_subhalos(ran_key, lgmp_min, lgmp_max, z_min, z_max, sky_area_degsq):
+    z_halopop, logmp_halopop = mc_lc_hmf(
+        ran_key, lgmp_min, lgmp_max, z_min, z_max, sky_area_degsq
+    )
+    cenpop = mc_lightcone_host_halo(*args)
+    return cenpop
+
+
 @partial(jjit, static_argnames=("nsub_tot",))
 def mc_lightcone_subhalo_mass_function(
     ran_key,
