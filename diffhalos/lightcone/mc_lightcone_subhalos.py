@@ -10,7 +10,7 @@ from jax import numpy as jnp
 
 from functools import partial
 
-from ..mah.diffmahnet_utils import mc_mah_satpop as mc_mah_satpop_diffmahnet
+from ..mah.diffmahnet_utils import mc_mah_satpop
 from ..ccshmf.mc_subs import generate_subhalopop
 from ..ccshmf.ccshmf_model import (
     subhalo_lightcone_weights,
@@ -26,6 +26,17 @@ __all__ = (
 
 DEFAULT_DIFFMAHNET_SAT_MODEL = "satflow_v2_0_64bit.eqx"
 N_LGMU_PER_HOST = 5
+
+# def mc_lc_shmf(ran_key, lgmp_min, lgmhost, z_min, z_max, sky_area_degsq):
+#     return mc_lg_mu, lgmhost_pop, host_halo_indx
+
+
+# def mc_lc_subhalos(ran_key, lgmp_min, lgmp_max, z_min, z_max, sky_area_degsq):
+#     z_halopop, logmp_halopop = mc_lc_hmf(
+#         ran_key, lgmp_min, lgmp_max, z_min, z_max, sky_area_degsq
+#     )
+#     cenpop = mc_lightcone_host_halo(*args)
+#     return cenpop
 
 
 @partial(jjit, static_argnames=("nsub_tot",))
@@ -150,8 +161,7 @@ def mc_lightcone_subhalo_diffmah(
     )
 
     # get the MAH parameters for the subhalos
-    tarr = (jnp.ones(n_sub) * lgt0).reshape(n_sub, 1)
-    _, mah_params_sub = mc_mah_satpop_diffmahnet(
+    mah_params_sub = mc_mah_satpop(
         jnp.repeat(
             halopop.logmp_obs,
             n_mu_per_host,
@@ -164,10 +174,32 @@ def mc_lightcone_subhalo_diffmah(
             total_repeat_length=nsub_tot,
         ),
         ran_key,
-        tarr,
-        subhalo_model_key=subhalo_model_key,
-        logt0=lgt0,
+        subhalo_model_key,
     )
+
+    #################################
+    # # get the uncorrected MAH parameters for all halos
+    # logmp_obs_clipped = jnp.clip(logmp_obs_mf, logmp_cutoff, logmp_cutoff_himass)
+    # mah_params_uncorrected = mc_mah_cenpop(
+    #     logmp_obs_clipped,
+    #     t_obs,
+    #     mah_key,
+    #     centrals_model_key,
+    # )
+
+    # # compute the uncorrected observed masses
+    # logmp_obs_uncorrected = log_mah_kern(mah_params_uncorrected, t_obs, lgt0)
+
+    # # rescale the mah parameters to the correct logm0
+    # mah_params = rescale_mah_parameters(
+    #     mah_params_uncorrected,
+    #     logmp_obs_mf,
+    #     logmp_obs_uncorrected,
+    # )
+
+    # # compute observed mass with corrected parameters
+    # logmp_obs = log_mah_kern(mah_params, t_obs, lgt0)
+    #################################
 
     new_fields = ("host_index_for_sub", "mah_params_sub")
     new_data = (host_index_for_sub, mah_params_sub)

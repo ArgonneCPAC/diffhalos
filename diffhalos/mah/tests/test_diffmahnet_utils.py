@@ -4,24 +4,31 @@ import numpy as np
 from jax import random as jran
 from jax import numpy as jnp
 
-from ..diffmahnet_utils import mc_mah_cenpop, mc_mah_satpop, get_mean_and_std_of_mah
+from ..diffmahnet_utils import (
+    mc_mah_cenpop,
+    mc_mah_satpop,
+    get_mean_and_std_of_mah,
+)
 from ..diffmahpop_utils import mc_mah_cenpop as mc_mah_cenpop_diffmahpop
+from ...mah.diffmahnet.diffmahnet import log_mah_kern
 
 
 def test_mc_mah_cenpop_behaves_as_expected():
 
     ran_key = jran.key(0)
 
-    n_cens = 10
+    centrals_model_key = "cenflow_v2_0_64bit.eqx"
+
+    n_cens = 100
     m_obs = np.linspace(9.0, 14.0, n_cens)
     t_obs = np.linspace(12.0, 13.5, n_cens)
 
-    n_sample = 1000
+    n_sample = 100
     n_t = 100
     t_min = 0.5
     logt0 = np.log10(13.8)
 
-    # get a list of (m_obs, t_obs) for each MC realization
+    # get (m_obs, t_obs) for each MC realization
     m_vals, t_vals = [
         jnp.repeat(x.flatten(), n_sample)
         for x in np.stack(
@@ -30,35 +37,43 @@ def test_mc_mah_cenpop_behaves_as_expected():
         ).T
     ]
 
-    # construct time grids for each halo, given observation time
-    t_grid = jnp.linspace(t_min, t_vals, n_t).T
-
-    cen_mah, _ = mc_mah_cenpop(
+    # compute the MAH parameters
+    mah_params = mc_mah_cenpop(
         m_vals,
         t_vals,
         ran_key,
-        t_grid,
-        logt0=logt0,
+        centrals_model_key,
     )
 
-    assert np.all(np.isfinite(cen_mah))
-    assert cen_mah.shape == t_grid.shape == (n_cens * n_sample, n_t)
+    # construct time grids for each halo, given observation time
+    t_grid = jnp.linspace(t_min, t_vals, n_t).T
+
+    # compute observed mass with corrected parameters
+    logmp_obs = log_mah_kern(mah_params, t_grid, logt0)
+
+    for _field in mah_params._fields:
+        assert mah_params._asdict()[_field].shape == (n_cens * n_sample,)
+        assert np.all(np.isfinite(mah_params._asdict()[_field]))
+
+    assert np.all(np.isfinite(logmp_obs))
 
 
 def test_cenpop_diffmahnet_vs_diffmahpop():
 
     ran_key = jran.key(0)
 
-    n_cens = 10
+    centrals_model_key = "cenflow_v2_0_64bit.eqx"
+
+    n_cens = 100
     m_obs = np.linspace(9.0, 14.0, n_cens)
     t_obs = np.linspace(12.0, 13.5, n_cens)
 
-    n_sample = 1000
+    n_sample = 100
     n_t = 100
     t_min = 0.5
     logt0 = np.log10(13.8)
 
-    # get a list of (m_obs, t_obs) for each MC realization
+    # get (m_obs, t_obs) for each MC realization
     m_vals, t_vals = [
         jnp.repeat(x.flatten(), n_sample)
         for x in np.stack(
@@ -67,19 +82,24 @@ def test_cenpop_diffmahnet_vs_diffmahpop():
         ).T
     ]
 
-    # construct time grids for each halo, given observation time
-    t_grid = jnp.linspace(t_min, t_vals, n_t).T
-
-    cen_mah, _ = mc_mah_cenpop(
+    # compute diffmahnet MAH parameters
+    mah_params_diffmahnet = mc_mah_cenpop(
         m_vals,
         t_vals,
         ran_key,
-        t_grid,
-        logt0=logt0,
+        centrals_model_key,
     )
 
+    # construct time grids for diffmahnet
+    t_grid = jnp.linspace(t_min, t_vals, n_t).T
+
+    # compute diffmahnet mah
+    cen_mah_diffmahnet = log_mah_kern(mah_params_diffmahnet, t_grid, logt0)
+
+    # construct time grids for diffmahpop
     t_grid = jnp.linspace(t_min, t_obs.max(), n_t)
 
+    # compute diffmahpop MAH parameters
     cen_mah_diffmahpop, _ = mc_mah_cenpop_diffmahpop(
         m_vals,
         t_vals,
@@ -88,10 +108,10 @@ def test_cenpop_diffmahnet_vs_diffmahpop():
         logt0=logt0,
     )
 
-    assert np.all(np.isfinite(cen_mah))
+    assert np.all(np.isfinite(cen_mah_diffmahnet))
     assert np.all(np.isfinite(cen_mah_diffmahpop))
 
-    mah_mean = get_mean_and_std_of_mah(cen_mah)[0]
+    mah_mean = get_mean_and_std_of_mah(cen_mah_diffmahnet)[0]
     mah_mean_diffmahpop = get_mean_and_std_of_mah(cen_mah_diffmahpop)[0]
 
     assert np.allclose(mah_mean, mah_mean_diffmahpop, rtol=0.1)
@@ -100,6 +120,8 @@ def test_cenpop_diffmahnet_vs_diffmahpop():
 def test_mc_mah_satpop_behaves_as_expected():
 
     ran_key = jran.key(0)
+
+    subhalo_model_key = "satflow_v2_0_64bit.eqx"
 
     n_subs = 10
     m_obs = np.linspace(9.0, 14.0, n_subs)
@@ -119,16 +141,19 @@ def test_mc_mah_satpop_behaves_as_expected():
         ).T
     ]
 
-    # construct time grids for each halo, given observation time
-    t_grid = jnp.linspace(t_min, t_vals, n_t).T
-
-    sat_mah, _ = mc_mah_satpop(
+    # compute the MAH parameters
+    mah_params = mc_mah_satpop(
         m_vals,
         t_vals,
         ran_key,
-        t_grid,
-        logt0=logt0,
+        subhalo_model_key,
     )
+
+    # construct time grids for each halo, given observation time
+    t_grid = jnp.linspace(t_min, t_vals, n_t).T
+
+    # compute observed mass with corrected parameters
+    sat_mah = log_mah_kern(mah_params, t_grid, logt0)
 
     assert np.all(np.isfinite(sat_mah))
     assert sat_mah.shape == t_grid.shape == (n_subs * n_sample, n_t)

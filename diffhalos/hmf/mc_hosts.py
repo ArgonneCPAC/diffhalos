@@ -283,4 +283,5 @@ def _mc_host_halos_singlez_kern(
         lgmp_max=lgmp_max,
     )
     mc_lg_mp = jnp.interp(uran, cdf_table, lgmp_table)
+
     return mc_lg_mp

@@ -23,13 +23,15 @@ def test_mc_lightcone_host_halo_mass_function():
     n_grid_z = 500
     z_grid = np.linspace(z_min, z_max, n_grid_z)
     sky_area_degsq = 10.0
+
     cosmo = DEFAULT_COSMOLOGY
+    hmf_params = DEFAULT_HMF_PARAMS
 
     mean_nhalos_grid = hmf_model.get_mean_nhalos_from_sky_area(
         z_grid,
         sky_area_degsq,
         cosmo,
-        DEFAULT_HMF_PARAMS,
+        hmf_params,
         lgmp_min,
         lgmp_max,
     )
@@ -81,7 +83,7 @@ def test_mc_lightcone_host_halo_mass_function():
         mean_nhalos = hmf_model.get_mean_nhalos_from_volume(
             z_med,
             vol_com_mpc,
-            DEFAULT_HMF_PARAMS,
+            hmf_params,
             lgmp_min,
             lgmp_max,
         )
@@ -121,11 +123,13 @@ def test_mc_lightcone_host_halo_mass_function_lgmp_max_feature():
     lgmp_max = 17.0
     lgmp_max_test = 13.0
 
+    hmf_params = DEFAULT_HMF_PARAMS
+
     mean_nhalos_grid = hmf_model.get_mean_nhalos_from_sky_area(
         z_grid,
         sky_area_degsq,
         DEFAULT_COSMOLOGY,
-        DEFAULT_HMF_PARAMS,
+        hmf_params,
         lgmp_min,
         lgmp_max,
     )
@@ -134,7 +138,7 @@ def test_mc_lightcone_host_halo_mass_function_lgmp_max_feature():
         z_grid,
         sky_area_degsq,
         DEFAULT_COSMOLOGY,
-        DEFAULT_HMF_PARAMS,
+        hmf_params,
         lgmp_min,
         lgmp_max_test,
     )
@@ -258,7 +262,9 @@ def test_mc_lightcone_host_halo():
     sky_area_degsq = 1.0
     n_grid_z = 500
     lgmp_max = 17.0
+
     cosmo = DEFAULT_COSMOLOGY
+    hmf_params = DEFAULT_HMF_PARAMS
 
     n_tests = 5
     z_max_arr = np.linspace(0.2, 2.5, n_tests)
@@ -271,7 +277,7 @@ def test_mc_lightcone_host_halo():
             z_grid,
             sky_area_degsq,
             cosmo,
-            DEFAULT_HMF_PARAMS,
+            hmf_params,
             lgmp_min,
             lgmp_max,
         )
@@ -279,11 +285,12 @@ def test_mc_lightcone_host_halo():
         nhalos_tot = int(nhalos_grid.sum())
 
         args = (test_key, lgmp_min, z_grid, sky_area_degsq, nhalos_tot)
-
         cenpop = mclh.mc_lightcone_host_halo(*args)
-        n_gals = cenpop.z_obs.size
-        assert cenpop.logmp_obs.size == cenpop.logmp0.size == n_gals
+
         assert np.all(np.isfinite(cenpop.z_obs))
+        assert np.all(np.isfinite(cenpop.logmp_obs))
+        assert np.all(np.isfinite(cenpop.logmp0))
+        assert cenpop.logmp_obs.size == cenpop.logmp0.size == cenpop.z_obs.size
 
         assert np.all(cenpop.z_obs >= z_min)
         assert np.all(cenpop.z_obs <= z_max)
@@ -304,7 +311,9 @@ def test_mc_lightcone_host_halo_alt_mf_params():
     sky_area_degsq = 1.0
     n_grid_z = 500
     lgmp_max = 17.0
+
     cosmo = DEFAULT_COSMOLOGY
+    hmf_params = DEFAULT_HMF_PARAMS
 
     n_tests = 5
     z_max_arr = np.linspace(0.2, 2.5, n_tests)
@@ -317,7 +326,7 @@ def test_mc_lightcone_host_halo_alt_mf_params():
             z_grid,
             sky_area_degsq,
             cosmo,
-            DEFAULT_HMF_PARAMS,
+            hmf_params,
             lgmp_min,
             lgmp_max,
         )
@@ -329,9 +338,11 @@ def test_mc_lightcone_host_halo_alt_mf_params():
             *args,
             hmf_params=hchmf.HMF_PARAMS,
         )
-        n_gals = cenpop.z_obs.size
-        assert cenpop.logmp_obs.size == cenpop.logmp0.size == n_gals
+
         assert np.all(np.isfinite(cenpop.z_obs))
+        assert np.all(np.isfinite(cenpop.logmp_obs))
+        assert np.all(np.isfinite(cenpop.logmp0))
+        assert cenpop.logmp_obs.size == cenpop.logmp0.size == cenpop.z_obs.size
 
         assert np.all(cenpop.z_obs >= z_min)
         assert np.all(cenpop.z_obs <= z_max)
@@ -339,3 +350,22 @@ def test_mc_lightcone_host_halo_alt_mf_params():
         # Some halos with logmp_obs<lgmp_min is ok,
         # but too many indicates an issue with diffmahnet replicating logmp_obs
         assert np.mean(cenpop.logmp_obs < lgmp_min) < 0.2, f"z_min={z_min:.2f}"
+
+
+# def test_mc_lightcone_host_halo_lgmp_max():
+#     """
+#     Regression test enforcing that mc_lightcone_host_halo
+#     returns some halos with mass that is close to lgmp_max
+#     """
+#     nhalos_tot = 2_000
+#     z_min, z_max = 0.4, 2.0
+#     lgmp_min, lgmp_max = 10.5, 15.5
+
+#     z_grid = np.linspace(z_min, z_max, 100)
+#     ran_key = jran.key(0)
+
+#     sky_area_degsq = 100.0
+#     args = (ran_key, lgmp_min, z_grid, sky_area_degsq, nhalos_tot)
+#     cenpop = mclh.mc_lightcone_host_halo(*args, lgmp_max=lgmp_max)
+
+#     assert np.any(cenpop.logmp_obs.max() > lgmp_max - 0.5)

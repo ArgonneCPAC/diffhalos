@@ -22,7 +22,10 @@ except ImportError:
 
 import diffmah
 from diffmah import DEFAULT_MAH_PARAMS
-from diffmah.diffmah_kernels import get_unbounded_mah_params, get_bounded_mah_params
+from diffmah.diffmah_kernels import (
+    get_unbounded_mah_params,
+    get_bounded_mah_params,
+)
 
 DEFAULT_MAH_UPARAMS = get_unbounded_mah_params(DEFAULT_MAH_PARAMS)
 
