@@ -11,7 +11,7 @@ from jax import numpy as jnp
 from functools import partial
 
 from ..mah.diffmahnet_utils import mc_mah_satpop
-from ..ccshmf.mc_subs import generate_subhalopop
+from ..ccshmf.mc_subs import _generate_subhalopop
 from ..ccshmf.ccshmf_model import (
     subhalo_lightcone_weights,
     DEFAULT_CCSHMF_PARAMS,
@@ -19,9 +19,8 @@ from ..ccshmf.ccshmf_model import (
 from ..utils.namedtuple_utils import add_field_to_namedtuple
 
 __all__ = (
-    "mc_lightcone_subhalo_mass_function",
-    "mc_lightcone_subhalo_diffmah",
-    "mc_weighted_subhalo_lightcone",
+    # "mc_lightcone_subhalo",
+    # "weighted_subhalo_lightcone",
 )
 
 DEFAULT_DIFFMAHNET_SAT_MODEL = "satflow_v2_0_64bit.eqx"
@@ -40,7 +39,7 @@ N_LGMU_PER_HOST = 5
 
 
 @partial(jjit, static_argnames=("nsub_tot",))
-def mc_lightcone_subhalo_mass_function(
+def _mc_lightcone_subhalo_mass_function(
     ran_key,
     lgmhost,
     lgmp_min,
@@ -87,7 +86,7 @@ def mc_lightcone_subhalo_mass_function(
         so that lgmhost_pop = lgmhost_arr[host_halo_indx];
         thus all values satisfy 0 <= host_halo_indx < nhosts
     """
-    mc_lg_mu, lgmhost_pop, host_halo_indx = generate_subhalopop(
+    mc_lg_mu, lgmhost_pop, host_halo_indx = _generate_subhalopop(
         ran_key,
         lgmhost,
         lgmp_min,
@@ -100,7 +99,7 @@ def mc_lightcone_subhalo_mass_function(
 
 
 @partial(jjit, static_argnames=("nsub_tot", "subhalo_model_key"))
-def mc_lightcone_subhalo_diffmah(
+def _mc_lightcone_subhalo(
     ran_key,
     halopop,
     lgt0,
@@ -151,7 +150,6 @@ def mc_lightcone_subhalo_diffmah(
     """
 
     n_host = halopop.logmp_obs.size
-    n_sub = lgmu.size
 
     # match host index with subhalos
     host_index_for_sub = jnp.repeat(
@@ -209,7 +207,7 @@ def mc_lightcone_subhalo_diffmah(
 
 
 @partial(jjit, static_argnames=("subhalo_model_key", "n_mu_per_host"))
-def mc_weighted_subhalo_lightcone(
+def weighted_subhalo_lightcone(
     halopop,
     ran_key,
     lgmp_min,
@@ -273,7 +271,7 @@ def mc_weighted_subhalo_lightcone(
 
     # generate diffmah subhalo populations
     n_mu_per_host_arr = jnp.repeat(jnp.asarray(n_mu_per_host), n_host)
-    halopop = mc_lightcone_subhalo_diffmah(
+    halopop = _mc_lightcone_subhalo(
         ran_key,
         halopop,
         lgt0,

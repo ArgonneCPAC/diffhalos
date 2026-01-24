@@ -24,6 +24,7 @@ from ..hmf import hmf_model, mc_hosts
 from ..mah.diffmahnet_utils import mc_mah_cenpop
 from ..mah.utils import rescale_mah_parameters
 from ..mah.diffmahnet.diffmahnet import log_mah_kern
+from ..utils.geometry_utils import compute_volume_from_sky_area
 
 N_HMF_GRID = 2_000
 DEFAULT_LOGMP_CUTOFF = 10.0
@@ -49,69 +50,12 @@ def mc_lc_hmf(
     cosmo_params=DEFAULT_COSMOLOGY,
     hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
     lgmp_max=mc_hosts.LGMH_MAX,
-):
-
-    args = ()
-    kwargs = dict(
-        cosmo_params=cosmo_params,
-        hmf_params=hmf_params,
-        lgmp_max=lgmp_max,
-    )
-
-    z_halopop, logmp_halopop = _mc_lightcone_host_halo_mass_function(*args, **kwargs)
-
-    return z_halopop, logmp_halopop
-
-
-def mc_lc_halos(
-    ran_key,
-    lgmp_min,
-    z_min,
-    z_max,
-    sky_area_degsq,
-    cosmo_params=DEFAULT_COSMOLOGY,
-    hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
-    logmp_cutoff=DEFAULT_LOGMP_CUTOFF,
-    logmp_cutoff_himass=DEFAULT_LOGMP_HIMASS_CUTOFF,
-    lgmp_max=mc_hosts.LGMH_MAX,
-    centrals_model_key=DEFAULT_DIFFMAHNET_CEN_MODEL,
-):
-
-    z_halopop, logmp_halopop = mc_lc_hmf(
-        ran_key, lgmp_min, lgmp_max, z_min, z_max, sky_area_degsq
-    )
-
-    args = ()
-    kwargs = dict(
-        cosmo_params=cosmo_params,
-        hmf_params=hmf_params,
-        logmp_cutoff=logmp_cutoff,
-        logmp_cutoff_himass=logmp_cutoff_himass,
-        lgmp_max=lgmp_max,
-        centrals_model_key=centrals_model_key,
-    )
-
-    cenpop = _mc_lightcone_host_halo(*args, **kwargs)
-
-    return cenpop
-
-
-@partial(jjit, static_argnames=("nhalos_tot",))
-def _mc_lightcone_host_halo_mass_function(
-    ran_key,
-    lgmp_min,
-    z_grid,
-    sky_area_degsq,
-    nhalos_tot,
-    cosmo_params=DEFAULT_COSMOLOGY,
-    hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
-    lgmp_max=mc_hosts.LGMH_MAX,
+    n_hmf_grid=N_HMF_GRID,
 ):
     """
     Generate a Monte Carlo realization of a lightcone of
-    host halo masses and redshifts, on an input grid
-    in redshift, between a minimum and a maximum halo mass
-    sampling from the halo mass function
+    host halo masses and redshifts, between two redshifts
+    and between a minimum and a maximum mass
 
     Parameters
     ----------
@@ -121,14 +65,14 @@ def _mc_lightcone_host_halo_mass_function(
     lgmp_min: float
         minimum halo mass, in Msun
 
-    z_grid: ndarray of shape (n_z, )
-        redshift points
+    z_min: float
+        minimum redshift
+
+    z_max: float
+        maximum redshift
 
     sky_area_degsq: float
         sky area, in deg^2
-
-    nhalos_tot: int
-        total number of halos to generate in the lightcone
 
     cosmo_params: namedtuple
         dsps.cosmology.flat_wcdm cosmology
@@ -137,11 +81,11 @@ def _mc_lightcone_host_halo_mass_function(
     hmf_params: namedtuple
         halo mass function parameters
 
-    lgmp_min: float
-        base-10 log of minimum halo mass, in Msun
-
     lgmp_max: float
         base-10 log of maximum halo mass, in Msun
+
+    n_hmf_grid: int
+        number of redshift grid points for HMF computations
 
     Returns
     -------
@@ -153,20 +97,39 @@ def _mc_lightcone_host_halo_mass_function(
         at the appropriate redshift for each point
     """
 
-    m_key, z_key = jran.split(ran_key, 2)
+    # randoms for Nhalos, halo mass, and redshift
+    halo_counts_key, m_key, z_key = jran.split(ran_key, 3)
 
-    # get the mean number of halos on redshift grid
-    mean_nhalos_grid = hmf_model.get_mean_nhalos_from_sky_area(
+    # set up a uniform grid in redshift
+    z_grid = jnp.linspace(z_min, z_max, n_hmf_grid)
+
+    # compute the comoving volume of a thin shell at each grid point
+    volume_com_mpc = compute_volume_from_sky_area(
         z_grid,
         sky_area_degsq,
         cosmo_params,
-        hmf_params,
-        lgmp_min,
-        lgmp_max,
     )
 
+    # at each grid point, compute <Nhalos> for the shell volume
+    mean_nhalos = mc_hosts._compute_nhalos_tot(
+        hmf_params,
+        lgmp_min,
+        z_grid,
+        volume_com_mpc,
+    )
+    mean_nhalos_lgmax = mc_hosts._compute_nhalos_tot(
+        hmf_params,
+        lgmp_max,
+        z_grid,
+        volume_com_mpc,
+    )
+    mean_nhalos = mean_nhalos - mean_nhalos_lgmax
+
+    # at each grid point, compute a Poisson realization of <Nhalos>
+    nhalos_tot = jran.poisson(halo_counts_key, mean_nhalos).sum()
+
     # compute the CDF of the volume
-    weights_grid = mean_nhalos_grid / mean_nhalos_grid.sum()
+    weights_grid = mean_nhalos / mean_nhalos.sum()
     cdf_grid = jnp.cumsum(weights_grid)
 
     # assign redshift via inverse transformation sampling of the halo counts CDF
@@ -182,24 +145,23 @@ def _mc_lightcone_host_halo_mass_function(
     return z_halopop, logmp_halopop
 
 
-@partial(jjit, static_argnames=["centrals_model_key", "nhalos_tot"])
-def _mc_lightcone_host_halo(
+def mc_lc_halos(
     ran_key,
     lgmp_min,
-    z_grid,
+    z_min,
+    z_max,
     sky_area_degsq,
-    nhalos_tot,
     cosmo_params=DEFAULT_COSMOLOGY,
     hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
     logmp_cutoff=DEFAULT_LOGMP_CUTOFF,
     logmp_cutoff_himass=DEFAULT_LOGMP_HIMASS_CUTOFF,
     lgmp_max=mc_hosts.LGMH_MAX,
+    n_hmf_grid=N_HMF_GRID,
     centrals_model_key=DEFAULT_DIFFMAHNET_CEN_MODEL,
 ):
     """
-    Generate a halo lightcone, including MAHs, on an input
-    grid in redshift, between a minimum and a maximum halo mass,
-    via sampling from the halo mass function
+    Generate a halo lightcone, including MAHs,
+    between a minimum and a maximum value of redshift and halo mass
 
     Parameters
     ----------
@@ -209,8 +171,11 @@ def _mc_lightcone_host_halo(
     lgmp_min: float
         minimum halo mass, in Msun
 
-    z_grid: ndarray of shape (n_z, )
-        redshift values
+    z_min: float
+        minimum redshift
+
+    z_max: float
+        maximum redshift
 
     sky_area_degsq: float
         sky area, in deg^2
@@ -237,6 +202,9 @@ def _mc_lightcone_host_halo(
     lgmp_max: float
         base-10 log of maximum host halo mass, in Msun
 
+    n_hmf_grid: int
+        number of redshift grid points for HMF computations
+
     centrals_model_key: str
         diffmahnet model to use for centrals
 
@@ -258,15 +226,16 @@ def _mc_lightcone_host_halo(
 
     # generate mc realization of the halo mass function
     lc_hmf_key, mah_key = jran.split(ran_key, 2)
-    z_obs, logmp_obs_mf = mc_lightcone_host_halo_mass_function(
+    z_obs, logmp_obs_mf = mc_lc_hmf(
         lc_hmf_key,
         lgmp_min,
-        z_grid,
+        z_min,
+        z_max,
         sky_area_degsq,
-        nhalos_tot,
         cosmo_params=cosmo_params,
         hmf_params=hmf_params,
         lgmp_max=lgmp_max,
+        n_hmf_grid=n_hmf_grid,
     )
 
     t_obs = flat_wcdm.age_at_z(z_obs, *cosmo_params)
@@ -320,7 +289,7 @@ def weighted_lightcone_host_halo(
 ):
     """
     Generates a weighted lightcone population of halos with MAHs,
-    on a grid generated based on a sequence of any kind
+    on an input grid of redshift and mass
 
     Parameters
     ----------

@@ -20,33 +20,16 @@ def test_mc_lightcone_host_halo_mass_function():
     lgmp_min = 12.0
     lgmp_max = 17.0
     z_min, z_max = 0.4, 0.5
-    n_grid_z = 500
-    z_grid = np.linspace(z_min, z_max, n_grid_z)
     sky_area_degsq = 10.0
 
     cosmo = DEFAULT_COSMOLOGY
     hmf_params = DEFAULT_HMF_PARAMS
 
-    mean_nhalos_grid = hmf_model.get_mean_nhalos_from_sky_area(
-        z_grid,
-        sky_area_degsq,
-        cosmo,
-        hmf_params,
-        lgmp_min,
-        lgmp_max,
-    )
-
     n_tests = 5
     ran_keys = jran.split(jran.key(0), n_tests)
     for ran_key in ran_keys:
-        nhalos_grid = jran.poisson(ran_key, mean_nhalos_grid)
-        nhalos_tot = int(nhalos_grid.sum())
-        args = (ran_key, lgmp_min, z_grid, sky_area_degsq, nhalos_tot)
-
-        (
-            redshifts_galpop,
-            logmp_halopop,
-        ) = mclh.mc_lightcone_host_halo_mass_function(*args, lgmp_max=lgmp_max)
+        args = (ran_key, lgmp_min, z_min, z_max, sky_area_degsq)
+        redshifts_galpop, logmp_halopop = mclh.mc_lc_hmf(*args, lgmp_max=lgmp_max)
 
         assert np.all(np.isfinite(redshifts_galpop))
         assert np.all(np.isfinite(logmp_halopop))
@@ -54,8 +37,6 @@ def test_mc_lightcone_host_halo_mass_function():
         assert np.all(redshifts_galpop >= z_min)
         assert np.all(redshifts_galpop <= z_max)
         assert np.all(logmp_halopop > lgmp_min)
-        assert redshifts_galpop.size == nhalos_tot
-        assert logmp_halopop.size == nhalos_tot
 
         z_med = np.median(redshifts_galpop)
 
@@ -90,7 +71,7 @@ def test_mc_lightcone_host_halo_mass_function():
         counts_key, u_key = jran.split(ran_key, 2)
         nhalos = int(jran.poisson(counts_key, mean_nhalos))
 
-        lgmp_halopop_zmed = mc_hosts.mc_host_halos_singlez(
+        lgmp_halopop_zmed = mc_hosts._mc_host_halos_singlez(
             ran_key, lgmp_min, z_med, nhalos, lgmp_max=lgmp_max
         )
 
@@ -116,50 +97,17 @@ def test_mc_lightcone_host_halo_mass_function_lgmp_max_feature():
     ran_key = jran.key(0)
     lgmp_min = 12.0
     z_min, z_max = 0.4, 0.5
-    n_grid_z = 500
-    z_grid = np.linspace(z_min, z_max, n_grid_z)
     sky_area_degsq = 200.0
-
-    lgmp_max = 17.0
     lgmp_max_test = 13.0
-
-    hmf_params = DEFAULT_HMF_PARAMS
-
-    mean_nhalos_grid = hmf_model.get_mean_nhalos_from_sky_area(
-        z_grid,
-        sky_area_degsq,
-        DEFAULT_COSMOLOGY,
-        hmf_params,
-        lgmp_min,
-        lgmp_max,
-    )
-
-    mean_nhalos_grid_test = hmf_model.get_mean_nhalos_from_sky_area(
-        z_grid,
-        sky_area_degsq,
-        DEFAULT_COSMOLOGY,
-        hmf_params,
-        lgmp_min,
-        lgmp_max_test,
-    )
 
     n_tests = 10
     for __ in range(n_tests):
         ran_key, test_key = jran.split(ran_key, 2)
 
-        nhalos_grid = jran.poisson(test_key, mean_nhalos_grid)
-        nhalos_tot = int(nhalos_grid.sum())
-        args = (test_key, lgmp_min, z_grid, sky_area_degsq, nhalos_tot)
-        z_halopop, logmp_halopop = mclh.mc_lightcone_host_halo_mass_function(
-            *args,
-        )
+        args = (test_key, lgmp_min, z_min, z_max, sky_area_degsq)
+        z_halopop, logmp_halopop = mclh.mc_lc_hmf(*args)
 
-        nhalos_grid_test = jran.poisson(test_key, mean_nhalos_grid_test)
-        nhalos_tot_test = int(nhalos_grid_test.sum())
-        args = (test_key, lgmp_min, z_grid, sky_area_degsq, nhalos_tot_test)
-        z_halopop2, logmp_halopop2 = mclh.mc_lightcone_host_halo_mass_function(
-            *args, lgmp_max=lgmp_max_test
-        )
+        z_halopop2, logmp_halopop2 = mclh.mc_lc_hmf(*args, lgmp_max=lgmp_max_test)
         assert z_halopop.size > z_halopop2.size
         assert z_halopop2.size == logmp_halopop2.size
 
@@ -260,32 +208,15 @@ def test_mc_lightcone_host_halo():
     ran_key = jran.key(0)
     lgmp_min = 12.0
     sky_area_degsq = 1.0
-    n_grid_z = 500
-    lgmp_max = 17.0
-
-    cosmo = DEFAULT_COSMOLOGY
-    hmf_params = DEFAULT_HMF_PARAMS
 
     n_tests = 5
     z_max_arr = np.linspace(0.2, 2.5, n_tests)
     for z_max in z_max_arr:
         test_key, ran_key = jran.split(ran_key, 2)
         z_min = z_max - 0.05
-        z_grid = np.linspace(z_min, z_max, n_grid_z)
 
-        mean_nhalos_grid = hmf_model.get_mean_nhalos_from_sky_area(
-            z_grid,
-            sky_area_degsq,
-            cosmo,
-            hmf_params,
-            lgmp_min,
-            lgmp_max,
-        )
-        nhalos_grid = jran.poisson(ran_key, mean_nhalos_grid)
-        nhalos_tot = int(nhalos_grid.sum())
-
-        args = (test_key, lgmp_min, z_grid, sky_area_degsq, nhalos_tot)
-        cenpop = mclh.mc_lightcone_host_halo(*args)
+        args = (test_key, lgmp_min, z_min, z_max, sky_area_degsq)
+        cenpop = mclh.mc_lc_halos(*args)
 
         assert np.all(np.isfinite(cenpop.z_obs))
         assert np.all(np.isfinite(cenpop.logmp_obs))
@@ -309,35 +240,15 @@ def test_mc_lightcone_host_halo_alt_mf_params():
     ran_key = jran.key(0)
     lgmp_min = 12.0
     sky_area_degsq = 1.0
-    n_grid_z = 500
-    lgmp_max = 17.0
-
-    cosmo = DEFAULT_COSMOLOGY
-    hmf_params = DEFAULT_HMF_PARAMS
 
     n_tests = 5
     z_max_arr = np.linspace(0.2, 2.5, n_tests)
     for z_max in z_max_arr:
         test_key, ran_key = jran.split(ran_key, 2)
         z_min = z_max - 0.05
-        z_grid = np.linspace(z_min, z_max, n_grid_z)
 
-        mean_nhalos_grid = hmf_model.get_mean_nhalos_from_sky_area(
-            z_grid,
-            sky_area_degsq,
-            cosmo,
-            hmf_params,
-            lgmp_min,
-            lgmp_max,
-        )
-        nhalos_grid = jran.poisson(ran_key, mean_nhalos_grid)
-        nhalos_tot = int(nhalos_grid.sum())
-        args = (test_key, lgmp_min, z_grid, sky_area_degsq, nhalos_tot)
-
-        cenpop = mclh.mc_lightcone_host_halo(
-            *args,
-            hmf_params=hchmf.HMF_PARAMS,
-        )
+        args = (test_key, lgmp_min, z_min, z_max, sky_area_degsq)
+        cenpop = mclh.mc_lc_halos(*args, hmf_params=hchmf.HMF_PARAMS)
 
         assert np.all(np.isfinite(cenpop.z_obs))
         assert np.all(np.isfinite(cenpop.logmp_obs))

@@ -20,8 +20,84 @@ LGMH_MAX = 17.0
 __all__ = ("mc_host_halos_singlez",)
 
 
-@partial(jjit, static_argnames=("nhalos",))
 def mc_host_halos_singlez(
+    ran_key,
+    lgmp_min,
+    redshift,
+    volume_com_mpc,
+    hmf_params=DEFAULT_HMF_PARAMS,
+    lgmp_max=LGMH_MAX,
+):
+    """
+    Monte Carlo realization of the host halo mass function.
+    This is a convenience wrapper around ``_mc_host_halos_singlez``
+    that generates a poisson realization of host halos in the lightcone.
+
+    Parameters
+    ----------
+    ran_key: jran.PRNGKey
+        random key
+
+    lgmp_min: float
+        base-10 log of the halo mass competeness limit of the
+        generated population Halo mass is in units of Msun (not Msun/h);
+        smaller values of lgmp_min produce more halos in the returned sample
+
+    redshift: float
+        redshift of the halo population
+
+    volume_com_mpc: float
+        comoving volume of the generated population, in Mpc^3
+
+    hmf_params: namedtuple
+        HMF parameters named tuple
+
+    lgmp_max: float
+        base-10 log of the maximum mass
+
+    Returns
+    -------
+    lgmp_halopop: ndarray, shape (n_halos, )
+        base-10 log of the halo mass of the generated population
+
+    Notes
+    -----
+    Note that both number density and halo mass are defined in
+    physical units (not h=1 units)
+    """
+
+    mean_nhalos = _compute_nhalos_tot(
+        hmf_params,
+        lgmp_min,
+        redshift,
+        volume_com_mpc,
+    )
+    mean_nhalos_lgmax = _compute_nhalos_tot(
+        hmf_params,
+        lgmp_max,
+        redshift,
+        volume_com_mpc,
+    )
+    mean_nhalos = mean_nhalos - mean_nhalos_lgmax
+
+    nhalos = jran.poisson(ran_key, mean_nhalos)
+
+    uran = jran.uniform(ran_key, minval=0, maxval=1, shape=(nhalos,))
+    lgmp_halopop = jnp.array(
+        _mc_host_halos_singlez_kern(
+            uran,
+            hmf_params,
+            lgmp_min,
+            redshift,
+            lgmp_max=lgmp_max,
+        )
+    )
+
+    return lgmp_halopop
+
+
+@partial(jjit, static_argnames=("nhalos",))
+def _mc_host_halos_singlez(
     ran_key,
     lgmp_min,
     redshift,
@@ -105,8 +181,7 @@ def mc_host_halos_hist_singlez(
         redshift of the halo population
 
     volume_com_mpc: float
-        comoving volume of the generated population in units of Mpc^3;
-        larger values of volume_com produce more halos in the returned sample
+        comoving volume of the generated population, in Mpc^3
 
     hmf_params: namedtuple
         HMF parameters named tuple
