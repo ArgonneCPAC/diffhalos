@@ -25,7 +25,7 @@ def test_cuml_hmf_evaluations():
 def test_diff_hmf_evaluations():
     lgmp_arr = np.linspace(-6, 0, 500)
     redshift = 0.2
-    res = hmf_model.predict_differential_hmf(
+    res = hmf_model.predict_diff_hmf(
         hmf_model.DEFAULT_HMF_PARAMS,
         lgmp_arr,
         redshift,

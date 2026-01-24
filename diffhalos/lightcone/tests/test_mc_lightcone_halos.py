@@ -23,7 +23,6 @@ def test_mc_lightcone_host_halo_mass_function():
     sky_area_degsq = 10.0
 
     cosmo = DEFAULT_COSMOLOGY
-    hmf_params = DEFAULT_HMF_PARAMS
 
     n_tests = 5
     ran_keys = jran.split(jran.key(0), n_tests)
@@ -61,18 +60,12 @@ def test_mc_lightcone_host_halo_mass_function():
         fsky = sky_area_degsq / hmf_model.FULL_SKY_AREA
         vol_com_mpc = fsky * (vol_hi - vol_lo)
 
-        mean_nhalos = hmf_model.get_mean_nhalos_from_volume(
+        lgmp_halopop_zmed = mc_hosts.mc_host_halos_singlez(
+            ran_key,
+            lgmp_min,
             z_med,
             vol_com_mpc,
-            hmf_params,
-            lgmp_min,
-            lgmp_max,
-        )
-        counts_key, u_key = jran.split(ran_key, 2)
-        nhalos = int(jran.poisson(counts_key, mean_nhalos))
-
-        lgmp_halopop_zmed = mc_hosts._mc_host_halos_singlez(
-            ran_key, lgmp_min, z_med, nhalos, lgmp_max=lgmp_max
+            lgmp_max=lgmp_max,
         )
 
         n_lightcone, n_snapshot = redshifts_galpop.size, lgmp_halopop_zmed.size
@@ -143,7 +136,7 @@ def test_mc_weighted_halo_lightcone_stratified():
             lgmp_max,
         )
 
-        cenpop = mclh.weighted_lightcone_host_halo(
+        cenpop = mclh.weighted_lc_halos(
             ran_key,
             z_obs,
             logmp_obs,
@@ -181,7 +174,7 @@ def test_mc_weighted_halo_lightcone_input_grid():
         z_grid = np.linspace(z_min, z_max, num_halos)
         lgmp_grid = np.linspace(lgmp_min, lgmp_max, num_halos)
 
-        cenpop = mclh.weighted_lightcone_host_halo(
+        cenpop = mclh.weighted_lc_halos(
             ran_key,
             z_grid,
             lgmp_grid,
@@ -268,15 +261,13 @@ def test_mc_lightcone_host_halo_alt_mf_params():
 #     Regression test enforcing that mc_lightcone_host_halo
 #     returns some halos with mass that is close to lgmp_max
 #     """
-#     nhalos_tot = 2_000
-#     z_min, z_max = 0.4, 2.0
-#     lgmp_min, lgmp_max = 10.5, 15.5
-
-#     z_grid = np.linspace(z_min, z_max, 100)
 #     ran_key = jran.key(0)
 
+#     z_min, z_max = 0.4, 2.0
+#     lgmp_min, lgmp_max = 10.5, 15.5
 #     sky_area_degsq = 100.0
-#     args = (ran_key, lgmp_min, z_grid, sky_area_degsq, nhalos_tot)
-#     cenpop = mclh.mc_lightcone_host_halo(*args, lgmp_max=lgmp_max)
+
+#     args = (ran_key, lgmp_min, z_min, z_max, sky_area_degsq)
+#     cenpop = mclh.mc_lc_halos(*args, lgmp_max=lgmp_max)
 
 #     assert np.any(cenpop.logmp_obs.max() > lgmp_max - 0.5)

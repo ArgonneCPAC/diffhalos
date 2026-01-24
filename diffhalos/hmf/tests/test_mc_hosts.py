@@ -6,7 +6,7 @@ from jax import random as jran
 
 from ..hmf_model import (
     DEFAULT_HMF_PARAMS,
-    predict_differential_hmf,
+    predict_diff_hmf,
 )
 from ..mc_hosts import (
     LGMH_MAX,
@@ -44,7 +44,7 @@ def test_mc_host_halo_logmp_behaves_as_expected():
     assert np.all(lgmp_halopop2 < lgmp_max)
 
 
-def test_differential_cumulative_hmf_consistency():
+def test_diff_cumulative_hmf_consistency():
     ran_key = jran.key(0)
     z = 0.0
     lgmp_min = 12.0
@@ -59,22 +59,21 @@ def test_differential_cumulative_hmf_consistency():
     )
     lgm_bins = np.linspace(lgmp_min + 0.5, 14.0, 50)
 
-    differential_hmf = predict_differential_hmf(
+    diff_hmf = predict_diff_hmf(
         DEFAULT_HMF_PARAMS,
         lgm_bins,
         z,
     )
 
     binned_counts = np.histogram(lgm_halopop, bins=lgm_bins)[0]
-    differential_hmf_target = binned_counts / Vbox / np.diff(lgm_bins)
+    diff_hmf_target = binned_counts / Vbox / np.diff(lgm_bins)
 
     # Interpolate to compare same-sized arrays
     lgm_binmids = 0.5 * (lgm_bins[:-1] + lgm_bins[1:])
-    lg_diff_hmf = differential_hmf
     diff_hmf_interp = 10 ** np.interp(
         lgm_binmids,
         lgm_bins,
-        lg_diff_hmf,
+        diff_hmf,
     )
 
-    assert np.allclose(diff_hmf_interp, differential_hmf_target, rtol=0.1)
+    assert np.allclose(diff_hmf_interp, diff_hmf_target, rtol=0.1)

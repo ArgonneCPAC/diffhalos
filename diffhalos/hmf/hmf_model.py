@@ -1,5 +1,5 @@
 """
-The ``predict_cuml_hmf`` and ``predict_differential_hmf`` functions
+The ``predict_cuml_hmf`` and ``predict_diff_hmf`` functions
 give differentiable implementations for the cumulative and differential
 mass functions, respectively, for simulated host halos.
 These are both functions of mp,
@@ -31,7 +31,7 @@ N_HMF_GRID = 500
 
 __all__ = (
     "predict_cuml_hmf",
-    "predict_differential_hmf",
+    "predict_diff_hmf",
     "halo_lightcone_weights",
     "get_mean_nhalos_from_volume",
     "get_mean_nhalos_from_sky_area",
@@ -131,7 +131,7 @@ def _diff_hmf_grad_kern(params, logmp, redshift):
 
 
 _A = (None, 0, None)
-_predict_differential_hmf = jjit(
+_predict_diff_hmf = jjit(
     vmap(
         grad(_diff_hmf_grad_kern, argnums=1),
         in_axes=_A,
@@ -140,7 +140,7 @@ _predict_differential_hmf = jjit(
 
 
 @jjit
-def predict_differential_hmf(params, logmp, redshift):
+def predict_diff_hmf(params, logmp, redshift):
     """Predict the differential comoving number density of host halos
 
     Parameters
@@ -163,7 +163,7 @@ def predict_differential_hmf(params, logmp, redshift):
         Note that both number density and halo mass are defined in
         physical units (not h=1 units)
     """
-    hmf = jnp.log10(_predict_differential_hmf(params, logmp, redshift))
+    hmf = jnp.log10(_predict_diff_hmf(params, logmp, redshift))
     return hmf
 
 

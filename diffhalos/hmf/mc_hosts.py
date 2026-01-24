@@ -1,7 +1,6 @@
 """Generate MC realizations of the host dark matter halo mass function"""
 
 import numpy as np
-from functools import partial
 
 from jax import jit as jjit
 from jax import numpy as jnp
@@ -29,9 +28,7 @@ def mc_host_halos_singlez(
     lgmp_max=LGMH_MAX,
 ):
     """
-    Monte Carlo realization of the host halo mass function.
-    This is a convenience wrapper around ``_mc_host_halos_singlez``
-    that generates a poisson realization of host halos in the lightcone.
+    Monte Carlo realization of the host halo mass function
 
     Parameters
     ----------
@@ -96,62 +93,40 @@ def mc_host_halos_singlez(
     return lgmp_halopop
 
 
-@partial(jjit, static_argnames=("nhalos",))
-def _mc_host_halos_singlez(
-    ran_key,
+@jjit
+def _get_hmf_cdf_interp_tables(
+    hmf_params,
     lgmp_min,
     redshift,
-    nhalos,
-    hmf_params=DEFAULT_HMF_PARAMS,
     lgmp_max=LGMH_MAX,
 ):
-    """
-    Monte Carlo realization of the host halo mass function
-    at the input redshift
+    dlgmp = lgmp_max - lgmp_min
+    lgmp_table = U_TABLE * dlgmp + lgmp_min
 
-    Parameters
-    ----------
-    ran_key: jran.PRNGKey
-        random key
+    cdf_table = 10 ** predict_cuml_hmf(hmf_params, lgmp_table, redshift)
+    cdf_table = cdf_table - cdf_table[0]
+    cdf_table = cdf_table / cdf_table[-1]
 
-    lgmp_min: float
-        base-10 log of the halo mass competeness limit of the
-        generated population Halo mass is in units of Msun (not Msun/h);
-        smaller values of lgmp_min produce more halos in the returned sample
+    return lgmp_table, cdf_table
 
-    redshift: float
-        redshift of the halo population
 
-    nhalos: int
-        number of halos to generate
-
-    hmf_params: namedtuple
-        HMF parameters named tuple
-
-    lgmp_max: float
-        base-10 log of the maximum mass
-
-    Returns
-    -------
-    lgmp_halopop: ndarray, shape (n_halos, )
-        base-10 log of the halo mass of the generated population
-
-    Notes
-    -----
-    Note that both number density and halo mass are defined in
-    physical units (not h=1 units)
-    """
-
-    # nhalos = jran.poisson(counts_key, mean_nhalos)
-    uran = jran.uniform(ran_key, minval=0, maxval=1, shape=(nhalos,))
-    lgmp_halopop = _mc_host_halos_singlez_kern(
-        uran,
+@jjit
+def _mc_host_halos_singlez_kern(
+    uran,
+    hmf_params,
+    lgmp_min,
+    redshift,
+    lgmp_max=LGMH_MAX,
+):
+    lgmp_table, cdf_table = _get_hmf_cdf_interp_tables(
         hmf_params,
         lgmp_min,
         redshift,
         lgmp_max=lgmp_max,
     )
-    return jnp.array(lgmp_halopop)
+    mc_lg_mp = jnp.interp(uran, cdf_table, lgmp_table)
+
+    return mc_lg_mp
 
 
 def mc_host_halos_hist_singlez(
@@ -324,39 +299,3 @@ def mc_host_halos_hist_singlez_out_of_core(
     logm_bins = 0.5 * (logm_bin_edges[1:] + logm_bin_edges[:-1])
 
     return halo_counts, logm_bins
-
-
-@jjit
-def _get_hmf_cdf_interp_tables(
-    hmf_params,
-    lgmp_min,
-    redshift,
-    lgmp_max=LGMH_MAX,
-):
-    dlgmp = lgmp_max - lgmp_min
-    lgmp_table = U_TABLE * dlgmp + lgmp_min
-
-    cdf_table = 10 ** predict_cuml_hmf(hmf_params, lgmp_table, redshift)
-    cdf_table = cdf_table - cdf_table[0]
-    cdf_table = cdf_table / cdf_table[-1]
-
-    return lgmp_table, cdf_table
-
-
-@jjit
-def _mc_host_halos_singlez_kern(
-    uran,
-    hmf_params,
-    lgmp_min,
-    redshift,
-    lgmp_max=LGMH_MAX,
-):
-    lgmp_table, cdf_table = _get_hmf_cdf_interp_tables(
-        hmf_params,
-        lgmp_min,
-        redshift,
-        lgmp_max=lgmp_max,
-    )
-    mc_lg_mp = jnp.interp(uran, cdf_table, lgmp_table)
-
-    return mc_lg_mp

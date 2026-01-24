@@ -7,7 +7,6 @@ generate_subhalopop can be used to add subhalos with synthetic values of Mpeak.
 """
 
 import numpy as np
-from functools import partial
 
 from jax import jit as jjit
 from jax import numpy as jnp
@@ -16,7 +15,7 @@ from jax import vmap
 
 from .ccshmf_model import (
     DEFAULT_CCSHMF_PARAMS,
-    predict_ccshmf,
+    predict_cuml_cshmf,
     get_lgmu_cutoff,
     compute_mean_subhalo_counts,
 )
@@ -24,90 +23,13 @@ from .ccshmf_model import (
 N_LGMU_TABLE = 100
 U_TABLE = np.linspace(1, 0, N_LGMU_TABLE)
 
-__all__ = (
-    "generate_subhalopop",
-    "get_mean_subhalo_counts_poisson",
-)
+__all__ = ("generate_subhalopop",)
 
 
 def generate_subhalopop(
     ran_key,
     lgmhost_arr,
     lgmp_min,
-    ccshmf_params=DEFAULT_CCSHMF_PARAMS,
-):
-    """
-    Generate a population of subhalos with synthetic values of Mpeak.
-    This is a convenience wrapper around ``_generate_subhalopop``
-    that automatically generates a poisson MC realization
-    of the subhalo population.
-
-    Parameters
-    ----------
-    ran_key: jax.random.PRNGKey
-        random key
-
-    lgmhost_arr: ndarray of shape (nhosts, )
-        base-10 log of host halo mass, in Msun
-
-    lgmp_min: float
-        base-10 log of the smallest Mpeak value
-        of the synthetic subhalos, in Msun
-
-    subhalo_counts_per_halo: ndarray of shape (nsubs, )
-        subhalo counts per host halo;
-        note that the total, i.e. subhalo_counts_per_halo.sum(),
-        must be the same as ``nsub_tot``, and thus it should
-        be nsub_tot=subhalo_counts_per_halo.sum()
-
-    nsub_tot: int
-        number of subhalos to generate
-
-    cshmf_params: namedtuple
-        CCSHMF parameters named tuple
-
-    Returns
-    -------
-    mc_lg_mu: ndarray of shape (n_mu, )
-        base-10 log of mu=Msub/Mhost of the Monte Carlo subhalo population
-
-    lgmhost_pop: ndarray of shape (n_mu*n_host, )
-        base-10 log of Mhost of the Monte Carlo subhalo population, in Msun
-
-    host_halo_indx: ndarray of shape (n_mu*n_host, )
-        index of the input host halo of each generated subhalo,
-        so that lgmhost_pop = lgmhost_arr[host_halo_indx];
-        thus all values satisfy 0 <= host_halo_indx < nhosts
-    """
-    ran_key, counts_key = jran.split(ran_key, 2)
-
-    subhalo_counts_per_halo = get_mean_subhalo_counts_poisson(
-        counts_key,
-        lgmhost_arr,
-        lgmp_min,
-    )
-
-    nsub_tot = int(jnp.sum(subhalo_counts_per_halo))
-
-    mc_lg_mu, lgmhost_pop, host_halo_indx = _generate_subhalopop(
-        ran_key,
-        lgmhost_arr,
-        lgmp_min,
-        subhalo_counts_per_halo,
-        nsub_tot,
-        ccshmf_params=ccshmf_params,
-    )
-
-    return mc_lg_mu, lgmhost_pop, host_halo_indx
-
-
-@partial(jjit, static_argnames=("nsub_tot",))
-def _generate_subhalopop(
-    ran_key,
-    lgmhost_arr,
-    lgmp_min,
-    subhalo_counts_per_halo,
-    nsub_tot,
     ccshmf_params=DEFAULT_CCSHMF_PARAMS,
 ):
     """
@@ -125,15 +47,6 @@ def _generate_subhalopop(
         base-10 log of the smallest Mpeak value
         of the synthetic subhalos, in Msun
 
-    subhalo_counts_per_halo: ndarray of shape (nsubs, )
-        subhalo counts per host halo;
-        note that the total, i.e. subhalo_counts_per_halo.sum(),
-        must be the same as ``nsub_tot``, and thus it should
-        be nsub_tot=subhalo_counts_per_halo.sum()
-
-    nsub_tot: int
-        number of subhalos to generate
-
     cshmf_params: namedtuple
         CCSHMF parameters named tuple
 
@@ -151,8 +64,18 @@ def _generate_subhalopop(
         thus all values satisfy 0 <= host_halo_indx < nhosts
     """
 
+    # random keys for uniforms randoms, and subhalo counts
+    uran_key, counts_key = jran.split(ran_key, 2)
+
+    # generate a Poisson realization of subhalo counts per host halo
+    mean_counts = compute_mean_subhalo_counts(lgmhost_arr, lgmp_min)
+    subhalo_counts_per_halo = jran.poisson(counts_key, mean_counts)
+
+    # compute the total number of subhalos
+    nsub_tot = jnp.sum(subhalo_counts_per_halo)
+
     # uniform randoms for mu sampling
-    urandoms = jran.uniform(ran_key, shape=(nsub_tot,))
+    urandoms = jran.uniform(uran_key, shape=(nsub_tot,))
 
     # host halo population that matches the subhalo sample
     lgmhost_pop = jnp.repeat(
@@ -175,41 +98,7 @@ def _generate_subhalopop(
         ccshmf_params,
     )
 
-    return mc_lg_mu, lgmhost_pop, host_halo_indx
-
-
-@jjit
-def get_mean_subhalo_counts_poisson(
-    counts_key,
-    lgmhost_arr,
-    lgmp_min,
-):
-    """
-    Compute the mean number of subhalo counts in host
-    for a poisson realization
-
-    Parameters
-    ----------
-    counts_key: jax.random.PRNGKey
-        random key
-
-    lgmhost_arr: ndarray of shape (nhosts, )
-        base-10 log of host halo mass, in Msun
-
-    lgmp_min: float
-        base-10 log of the smallest Mpeak value
-        of the synthetic subhalos, in Msun
-
-    Returns
-    -------
-    subhalo_counts_per_halo: ndarray of shape (nhosts, )
-        number of subhalos per host halo
-    """
-
-    mean_counts = compute_mean_subhalo_counts(lgmhost_arr, lgmp_min)
-    subhalo_counts_per_halo = jran.poisson(counts_key, mean_counts)
-
-    return subhalo_counts_per_halo
+    return mc_lg_mu, lgmhost_pop, host_halo_indx, subhalo_counts_per_halo
 
 
 @jjit
@@ -246,7 +135,7 @@ def generate_subhalopop_kern(
     """
     lgmu_cutoff = get_lgmu_cutoff(lgmhost, lgmp_min, 1)
     lgmu_table = U_TABLE * lgmu_cutoff
-    cdf_counts = 10 ** predict_ccshmf(ccshmf_params, lgmhost, lgmu_table)
+    cdf_counts = 10 ** predict_cuml_cshmf(ccshmf_params, lgmhost, lgmu_table)
     cdf_counts = cdf_counts - cdf_counts[0]
     cdf_counts = cdf_counts / cdf_counts[-1]
 

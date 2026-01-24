@@ -1,3 +1,3 @@
 # flake8:noqa
 
-from .mc_lightcone_halos import mc_lc_hmf, mc_lc_halos
+from .mc_lightcone_halos import mc_lc_hmf, mc_lc_halos, weighted_lc_halos

@@ -11,64 +11,50 @@ from jax import numpy as jnp
 from functools import partial
 
 from ..mah.diffmahnet_utils import mc_mah_satpop
-from ..ccshmf.mc_subs import _generate_subhalopop
+from ..ccshmf.mc_subs import generate_subhalopop
 from ..ccshmf.ccshmf_model import (
     subhalo_lightcone_weights,
     DEFAULT_CCSHMF_PARAMS,
 )
+from ..mah.diffmahnet.diffmahnet import log_mah_kern
+from ..mah.utils import rescale_mah_parameters
 from ..utils.namedtuple_utils import add_field_to_namedtuple
 
 __all__ = (
-    # "mc_lightcone_subhalo",
-    # "weighted_subhalo_lightcone",
+    "mc_lc_shmf",
+    "mc_lc_subhalos",
 )
 
 DEFAULT_DIFFMAHNET_SAT_MODEL = "satflow_v2_0_64bit.eqx"
 N_LGMU_PER_HOST = 5
 
-# def mc_lc_shmf(ran_key, lgmp_min, lgmhost, z_min, z_max, sky_area_degsq):
-#     return mc_lg_mu, lgmhost_pop, host_halo_indx
+
+DEFAULT_LOGMSUB_CUTOFF = 10.0
+DEFAULT_LOGMSUB_HIMASS_CUTOFF = 14.5
 
 
-# def mc_lc_subhalos(ran_key, lgmp_min, lgmp_max, z_min, z_max, sky_area_degsq):
-#     z_halopop, logmp_halopop = mc_lc_hmf(
-#         ran_key, lgmp_min, lgmp_max, z_min, z_max, sky_area_degsq
-#     )
-#     cenpop = mc_lightcone_host_halo(*args)
-#     return cenpop
-
-
-@partial(jjit, static_argnames=("nsub_tot",))
-def _mc_lightcone_subhalo_mass_function(
+def mc_lc_shmf(
     ran_key,
-    lgmhost,
+    lgmhost_arr,
     lgmp_min,
-    subhalo_counts_per_halo,
-    nsub_tot,
     ccshmf_params=DEFAULT_CCSHMF_PARAMS,
 ):
     """
-    Generate MC generalization of the subhalo mass function in a lightcone
+    Generate MC generalization of the subhalo mass function in a lightcone,
+    provided the masses of their host halos.
+    This function is essentially a convenient wrapper around the
+    ``mc_subs.generate_subhalopop`` function
 
     Parameters
     ----------
     ran_key: jran.key
         random key
 
-    lgmhost: ndarray of shape (n_host, )
+    lgmhost_arr: ndarray of shape (n_host, )
         base-10 log of host halo mass, in Msun
 
     lgmp_min: float
         base-10 log of the minimum subhalo mass, in Msub
-
-    subhalo_counts_per_halo: ndarray of shape (nsubs, )
-        subhalo counts per host halo;
-        note that the total, i.e. subhalo_counts_per_halo.sum(),
-        must be the same as ``nsub_tot``, and thus it should
-        be nsub_tot=subhalo_counts_per_halo.sum()
-
-    nsub_tot: int
-        number of subhalos to generate
 
     ccshmf_params: namedtuple
         CCSHMF parameters
@@ -85,27 +71,29 @@ def _mc_lightcone_subhalo_mass_function(
         index of the input host halo of each generated subhalo,
         so that lgmhost_pop = lgmhost_arr[host_halo_indx];
         thus all values satisfy 0 <= host_halo_indx < nhosts
+
+    subhalo_counts_per_halo: ndarray of shape (m_hosts, )
+        number of generated subhalos per host halo
     """
-    mc_lg_mu, lgmhost_pop, host_halo_indx = _generate_subhalopop(
-        ran_key,
-        lgmhost,
-        lgmp_min,
-        subhalo_counts_per_halo,
-        nsub_tot,
-        ccshmf_params=ccshmf_params,
+    mc_lg_mu, lgmhost_pop, host_halo_indx, subhalo_counts_per_halo = (
+        generate_subhalopop(
+            ran_key,
+            lgmhost_arr,
+            lgmp_min,
+            ccshmf_params=ccshmf_params,
+        )
     )
 
-    return mc_lg_mu, lgmhost_pop, host_halo_indx
+    return mc_lg_mu, lgmhost_pop, host_halo_indx, subhalo_counts_per_halo
 
 
-@partial(jjit, static_argnames=("nsub_tot", "subhalo_model_key"))
-def _mc_lightcone_subhalo(
+def mc_lc_subhalos(
     ran_key,
     halopop,
-    lgt0,
-    lgmu,
-    n_mu_per_host,
-    nsub_tot,
+    lgmp_min,
+    ccshmf_params=DEFAULT_CCSHMF_PARAMS,
+    logmsub_cutoff=DEFAULT_LOGMSUB_CUTOFF,
+    logmsub_cutoff_himass=DEFAULT_LOGMSUB_HIMASS_CUTOFF,
     subhalo_model_key=DEFAULT_DIFFMAHNET_SAT_MODEL,
 ):
     """
@@ -118,89 +106,83 @@ def _mc_lightcone_subhalo(
         random key
 
     halopop: namedtuple
-        halo population, with necessary fields:
+        central population, with necessary fields:
             logmp_obs: ndarray of shape (n_host, )
                 base-10 log of halo mass at observation, in Msun
 
             t_obs: ndarray of shape (n_host, )
                 cosmic time at observation, in Gyr
 
-    lgt0: float
-        base-10 log of cosmic time today, in Gyr
+            logt0: float
+                base-10 log of cosmic time at today, in Gyr
 
-    lgmu: ndarray of shape (n_sub, )
-        values of mu=Msub/Mhost for all subhalos in the lightcone
+    lgmp_min: float
+        absolute minimum subhalo mass, in Msun
 
-    n_mu_per_host: float
-        number of mu=Msub/Mhost values to use per host halo
+    ccshmf_params: namedtuple
+        CCSHMF parameters
 
-    nsub_tot: int
-        number of subhalos to generate;
-        note that it must be nsub_tot=n_mu_per_host.sum()
+    logmsub_cutoff: float
+        base-10 log of minimum subhalo mass for which
+        diffmahnet is used to generate MAHs, in Msun;
+        for logmsub < logmsub_cutoff, P(θ_MAH | logmsub) = P(θ_MAH | logmsub_cutoff)
+
+    logmsub_cutoff_himass: float
+        base-10 log of maximum subhalo mass for which
+        diffmahnet is used to generate MAHs, in Msun
 
     subhalo_model_key: str
         diffmahnet model to use for satellites
 
     Returns
     -------
-    halopop: dict
-        same as input with added keys:
+    halopop: namedtuple
+        same as input ``halopop`` with added keys:
             mah_params: namedtuple of ndarray's with shape (n_subs, n_mah_params)
                 diffmah parameters for each subhalo in the lightcone
     """
 
-    n_host = halopop.logmp_obs.size
-
-    # match host index with subhalos
-    host_index_for_sub = jnp.repeat(
-        jnp.arange(n_host),
-        n_mu_per_host,
-        total_repeat_length=nsub_tot,
+    # generate a Poisson realization of subhalos, given the host halo population
+    mc_lg_mu_shmf, _, host_index_for_sub, n_mu_per_host = generate_subhalopop(
+        ran_key,
+        halopop.logmp_obs,
+        lgmp_min,
+        ccshmf_params=ccshmf_params,
     )
 
-    # get the MAH parameters for the subhalos
-    mah_params_sub = mc_mah_satpop(
-        jnp.repeat(
-            halopop.logmp_obs,
-            n_mu_per_host,
-            total_repeat_length=nsub_tot,
-        )
-        * lgmu,
-        jnp.repeat(
-            halopop.t_obs,
-            n_mu_per_host,
-            total_repeat_length=nsub_tot,
-        ),
+    # get the subhalo mass and time of observation for MAH computations
+    logmsub_obs_shmf = jnp.repeat(halopop.logmp_obs, n_mu_per_host) + mc_lg_mu_shmf
+    t_obs = jnp.repeat(halopop.t_obs, n_mu_per_host)
+
+    # get the uncorrected MAH parameters for all subhalos
+    logmsub_obs_clipped = jnp.clip(
+        logmsub_obs_shmf, logmsub_cutoff, logmsub_cutoff_himass
+    )
+    mah_params_subs_uncorrected = mc_mah_satpop(
+        logmsub_obs_clipped,
+        t_obs,
         ran_key,
         subhalo_model_key,
     )
 
-    #################################
-    # # get the uncorrected MAH parameters for all halos
-    # logmp_obs_clipped = jnp.clip(logmp_obs_mf, logmp_cutoff, logmp_cutoff_himass)
-    # mah_params_uncorrected = mc_mah_cenpop(
-    #     logmp_obs_clipped,
-    #     t_obs,
-    #     mah_key,
-    #     centrals_model_key,
-    # )
+    # compute the uncorrected observed masses
+    logt0 = halopop.logt0
+    logmsub_obs_uncorrected = log_mah_kern(mah_params_subs_uncorrected, t_obs, logt0)
 
-    # # compute the uncorrected observed masses
-    # logmp_obs_uncorrected = log_mah_kern(mah_params_uncorrected, t_obs, lgt0)
+    # rescale the mah parameters to the correct logm0
+    mah_params_subs = rescale_mah_parameters(
+        mah_params_subs_uncorrected,
+        logmsub_obs_shmf,
+        logmsub_obs_uncorrected,
+    )
 
-    # # rescale the mah parameters to the correct logm0
-    # mah_params = rescale_mah_parameters(
-    #     mah_params_uncorrected,
-    #     logmp_obs_mf,
-    #     logmp_obs_uncorrected,
-    # )
+    # compute observed mass and mu values with corrected parameters
+    logmsub_obs = log_mah_kern(mah_params_subs, t_obs, logt0)
+    mc_lg_mu = logmsub_obs - halopop.logmp_obs
 
-    # # compute observed mass with corrected parameters
-    # logmp_obs = log_mah_kern(mah_params, t_obs, lgt0)
-    #################################
-
-    new_fields = ("host_index_for_sub", "mah_params_sub")
-    new_data = (host_index_for_sub, mah_params_sub)
+    # add the subhalo data to the halo population namedtuple
+    new_fields = ("host_index_for_sub", "mah_params_sub", "logmu_subs")
+    new_data = (host_index_for_sub, mah_params_subs, mc_lg_mu)
     halopop = add_field_to_namedtuple(halopop, new_fields, new_data)
 
     return halopop

@@ -38,6 +38,7 @@ mc_logmp_vmap = jjit(vmap(mc_hosts._mc_host_halos_singlez_kern, in_axes=_AXES))
 __all__ = (
     "mc_lc_hmf",
     "mc_lc_halos",
+    "weighted_lc_halos",
 )
 
 
@@ -192,12 +193,12 @@ def mc_lc_halos(
 
     logmp_cutoff: float
         base-10 log of minimum halo mass for which
-        DiffmahPop is used to generate MAHs, in Msun;
+        diffmahnet is used to generate MAHs, in Msun;
         for logmp < logmp_cutoff, P(θ_MAH | logmp) = P(θ_MAH | logmp_cutoff)
 
     logmp_cutoff_himass: float
         base-10 log of maximum halo mass for which
-        DiffmahPop is used to generate MAHs, in Msun
+        diffmahnet is used to generate MAHs, in Msun
 
     lgmp_max: float
         base-10 log of maximum host halo mass, in Msun
@@ -210,7 +211,8 @@ def mc_lc_halos(
 
     Returns
     -------
-    cenpop: namedtuple with fields:
+    cenpop: namedtuple
+        central halo population with fields:
         z_obs: ndarray of shape (n_halos, )
             lightcone redshift
 
@@ -222,6 +224,9 @@ def mc_lc_halos(
 
         logmp0: narray of shape (n_halos, )
             base-10 log of halo mass at z=0, in Msun
+
+        logt0: float
+            base-10 log of cosmic time at today, in Gyr
     """
 
     # generate mc realization of the halo mass function
@@ -240,7 +245,7 @@ def mc_lc_halos(
 
     t_obs = flat_wcdm.age_at_z(z_obs, *cosmo_params)
     t_0 = flat_wcdm.age_at_z0(*cosmo_params)
-    lgt0 = jnp.log10(t_0)
+    logt0 = jnp.log10(t_0)
 
     # get the uncorrected MAH parameters for all halos
     logmp_obs_clipped = jnp.clip(logmp_obs_mf, logmp_cutoff, logmp_cutoff_himass)
@@ -252,7 +257,7 @@ def mc_lc_halos(
     )
 
     # compute the uncorrected observed masses
-    logmp_obs_uncorrected = log_mah_kern(mah_params_uncorrected, t_obs, lgt0)
+    logmp_obs_uncorrected = log_mah_kern(mah_params_uncorrected, t_obs, logt0)
 
     # rescale the mah parameters to the correct logm0
     mah_params = rescale_mah_parameters(
@@ -262,21 +267,21 @@ def mc_lc_halos(
     )
 
     # compute observed mass with corrected parameters
-    logmp_obs = log_mah_kern(mah_params, t_obs, lgt0)
+    logmp_obs = log_mah_kern(mah_params, t_obs, logt0)
 
     # compute MAH values today
-    logmp0 = _log_mah_kern(mah_params, 10**lgt0, lgt0)
+    logmp0 = _log_mah_kern(mah_params, 10**logt0, logt0)
 
     # create output namedtuple
-    fields = ("z_obs", "t_obs", "logmp_obs", "mah_params", "logmp0")
-    values = (z_obs, t_obs, logmp_obs, mah_params, logmp0)
+    fields = ("z_obs", "t_obs", "logmp_obs", "mah_params", "logmp0", "logt0")
+    values = (z_obs, t_obs, logmp_obs, mah_params, logmp0, logt0)
     cenpop_out = namedtuple("halopop", fields)(*values)
 
     return cenpop_out
 
 
 @partial(jjit, static_argnames=["centrals_model_key"])
-def weighted_lightcone_host_halo(
+def weighted_lc_halos(
     ran_key,
     z_obs,
     logmp_obs,
