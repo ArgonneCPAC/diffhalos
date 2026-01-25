@@ -2,9 +2,7 @@
 
 import numpy as np
 from jax import random as jran
-from collections import namedtuple
 
-from .. import mc_lightcone_halos as mclh
 from .. import mc_lightcone_subhalos as mclsh
 from ...ccshmf import mc_subs
 from ..utils import generate_mock_cenpop
@@ -118,7 +116,7 @@ def test_mc_lc_subhalos_vs_subpop_from_mc_subs():
         del lc_subpop, mc_lg_mu_pop
 
 
-def test_mc_weighted_subhalo_lightcone_behaves_as_expected():
+def test_mc_weighted_lc_subhalos_behaves_as_expected():
     ran_key = jran.key(0)
 
     z_min = 0.4
@@ -132,7 +130,7 @@ def test_mc_weighted_subhalo_lightcone_behaves_as_expected():
 
     # use a mock host halo population for this test
     cenpop = generate_mock_cenpop(z_min, z_max, logmp_min, logmp_max, n_cens=n_cens)
-    halopop = mclsh.weighted_subhalo_lightcone(cenpop, ran_key, lgmp_min)
+    halopop = mclsh.weighted_lc_subhalos(cenpop, ran_key, lgmp_min)
 
     weighted_lc_subhalo_fields = (
         "logmp_obs",
@@ -162,7 +160,7 @@ def test_mc_weighted_subhalo_lightcone_behaves_as_expected():
         assert _params.size == n_cens * n_sub_per_host
 
 
-def test_mc_weighted_subhalo_lightcone_with_different_nsubs_per_host():
+def test_mc_weighted_lc_subhalos_with_different_nsubs_per_host():
     ran_key = jran.key(0)
 
     z_min = 0.4
@@ -176,7 +174,7 @@ def test_mc_weighted_subhalo_lightcone_with_different_nsubs_per_host():
 
     # use a mock host halo population for this test
     cenpop = generate_mock_cenpop(z_min, z_max, logmp_min, logmp_max, n_cens=n_cens)
-    halopop = mclsh.weighted_subhalo_lightcone(
+    halopop = mclsh.weighted_lc_subhalos(
         cenpop, ran_key, lgmp_min, n_mu_per_host=n_sub_per_host
     )
 
@@ -208,7 +206,7 @@ def test_mc_weighted_subhalo_lightcone_with_different_nsubs_per_host():
         assert _params.size == n_cens * n_sub_per_host
 
 
-def test_mc_weighted_subhalo_lightcone_agrees_with_mc_subhalopop():
+def test_mc_weighted_lc_subhalos_agrees_with_mc_subhalopop():
 
     ran_key = jran.key(0)
 
@@ -225,7 +223,7 @@ def test_mc_weighted_subhalo_lightcone_agrees_with_mc_subhalopop():
     n_tests = 5
     lgmp_min_arr = np.linspace(9.0, 10.0, n_tests)
     for lgmp_min in lgmp_min_arr:
-        halopop = mclsh.weighted_subhalo_lightcone(cenpop, ran_key, lgmp_min)
+        halopop = mclsh.weighted_lc_subhalos(cenpop, ran_key, lgmp_min)
 
         mc_lg_mu_pop = mc_subs.generate_subhalopop(
             ran_key,

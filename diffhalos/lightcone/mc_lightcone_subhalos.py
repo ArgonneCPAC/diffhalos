@@ -24,6 +24,7 @@ from ..utils.namedtuple_utils import add_field_to_namedtuple
 __all__ = (
     "mc_lc_shmf",
     "mc_lc_subhalos",
+    "weighted_subhalo_lightcone",
 )
 
 DEFAULT_DIFFMAHNET_SAT_MODEL = "satflow_v2_0_64bit.eqx"
@@ -199,7 +200,7 @@ def mc_lc_subhalos(
 
 
 @partial(jjit, static_argnames=("subhalo_model_key", "n_mu_per_host"))
-def weighted_subhalo_lightcone(
+def weighted_lc_subhalos(
     halopop,
     ran_key,
     lgmp_min,
