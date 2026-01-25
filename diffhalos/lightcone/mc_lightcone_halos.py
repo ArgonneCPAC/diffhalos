@@ -35,11 +35,7 @@ DEFAULT_DIFFMAHNET_CEN_MODEL = "cenflow_v2_0_64bit.eqx"
 _AXES = (0, None, None, 0, None)
 mc_logmp_vmap = jjit(vmap(mc_hosts._mc_host_halos_singlez_kern, in_axes=_AXES))
 
-__all__ = (
-    "mc_lc_hmf",
-    "mc_lc_halos",
-    "weighted_lc_halos",
-)
+__all__ = ("mc_lc_hmf", "mc_lc_halos", "weighted_lc_halos")
 
 
 def mc_lc_hmf(
