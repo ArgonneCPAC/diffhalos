@@ -7,6 +7,7 @@ config.update("jax_enable_x64", True)
 
 from jax import jit as jjit
 from jax import numpy as jnp
+from jax import random as jran
 
 from functools import partial
 
@@ -138,20 +139,29 @@ def mc_lc_subhalos(
     -------
     halopop: namedtuple
         same as input ``halopop`` with added keys:
-            mah_params: namedtuple of ndarray's with shape (n_subs, n_mah_params)
+            host_index_for_subs: ndarray of shape (n_subs_per_host*n_host, )
+                index of the host halo of each generated subhalo
+
+            mah_params_subs: namedtuple of ndarray's with shape (n_subs, n_mah_params)
                 diffmah parameters for each subhalo in the lightcone
+
+            logmu_obs: ndarray of shape (n_subs, )
+                base-10 log of mu=Msub/Mhost for each subhalo in the lightcone
     """
 
+    # two random keys, one for the MC subhalo population and one for diffmahnet
+    mu_key, mah_key = jran.split(ran_key, 2)
+
     # generate a Poisson realization of subhalos, given the host halo population
-    mc_lg_mu_shmf, _, host_index_for_sub, n_mu_per_host = generate_subhalopop(
-        ran_key,
+    mc_lg_mu_shmf, _, host_index_for_subs, n_mu_per_host = generate_subhalopop(
+        mu_key,
         halopop.logmp_obs,
         lgmp_min,
         ccshmf_params=ccshmf_params,
     )
 
     # get the subhalo mass and time of observation for MAH computations
-    logmsub_obs_shmf = jnp.repeat(halopop.logmp_obs, n_mu_per_host) + mc_lg_mu_shmf
+    logmsub_obs_shmf = mc_lg_mu_shmf + jnp.repeat(halopop.logmp_obs, n_mu_per_host)
     t_obs = jnp.repeat(halopop.t_obs, n_mu_per_host)
 
     # get the uncorrected MAH parameters for all subhalos
@@ -161,7 +171,7 @@ def mc_lc_subhalos(
     mah_params_subs_uncorrected = mc_mah_satpop(
         logmsub_obs_clipped,
         t_obs,
-        ran_key,
+        mah_key,
         subhalo_model_key,
     )
 
@@ -178,11 +188,11 @@ def mc_lc_subhalos(
 
     # compute observed mass and mu values with corrected parameters
     logmsub_obs = log_mah_kern(mah_params_subs, t_obs, logt0)
-    mc_lg_mu = logmsub_obs - halopop.logmp_obs
+    mc_lg_mu = logmsub_obs - jnp.repeat(halopop.logmp_obs, n_mu_per_host)
 
     # add the subhalo data to the halo population namedtuple
-    new_fields = ("host_index_for_sub", "mah_params_sub", "logmu_subs")
-    new_data = (host_index_for_sub, mah_params_subs, mc_lg_mu)
+    new_fields = ("host_index_for_subs", "mah_params_subs", "logmu_obs")
+    new_data = (host_index_for_subs, mah_params_subs, mc_lg_mu)
     halopop = add_field_to_namedtuple(halopop, new_fields, new_data)
 
     return halopop
@@ -193,9 +203,10 @@ def weighted_subhalo_lightcone(
     halopop,
     ran_key,
     lgmp_min,
-    lgt0,
     n_mu_per_host=N_LGMU_PER_HOST,
     ccshmf_params=DEFAULT_CCSHMF_PARAMS,
+    logmsub_cutoff=DEFAULT_LOGMSUB_CUTOFF,
+    logmsub_cutoff_himass=DEFAULT_LOGMSUB_HIMASS_CUTOFF,
     subhalo_model_key=DEFAULT_DIFFMAHNET_SAT_MODEL,
 ):
     """
@@ -203,19 +214,19 @@ def weighted_subhalo_lightcone(
 
     Parameters
     ----------
-    halopop: dict
-        halo population, with necessary keys:
+    halopop: namedtuple
+        central population, with necessary fields:
             logmp_obs: ndarray of shape (n_host, )
                 base-10 log of halo mass at observation, in Msun
 
             t_obs: ndarray of shape (n_host, )
                 cosmic time at observation, in Gyr
 
+            logt0: float
+                base-10 log of cosmic time at today, in Gyr
+
     lgmp_min: float
         base-10 log of the minimum mass, in Msun
-
-    lgt0: float
-        base-10 log of cosmic time today, in Gyr
 
     n_mu_per_host: int
         number of mu=Msub/Mhost values to use per host halo;
@@ -225,6 +236,15 @@ def weighted_subhalo_lightcone(
     cshmf_params: namedtuple
         CCSHMF parameters
 
+    logmsub_cutoff: float
+        base-10 log of minimum subhalo mass for which
+        diffmahnet is used to generate MAHs, in Msun;
+        for logmsub < logmsub_cutoff, P(θ_MAH | logmsub) = P(θ_MAH | logmsub_cutoff)
+
+    logmsub_cutoff_himass: float
+        base-10 log of maximum subhalo mass for which
+        diffmahnet is used to generate MAHs, in Msun
+
     subhalo_model_key: str
         diffmahnet model to use for satellites
 
@@ -232,13 +252,20 @@ def weighted_subhalo_lightcone(
     -------
     halopop: dict
         same as input with added keys:
-            nsubhalos: ndarray of shape (n_host*n_mu, )
-                subhalo number weights
+            host_index_for_subs: ndarray of shape (n_subs_per_host*n_host, )
+                index of the host halo of each generated subhalo
 
-            logmu_subs: ndarray of shape (n_host*n_mu, )
-                base-10 log of mu values per host halo
+            mah_params_subs: namedtuple of ndarray's with shape (n_subs, n_mah_params)
+                diffmah parameters for each subhalo in the lightcone
+
+            logmu_obs: ndarray of shape (n_subs, )
+                base-10 log of mu=Msub/Mhost for each subhalo in the lightcone
+
+            nsubhalos: ndarray of shape (n_nub, )
+                subhalo weighted counts
     """
 
+    # number of host halos
     n_host = halopop.logmp_obs.size
 
     # get subhalo weights
@@ -251,21 +278,41 @@ def weighted_subhalo_lightcone(
     nsubhalo_weights = nsubhalo_weights.reshape(n_host * n_mu_per_host)
     lgmu = lgmu.reshape(n_host * n_mu_per_host)
 
-    # generate diffmah subhalo populations
-    n_mu_per_host_arr = jnp.repeat(jnp.asarray(n_mu_per_host), n_host)
-    halopop = _mc_lightcone_subhalo(
+    # get the subhalo mass and time of observation for MAH computations
+    logmsub_obs = lgmu + jnp.repeat(halopop.logmp_obs, n_mu_per_host)
+    t_obs = jnp.repeat(halopop.t_obs, n_mu_per_host)
+
+    # get the uncorrected MAH parameters for all subhalos
+    logmsub_obs_clipped = jnp.clip(logmsub_obs, logmsub_cutoff, logmsub_cutoff_himass)
+    mah_params_subs_uncorrected = mc_mah_satpop(
+        logmsub_obs_clipped,
+        t_obs,
         ran_key,
-        halopop,
-        lgt0,
-        lgmu,
-        n_mu_per_host_arr,
-        int(n_mu_per_host * n_host),
-        subhalo_model_key=subhalo_model_key,
+        subhalo_model_key,
     )
 
+    # compute the uncorrected observed masses
+    logt0 = halopop.logt0
+    logmsub_obs_uncorrected = log_mah_kern(mah_params_subs_uncorrected, t_obs, logt0)
+
+    # rescale the mah parameters to the correct logm0
+    mah_params_subs = rescale_mah_parameters(
+        mah_params_subs_uncorrected,
+        logmsub_obs,
+        logmsub_obs_uncorrected,
+    )
+
+    # compute observed mass and mu values with corrected parameters
+    logmsub_obs = log_mah_kern(mah_params_subs, t_obs, logt0)
+    logmu_obs = logmsub_obs - jnp.repeat(halopop.logmp_obs, n_mu_per_host)
+
+    # construct the host index array for the subhalos
+    halo_ids = jnp.arange(halopop.logmp_obs.size).astype(int)
+    host_index_for_subs = jnp.repeat(halo_ids, n_mu_per_host)
+
     # add subhalo weights to the dictionary
-    new_fields = ("nsubhalos", "logmu_subs")
-    new_data = (nsubhalo_weights, lgmu)
+    new_fields = ("nsubhalos", "host_index_for_subs", "mah_params_subs", "logmu_obs")
+    new_data = (nsubhalo_weights, host_index_for_subs, mah_params_subs, logmu_obs)
     halopop = add_field_to_namedtuple(halopop, new_fields, new_data)
 
     return halopop

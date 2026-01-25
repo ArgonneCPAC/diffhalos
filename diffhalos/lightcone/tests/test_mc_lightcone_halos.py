@@ -5,7 +5,7 @@ from jax import random as jran
 
 from dsps.cosmology import flat_wcdm, DEFAULT_COSMOLOGY
 
-from ...hmf import hmf_model, mc_hosts, DEFAULT_HMF_PARAMS
+from ...hmf import hmf_model, mc_hosts
 from ...calibrations.hmf_cal import hacc_core_hmf_params as hchmf
 from .. import mc_lightcone_halos as mclh
 from ...utils.stratified_grid import stratified_grid_scaled
