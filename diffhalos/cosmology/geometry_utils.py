@@ -78,6 +78,8 @@ def compute_volume_from_sky_area(
     vol_shell_grid_mpc: ndarray of shape (n_z, )
         comoving volume, in Mpc^3
     """
+    redshift = jnp.atleast_1d(redshift)
+
     fsky = sky_area_degsq / FULL_SKY_AREA
     vol_shell_grid_mpc = fsky * spherical_shell_comoving_volume(
         redshift,

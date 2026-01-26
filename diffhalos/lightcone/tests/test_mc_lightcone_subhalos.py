@@ -1,11 +1,14 @@
 """ """
 
 import numpy as np
+
 from jax import random as jran
+from jax import numpy as jnp
 
 from .. import mc_lightcone_subhalos as mclsh
 from ...ccshmf import mc_subs
 from ..utils import generate_mock_cenpop
+from ...mah.utils import apply_mah_rescaling
 
 
 def test_mc_lc_shmf_works_as_expected():
@@ -114,6 +117,56 @@ def test_mc_lc_subhalos_vs_subpop_from_mc_subs():
         assert np.all(np.abs(fracdiff) < 0.2)
 
         del lc_subpop, mc_lg_mu_pop
+
+
+def test_mah_params_rescaling():
+    """Assert that the rescaled MAH parameters produce
+    masses that are close to the expected ones"""
+
+    ran_key = jran.key(0)
+    satpop_key, mah_key = jran.split(ran_key, 2)
+
+    z_min = 0.4
+    z_max = 0.5
+    logmp_min = 11.0
+    logmp_max = 14.0
+    lgmp_min = 10.0
+    n_cens = 2_000
+
+    subhalo_model_key = mclsh.DEFAULT_DIFFMAHNET_SAT_MODEL
+
+    # use a mock host halo population for this test
+    cenpop = generate_mock_cenpop(z_min, z_max, logmp_min, logmp_max, n_cens=n_cens)
+
+    mc_lg_mu_shmf, _, _, n_mu_per_host = mc_subs.generate_subhalopop(
+        satpop_key,
+        cenpop.logmp_obs,
+        lgmp_min,
+    )
+
+    logmsub_obs_shmf = mc_lg_mu_shmf + jnp.repeat(cenpop.logmp_obs, n_mu_per_host)
+    t_obs = jnp.repeat(cenpop.t_obs, n_mu_per_host)
+
+    # get the rescaled MAH parameters and MAH's for all halos
+    logmp_obs_clipped = jnp.clip(
+        logmsub_obs_shmf,
+        mclsh.DEFAULT_LOGMSUB_CUTOFF,
+        mclsh.DEFAULT_LOGMSUB_HIMASS_CUTOFF,
+    )
+    mah_params, logmsub_obs_rescaled = apply_mah_rescaling(
+        mah_key,
+        logmsub_obs_shmf,
+        logmp_obs_clipped,
+        t_obs,
+        cenpop.logt0,
+        subhalo_model_key,
+    )
+    mc_lg_mu_rescaled = logmsub_obs_rescaled - jnp.repeat(
+        cenpop.logmp_obs, n_mu_per_host
+    )
+
+    assert np.allclose(logmsub_obs_rescaled, logmsub_obs_shmf, rtol=1e-5)
+    assert np.allclose(mc_lg_mu_rescaled, mc_lg_mu_shmf, rtol=1e-5)
 
 
 def test_mc_weighted_lc_subhalos_behaves_as_expected():

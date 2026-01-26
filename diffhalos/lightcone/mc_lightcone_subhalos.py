@@ -18,7 +18,7 @@ from ..ccshmf.ccshmf_model import (
     DEFAULT_CCSHMF_PARAMS,
 )
 from ..mah.diffmahnet.diffmahnet import log_mah_kern
-from ..mah.utils import rescale_mah_parameters
+from ..mah.utils import apply_mah_rescaling
 from ..utils.namedtuple_utils import add_field_to_namedtuple
 
 __all__ = ("mc_lc_shmf", "mc_lc_subhalos", "weighted_lc_subhalos")
@@ -161,30 +161,20 @@ def mc_lc_subhalos(
     logmsub_obs_shmf = mc_lg_mu_shmf + jnp.repeat(halopop.logmp_obs, n_mu_per_host)
     t_obs = jnp.repeat(halopop.t_obs, n_mu_per_host)
 
-    # get the uncorrected MAH parameters for all subhalos
+    # get the rescaled mah parameters and mah's
     logmsub_obs_clipped = jnp.clip(
         logmsub_obs_shmf, logmsub_cutoff, logmsub_cutoff_himass
     )
-    mah_params_subs_uncorrected = mc_mah_satpop(
+    mah_params_subs, logmsub_obs = apply_mah_rescaling(
+        mah_key,
+        logmsub_obs_shmf,
         logmsub_obs_clipped,
         t_obs,
-        mah_key,
+        halopop.logt0,
         subhalo_model_key,
     )
 
-    # compute the uncorrected observed masses
-    logt0 = halopop.logt0
-    logmsub_obs_uncorrected = log_mah_kern(mah_params_subs_uncorrected, t_obs, logt0)
-
-    # rescale the mah parameters to the correct logm0
-    mah_params_subs = rescale_mah_parameters(
-        mah_params_subs_uncorrected,
-        logmsub_obs_shmf,
-        logmsub_obs_uncorrected,
-    )
-
-    # compute observed mass and mu values with corrected parameters
-    logmsub_obs = log_mah_kern(mah_params_subs, t_obs, logt0)
+    # compute the rescaled mu values
     mc_lg_mu = logmsub_obs - jnp.repeat(halopop.logmp_obs, n_mu_per_host)
 
     # add the subhalo data to the halo population namedtuple
@@ -279,28 +269,20 @@ def weighted_lc_subhalos(
     logmsub_obs = lgmu + jnp.repeat(halopop.logmp_obs, n_mu_per_host)
     t_obs = jnp.repeat(halopop.t_obs, n_mu_per_host)
 
-    # get the uncorrected MAH parameters for all subhalos
+    #################
+    # get the rescaled mah parameters and mah's
     logmsub_obs_clipped = jnp.clip(logmsub_obs, logmsub_cutoff, logmsub_cutoff_himass)
-    mah_params_subs_uncorrected = mc_mah_satpop(
+    mah_params_subs, logmsub_obs = apply_mah_rescaling(
+        ran_key,
+        logmsub_obs,
         logmsub_obs_clipped,
         t_obs,
-        ran_key,
+        halopop.logt0,
         subhalo_model_key,
     )
+    #################
 
-    # compute the uncorrected observed masses
-    logt0 = halopop.logt0
-    logmsub_obs_uncorrected = log_mah_kern(mah_params_subs_uncorrected, t_obs, logt0)
-
-    # rescale the mah parameters to the correct logm0
-    mah_params_subs = rescale_mah_parameters(
-        mah_params_subs_uncorrected,
-        logmsub_obs,
-        logmsub_obs_uncorrected,
-    )
-
-    # compute observed mass and mu values with corrected parameters
-    logmsub_obs = log_mah_kern(mah_params_subs, t_obs, logt0)
+    # compute the rescaled mu values
     logmu_obs = logmsub_obs - jnp.repeat(halopop.logmp_obs, n_mu_per_host)
 
     # construct the host index array for the subhalos

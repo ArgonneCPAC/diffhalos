@@ -1,14 +1,18 @@
 """ """
 
 import numpy as np
+
 from jax import random as jran
+from jax import numpy as jnp
 
-from dsps.cosmology import flat_wcdm, DEFAULT_COSMOLOGY
-
+from .. import mc_lightcone_halos as mclh
+from ...cosmology import flat_wcdm, DEFAULT_COSMOLOGY
 from ...hmf import hmf_model, mc_hosts
 from ...calibrations.hmf_cal import hacc_core_hmf_params as hchmf
-from .. import mc_lightcone_halos as mclh
 from ...utils.stratified_grid import stratified_grid_scaled
+from ...mah.diffmahnet.diffmahnet import log_mah_kern
+from ...mah.diffmahnet_utils import mc_mah_cenpop
+from ...mah.utils import apply_mah_rescaling
 
 
 def test_mc_lightcone_host_halo_mass_function():
@@ -109,6 +113,125 @@ def test_mc_lightcone_host_halo_mass_function_lgmp_max_feature():
         assert np.allclose(n1, n2, rtol=0.02)
 
 
+def test_mc_lightcone_host_halo():
+    """
+    Enforce mc_lightcone_host_halo returns reasonable results
+    """
+
+    ran_key = jran.key(0)
+    lgmp_min = 12.0
+    sky_area_degsq = 1.0
+
+    n_tests = 5
+    z_max_arr = np.linspace(0.2, 2.5, n_tests)
+    for z_max in z_max_arr:
+        test_key, ran_key = jran.split(ran_key, 2)
+        z_min = z_max - 0.05
+
+        args = (test_key, lgmp_min, z_min, z_max, sky_area_degsq)
+        cenpop = mclh.mc_lc_halos(*args)
+
+        for _field in cenpop._fields:
+            assert np.all(np.isfinite(cenpop._asdict()[_field]))
+
+        assert cenpop.logmp_obs.size == cenpop.logmp0.size == cenpop.z_obs.size
+
+        assert np.all(cenpop.z_obs >= z_min)
+        assert np.all(cenpop.z_obs <= z_max)
+
+        # some halos with logmp_obs<lgmp_min is ok,
+        # but too many indicates an issue with diffmahnet replicating logmp_obs
+        assert np.mean(cenpop.logmp_obs < lgmp_min) < 0.2, f"z_min={z_min:.2f}"
+
+
+def test_mc_lightcone_host_halo_alt_mf_params():
+    """
+    Enforce mc_lightcone_host_halo returns
+    reasonable results when passed
+    alternative halo mass function parameters
+    """
+    ran_key = jran.key(0)
+    lgmp_min = 12.0
+    sky_area_degsq = 1.0
+
+    n_tests = 5
+    z_max_arr = np.linspace(0.2, 2.5, n_tests)
+    for z_max in z_max_arr:
+        test_key, ran_key = jran.split(ran_key, 2)
+        z_min = z_max - 0.05
+
+        args = (test_key, lgmp_min, z_min, z_max, sky_area_degsq)
+        cenpop = mclh.mc_lc_halos(*args, hmf_params=hchmf.HMF_PARAMS)
+
+        for _field in cenpop._fields:
+            assert np.all(np.isfinite(cenpop._asdict()[_field]))
+
+        assert cenpop.logmp_obs.size == cenpop.logmp0.size == cenpop.z_obs.size
+
+        assert np.all(cenpop.z_obs >= z_min)
+        assert np.all(cenpop.z_obs <= z_max)
+
+        # Some halos with logmp_obs<lgmp_min is ok,
+        # but too many indicates an issue with diffmahnet replicating logmp_obs
+        assert np.mean(cenpop.logmp_obs < lgmp_min) < 0.2, f"z_min={z_min:.2f}"
+
+
+def test_mah_params_rescaling():
+    """Assert that the rescaled MAH parameters produce
+    masses that are close to the expected ones"""
+
+    ran_key = jran.key(0)
+    halopop_key, mah_key = jran.split(ran_key, 2)
+
+    lgmp_min = 12.0
+    z_min, z_max = 0.4, 0.5
+    sky_area_degsq = 200.0
+    logmp_cutoff = mclh.DEFAULT_LOGMP_CUTOFF
+    logmp_cutoff_himass = mclh.DEFAULT_LOGMP_HIMASS_CUTOFF
+    cosmo_params = DEFAULT_COSMOLOGY
+    centrals_model_key = mclh.DEFAULT_DIFFMAHNET_CEN_MODEL
+
+    args = (halopop_key, lgmp_min, z_min, z_max, sky_area_degsq)
+    z_obs, logmp_obs_mf = mclh.mc_lc_hmf(*args)
+
+    t_obs = flat_wcdm.age_at_z(z_obs, *cosmo_params)
+    t_0 = flat_wcdm.age_at_z0(*cosmo_params)
+    logt0 = jnp.log10(t_0)
+
+    # get the rescaled MAH parameters and MAH's for all halos
+    logmp_obs_clipped = jnp.clip(logmp_obs_mf, logmp_cutoff, logmp_cutoff_himass)
+    mah_params, logmp_obs = apply_mah_rescaling(
+        mah_key,
+        logmp_obs_mf,
+        logmp_obs_clipped,
+        t_obs,
+        logt0,
+        centrals_model_key,
+    )
+
+    # compute observed mass with corrected parameters
+    logmp_obs = log_mah_kern(mah_params, t_obs, logt0)
+
+    assert np.allclose(logmp_obs, logmp_obs_mf, rtol=1e-5)
+
+
+# def test_mc_lightcone_host_halo_lgmp_max():
+#     """
+#     Regression test enforcing that mc_lightcone_host_halo
+#     returns some halos with mass that is close to lgmp_max
+#     """
+#     ran_key = jran.key(0)
+
+#     z_min, z_max = 0.4, 2.0
+#     lgmp_min, lgmp_max = 10.5, 15.5
+#     sky_area_degsq = 100.0
+
+#     args = (ran_key, lgmp_min, z_min, z_max, sky_area_degsq)
+#     cenpop = mclh.mc_lc_halos(*args, lgmp_max=lgmp_max)
+
+#     assert np.any(cenpop.logmp_obs.max() > lgmp_max - 0.5)
+
+
 def test_mc_weighted_halo_lightcone_stratified():
     ran_key = jran.key(0)
     n_tests = 10
@@ -191,83 +314,3 @@ def test_mc_weighted_halo_lightcone_input_grid():
         # but too many indicates an issue with diffmahnet replicating logmp_obs
         assert np.mean(cenpop.logmp_obs < lgmp_min) < 0.2
         assert np.mean(cenpop.logmp_obs > lgmp_max) < 0.2
-
-
-def test_mc_lightcone_host_halo():
-    """
-    Enforce mc_lightcone_host_halo returns reasonable results
-    """
-
-    ran_key = jran.key(0)
-    lgmp_min = 12.0
-    sky_area_degsq = 1.0
-
-    n_tests = 5
-    z_max_arr = np.linspace(0.2, 2.5, n_tests)
-    for z_max in z_max_arr:
-        test_key, ran_key = jran.split(ran_key, 2)
-        z_min = z_max - 0.05
-
-        args = (test_key, lgmp_min, z_min, z_max, sky_area_degsq)
-        cenpop = mclh.mc_lc_halos(*args)
-
-        assert np.all(np.isfinite(cenpop.z_obs))
-        assert np.all(np.isfinite(cenpop.logmp_obs))
-        assert np.all(np.isfinite(cenpop.logmp0))
-        assert cenpop.logmp_obs.size == cenpop.logmp0.size == cenpop.z_obs.size
-
-        assert np.all(cenpop.z_obs >= z_min)
-        assert np.all(cenpop.z_obs <= z_max)
-
-        # some halos with logmp_obs<lgmp_min is ok,
-        # but too many indicates an issue with diffmahnet replicating logmp_obs
-        assert np.mean(cenpop.logmp_obs < lgmp_min) < 0.2, f"z_min={z_min:.2f}"
-
-
-def test_mc_lightcone_host_halo_alt_mf_params():
-    """
-    Enforce mc_lightcone_host_halo returns
-    reasonable results when passed
-    alternative halo mass function parameters
-    """
-    ran_key = jran.key(0)
-    lgmp_min = 12.0
-    sky_area_degsq = 1.0
-
-    n_tests = 5
-    z_max_arr = np.linspace(0.2, 2.5, n_tests)
-    for z_max in z_max_arr:
-        test_key, ran_key = jran.split(ran_key, 2)
-        z_min = z_max - 0.05
-
-        args = (test_key, lgmp_min, z_min, z_max, sky_area_degsq)
-        cenpop = mclh.mc_lc_halos(*args, hmf_params=hchmf.HMF_PARAMS)
-
-        assert np.all(np.isfinite(cenpop.z_obs))
-        assert np.all(np.isfinite(cenpop.logmp_obs))
-        assert np.all(np.isfinite(cenpop.logmp0))
-        assert cenpop.logmp_obs.size == cenpop.logmp0.size == cenpop.z_obs.size
-
-        assert np.all(cenpop.z_obs >= z_min)
-        assert np.all(cenpop.z_obs <= z_max)
-
-        # Some halos with logmp_obs<lgmp_min is ok,
-        # but too many indicates an issue with diffmahnet replicating logmp_obs
-        assert np.mean(cenpop.logmp_obs < lgmp_min) < 0.2, f"z_min={z_min:.2f}"
-
-
-# def test_mc_lightcone_host_halo_lgmp_max():
-#     """
-#     Regression test enforcing that mc_lightcone_host_halo
-#     returns some halos with mass that is close to lgmp_max
-#     """
-#     ran_key = jran.key(0)
-
-#     z_min, z_max = 0.4, 2.0
-#     lgmp_min, lgmp_max = 10.5, 15.5
-#     sky_area_degsq = 100.0
-
-#     args = (ran_key, lgmp_min, z_min, z_max, sky_area_degsq)
-#     cenpop = mclh.mc_lc_halos(*args, lgmp_max=lgmp_max)
-
-#     assert np.any(cenpop.logmp_obs.max() > lgmp_max - 0.5)
