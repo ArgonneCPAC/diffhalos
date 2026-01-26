@@ -4,10 +4,10 @@ import numpy as np
 
 from diffsky.experimental import mc_lightcone_halos as mclh
 from diffsky.mass_functions import mc_hosts as diffsky_mc_hosts
-from dsps.cosmology import DEFAULT_COSMOLOGY
 from jax import random as jran
 
 from .. import hmf_model
+from ...cosmology import DEFAULT_COSMOLOGY
 
 
 def test_cuml_hmf_evaluations():

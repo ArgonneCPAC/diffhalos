@@ -6,8 +6,8 @@ from jax import random as jran
 from jax import numpy as jnp
 
 from .. import mc_lightcone_subhalos as mclsh
-from ...ccshmf import mc_subs
 from ..utils import generate_mock_cenpop
+from ...ccshmf import mc_subs
 from ...mah.utils import apply_mah_rescaling
 
 

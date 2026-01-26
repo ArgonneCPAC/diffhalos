@@ -11,7 +11,6 @@ from ...hmf import hmf_model, mc_hosts
 from ...calibrations.hmf_cal import hacc_core_hmf_params as hchmf
 from ...utils.stratified_grid import stratified_grid_scaled
 from ...mah.diffmahnet.diffmahnet import log_mah_kern
-from ...mah.diffmahnet_utils import mc_mah_cenpop
 from ...mah.utils import apply_mah_rescaling
 
 

@@ -6,7 +6,7 @@ from functools import partial
 from jax import numpy as jnp
 from jax import jit as jjit
 
-from dsps.cosmology import flat_wcdm, DEFAULT_COSMOLOGY
+from ..cosmology import flat_wcdm, DEFAULT_COSMOLOGY
 
 __all__ = ()
 

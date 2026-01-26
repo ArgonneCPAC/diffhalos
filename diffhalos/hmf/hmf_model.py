@@ -11,10 +11,9 @@ from jax import jit as jjit
 from jax import vmap
 from jax import numpy as jnp
 
-from ..cosmology import flat_wcdm, DEFAULT_COSMOLOGY
-
 from .hmf_kernels import lg_hmf_kern
 from ..calibrations.hmf_cal import DEFAULT_HMF_PARAMS, HMF_Params  # noqa
+from ..cosmology import flat_wcdm, DEFAULT_COSMOLOGY
 from ..cosmology.geometry_utils import (
     spherical_shell_comoving_volume,
     compute_volume_from_sky_area,
