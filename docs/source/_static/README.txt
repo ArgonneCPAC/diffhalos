@@ -1,0 +1,1 @@
+This directory contains static figures used in the diffhalos documentation
