@@ -25,8 +25,8 @@ CCSHMF_Params = namedtuple("CCSHMF_Params", DEFAULT_CCSHMF_KERN_PDICT.keys())
 DEFAULT_CCSHMF_KERN_PARAMS = CCSHMF_Params(**DEFAULT_CCSHMF_KERN_PDICT)
 
 __all__ = (
-    "lg_ccshmf_kern",
-    "ccshmf_kern",
+    "lg_cuml_cshmf_kern",
+    "cuml_cshmf_kern",
     "lg_diff_cshmf_kern",
 )
 
