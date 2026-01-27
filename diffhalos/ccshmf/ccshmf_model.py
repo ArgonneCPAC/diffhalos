@@ -238,8 +238,8 @@ def subhalo_lightcone_weights_kern(
 
     Parameters
     ----------
-    lgmhost: ndarray of shape (n_host, )
-        base-10 log of the host halo masses, in Msun
+    lgmhost: float
+        base-10 log of the host halo mass, in Msun
 
     lgmp_min: float
         base-10 log of the minimum mass, in Msun

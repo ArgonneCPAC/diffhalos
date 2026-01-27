@@ -1,11 +1,11 @@
 """Utility functions for lightcone calculations"""
 
-from dsps.cosmology import flat_wcdm
 from jax import grad
 from jax import jit as jjit
 from jax import numpy as jnp
 from jax import vmap
 
+from ..cosmology import flat_wcdm
 from ..defaults import FULL_SKY_AREA
 
 _Z = (0, None, None, None, None)
@@ -37,6 +37,7 @@ def spherical_shell_comoving_volume(z_grid, cosmo_params):
     vol_shell_grid: float
         volume of grid shell, in comoving Mpc**3
     """
+    z_grid = jnp.atleast_1d(z_grid)
 
     # Compute comoving distance to each grid point
     r_grid = flat_wcdm.comoving_distance(z_grid, *cosmo_params)

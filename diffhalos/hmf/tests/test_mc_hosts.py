@@ -11,6 +11,7 @@ from ..hmf_model import (
 from ..mc_hosts import (
     LGMH_MAX,
     mc_host_halos_singlez,
+    mc_host_halos_hist_singlez,
 )
 
 
@@ -44,36 +45,24 @@ def test_mc_host_halo_logmp_behaves_as_expected():
     assert np.all(lgmp_halopop2 < lgmp_max)
 
 
-def test_diff_cumulative_hmf_consistency():
+def test_diff_hmf_pophist_vs_theory_consistency():
     ran_key = jran.key(0)
-    z = 0.0
-    lgmp_min = 12.0
+    lgmp_min = 11.0
     Lbox = 1000.0
     Vbox = Lbox**3
 
-    lgm_halopop = mc_host_halos_singlez(
-        ran_key,
-        lgmp_min,
-        z,
-        Vbox,
-    )
     lgm_bins = np.linspace(lgmp_min + 0.5, 14.0, 50)
 
-    diff_hmf = predict_diff_hmf(
-        DEFAULT_HMF_PARAMS,
-        lgm_bins,
-        z,
-    )
+    z_test = np.linspace(0.0, 1.0, 5)
 
-    binned_counts = np.histogram(lgm_halopop, bins=lgm_bins)[0]
-    diff_hmf_target = binned_counts / Vbox / np.diff(lgm_bins)
+    for z in z_test:
+        diff_hmf = predict_diff_hmf(DEFAULT_HMF_PARAMS, lgm_bins, z)
 
-    # Interpolate to compare same-sized arrays
-    lgm_binmids = 0.5 * (lgm_bins[:-1] + lgm_bins[1:])
-    diff_hmf_interp = 10 ** np.interp(
-        lgm_binmids,
-        lgm_bins,
-        diff_hmf,
-    )
+        diff_hmf_target, lgm_binmids = mc_host_halos_hist_singlez(
+            ran_key, lgmp_min, z, Vbox, bins=lgm_bins
+        )
 
-    assert np.allclose(diff_hmf_interp, diff_hmf_target, rtol=0.1)
+        # interpolate to compare same-sized arrays
+        diff_hmf_interp = 10 ** np.interp(lgm_binmids, lgm_bins, diff_hmf)
+
+        assert np.allclose(diff_hmf_interp, diff_hmf_target, rtol=0.1)

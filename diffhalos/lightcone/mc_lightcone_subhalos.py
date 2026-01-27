@@ -11,13 +11,8 @@ from jax import random as jran
 
 from functools import partial
 
-from ..mah.diffmahnet_utils import mc_mah_satpop
 from ..ccshmf.mc_subs import generate_subhalopop
-from ..ccshmf.ccshmf_model import (
-    subhalo_lightcone_weights,
-    DEFAULT_CCSHMF_PARAMS,
-)
-from ..mah.diffmahnet.diffmahnet import log_mah_kern
+from ..ccshmf.ccshmf_model import subhalo_lightcone_weights, DEFAULT_CCSHMF_PARAMS
 from ..mah.utils import apply_mah_rescaling
 from ..utils.namedtuple_utils import add_field_to_namedtuple
 

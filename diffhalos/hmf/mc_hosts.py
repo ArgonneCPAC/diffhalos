@@ -1,4 +1,9 @@
+# flake8: noqa: E402
 """Generate MC realizations of the host dark matter halo mass function"""
+
+from jax import config
+
+config.update("jax_enable_x64", True)
 
 import numpy as np
 
@@ -136,7 +141,7 @@ def mc_host_halos_hist_singlez(
     volume_com_mpc,
     hmf_params=DEFAULT_HMF_PARAMS,
     lgmp_max=LGMH_MAX,
-    n_bins=20,
+    bins=20,
 ):
     """
     Generate a histogram of a Monte Carlo realization of the
@@ -164,8 +169,8 @@ def mc_host_halos_hist_singlez(
     lgmp_max: float
         base-10 log of the maximum mass
 
-    n_bins: int
-        number of histogram bins
+    bins: int or ndarray of shape (n_bins, )
+        number of histogram bins or specified bins to use for binning
 
     Returns
     -------
@@ -184,7 +189,7 @@ def mc_host_halos_hist_singlez(
         lgmp_max=lgmp_max,
     )
 
-    hist_data = np.histogram(mc_logmhalo, bins=n_bins, density=False)
+    hist_data = np.histogram(mc_logmhalo, bins=bins, density=False)
 
     dlogm_bin_edges = hist_data[1]
     dlogm_bins = 0.5 * (dlogm_bin_edges[1:] + dlogm_bin_edges[:-1])

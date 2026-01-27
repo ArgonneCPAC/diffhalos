@@ -1,10 +1,15 @@
+# flake8: noqa: E402
 """
-The generate_subhalopop function generates a Monte Carlo
+The ``generate_subhalopop`` function generates a Monte Carlo
 realization of a subhalo population defined by its
 cumulative conditional subhalo mass function, CCSHMF.
 Starting with a simulated snapshot or lightcone with only host halos,
 generate_subhalopop can be used to add subhalos with synthetic values of Mpeak.
 """
+
+from jax import config
+
+config.update("jax_enable_x64", True)
 
 import numpy as np
 
@@ -63,6 +68,7 @@ def generate_subhalopop(
         so that lgmhost_pop = lgmhost_arr[host_halo_indx];
         thus all values satisfy 0 <= host_halo_indx < nhosts
     """
+    lgmhost_arr = jnp.atleast_1d(lgmhost_arr)
 
     # random keys for uniforms randoms, and subhalo counts
     uran_key, counts_key = jran.split(ran_key, 2)
@@ -155,7 +161,7 @@ def generate_subhalopop_hist(
     lgmhost,
     lgmp_min,
     ccshmf_params=DEFAULT_CCSHMF_PARAMS,
-    n_bins=20,
+    bins=20,
 ):
     """
     Generate a histogram of a population of subhalos
@@ -176,8 +182,8 @@ def generate_subhalopop_hist(
     ccshmf_params: namedtuple
         CCSHMF parameters named tuple
 
-    n_bins: int
-        number of histogram bins
+    bins: int or ndarray of shape (n_bins, )
+        number of histogram bins or specified bins to use for binning
 
     Returns
     -------
@@ -187,6 +193,8 @@ def generate_subhalopop_hist(
     dlogmu_bins: ndarray of shape (n_bins, )
         binned mu values
     """
+    lgmhost = jnp.atleast_1d(lgmhost)
+
     mc_lg_mu = generate_subhalopop(
         ran_key,
         lgmhost,
@@ -194,7 +202,7 @@ def generate_subhalopop_hist(
         ccshmf_params=ccshmf_params,
     )[0]
 
-    hist_data = np.histogram(mc_lg_mu, bins=n_bins, density=False)
+    hist_data = np.histogram(mc_lg_mu, bins=bins, density=False)
     dlogmu_bin_edges = hist_data[1]
     dlogmu_bins = 0.5 * (dlogmu_bin_edges[1:] + dlogmu_bin_edges[:-1])
 
@@ -247,6 +255,8 @@ def generate_subhalopop_hist_out_of_core(
     dlogmu_bins: ndarray of shape (n_bins, )
         binned mu values
     """
+    lgmhost = jnp.atleast_1d(lgmhost)
+
     dlogmu_bin_edges = np.linspace(logmu_min, logmu_max, n_bins + 1)
     dnsub_bins = np.zeros(n_bins)
     n_subhalo = 0
