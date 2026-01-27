@@ -1,7 +1,6 @@
 # flake8: noqa
 
 import math
-
 import numpy as np
 
 __all__ = (
@@ -88,8 +87,8 @@ def plot_triangle_GetDist(
     """
     Plot triangle for a set of chains using GetDist
     """
-    import getdist.plots as gplots
     from getdist import MCSamples
+    import getdist.plots as gplots
 
     plot_awesome(dpi=dpi, fontsize=fontsize)
 

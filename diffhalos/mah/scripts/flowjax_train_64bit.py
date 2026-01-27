@@ -3,11 +3,11 @@ from jax import config
 
 config.update("jax_enable_x64", True)
 
-import argparse
 import pathlib
+import argparse
 
-import diffmahnet
 import jax
+import diffmahnet
 from diffmahnet import datatools
 
 SAVE_DIR = pathlib.Path("./data/")

@@ -1,15 +1,16 @@
-import glob
 import json
+import glob
 import pathlib
 
-import equinox as eqx
-import flowjax
-import flowjax.distributions
-import flowjax.flows
-import flowjax.train
 import jax
 import jax.numpy as jnp
 import numpy as np
+import flowjax
+
+import flowjax.distributions
+import flowjax.flows
+import flowjax.train
+import equinox as eqx
 import paramax
 
 try:
@@ -21,7 +22,10 @@ except ImportError:
 
 import diffmah
 from diffmah import DEFAULT_MAH_PARAMS
-from diffmah.diffmah_kernels import get_bounded_mah_params, get_unbounded_mah_params
+from diffmah.diffmah_kernels import (
+    get_unbounded_mah_params,
+    get_bounded_mah_params,
+)
 
 DEFAULT_MAH_UPARAMS = get_unbounded_mah_params(DEFAULT_MAH_PARAMS)
 

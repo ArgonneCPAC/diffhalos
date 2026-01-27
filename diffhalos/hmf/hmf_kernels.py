@@ -22,7 +22,7 @@ DEFAULT_HMF_KERN_PARAMS = HMF_Params(**DEFAULT_HMF_KERN_PDICT)
 __all__ = (
     "lg_hmf_kern",
     "hmf_kern",
-    "lg_differential_hmf_kern",
+    "lg_diff_hmf_kern",
 )
 
 
@@ -42,12 +42,12 @@ def lg_hmf_kern(params, lgmp):
 
 
 @jjit
-def hmf_kern(params, lgmu):
-    lg_cuml = lg_hmf_kern(params, lgmu)
+def hmf_kern(params, lgmp):
+    lg_cuml = lg_hmf_kern(params, lgmp)
     return 10**lg_cuml
 
 
-_differential_hmf_kern = jjit(
+_diff_hmf_kern = jjit(
     vmap(
         grad(hmf_kern, argnums=1),
         in_axes=(None, 0),
@@ -56,5 +56,5 @@ _differential_hmf_kern = jjit(
 
 
 @jjit
-def lg_differential_hmf_kern(params, lgmu):
-    return jnp.log10(-_differential_hmf_kern(params, lgmu))
+def lg_diff_hmf_kern(params, lgmp):
+    return jnp.log10(-_diff_hmf_kern(params, lgmp))

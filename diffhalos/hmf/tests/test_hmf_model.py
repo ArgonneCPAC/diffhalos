@@ -1,12 +1,13 @@
 """ """
 
 import numpy as np
+
 from diffsky.experimental import mc_lightcone_halos as mclh
 from diffsky.mass_functions import mc_hosts as diffsky_mc_hosts
-from dsps.cosmology import DEFAULT_COSMOLOGY
 from jax import random as jran
 
 from .. import hmf_model
+from ...cosmology import DEFAULT_COSMOLOGY
 
 
 def test_cuml_hmf_evaluations():
@@ -24,7 +25,7 @@ def test_cuml_hmf_evaluations():
 def test_diff_hmf_evaluations():
     lgmp_arr = np.linspace(-6, 0, 500)
     redshift = 0.2
-    res = hmf_model.predict_differential_hmf(
+    res = hmf_model.predict_diff_hmf(
         hmf_model.DEFAULT_HMF_PARAMS,
         lgmp_arr,
         redshift,
