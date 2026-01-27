@@ -1,4 +1,4 @@
-name: unit tests with cron
+name: tests
 
 on:
   workflow_dispatch: null
@@ -12,7 +12,7 @@ on:
 
 jobs:
   tests:
-    name: pytest
+    name: tests
     runs-on: "ubuntu-latest"
 
     steps:
