@@ -1,13 +1,21 @@
+# flake8: noqa: E402
 """Generate MC realizations of the host dark matter halo mass function"""
 
-from functools import partial
+from jax import config
+
+config.update("jax_enable_x64", True)
 
 import numpy as np
+
 from jax import jit as jjit
 from jax import numpy as jnp
 from jax import random as jran
 
-from .hmf_model import DEFAULT_HMF_PARAMS, _compute_nhalos_tot, predict_cuml_hmf
+from .hmf_model import (
+    DEFAULT_HMF_PARAMS,
+    predict_cuml_hmf,
+    _compute_nhalos_tot,
+)
 
 N_LGMU_TABLE = 200
 U_TABLE = jnp.linspace(0, 1, N_LGMU_TABLE)
@@ -16,18 +24,16 @@ LGMH_MAX = 17.0
 __all__ = ("mc_host_halos_singlez",)
 
 
-@partial(jjit, static_argnames=("nhalos",))
 def mc_host_halos_singlez(
     ran_key,
     lgmp_min,
     redshift,
-    nhalos,
+    volume_com_mpc,
     hmf_params=DEFAULT_HMF_PARAMS,
     lgmp_max=LGMH_MAX,
 ):
     """
     Monte Carlo realization of the host halo mass function
-    at the input redshift
 
     Parameters
     ----------
@@ -42,8 +48,8 @@ def mc_host_halos_singlez(
     redshift: float
         redshift of the halo population
 
-    nhalos: int
-        number of halos to generate
+    volume_com_mpc: float
+        comoving volume of the generated population, in Mpc^3
 
     hmf_params: namedtuple
         HMF parameters named tuple
@@ -62,16 +68,70 @@ def mc_host_halos_singlez(
     physical units (not h=1 units)
     """
 
-    # nhalos = jran.poisson(counts_key, mean_nhalos)
+    mean_nhalos = _compute_nhalos_tot(
+        hmf_params,
+        lgmp_min,
+        redshift,
+        volume_com_mpc,
+    )
+    mean_nhalos_lgmax = _compute_nhalos_tot(
+        hmf_params,
+        lgmp_max,
+        redshift,
+        volume_com_mpc,
+    )
+    mean_nhalos = mean_nhalos - mean_nhalos_lgmax
+
+    nhalos = jran.poisson(ran_key, mean_nhalos)
+
     uran = jran.uniform(ran_key, minval=0, maxval=1, shape=(nhalos,))
-    lgmp_halopop = _mc_host_halos_singlez_kern(
-        uran,
+    lgmp_halopop = jnp.array(
+        _mc_host_halos_singlez_kern(
+            uran,
+            hmf_params,
+            lgmp_min,
+            redshift,
+            lgmp_max=lgmp_max,
+        )
+    )
+
+    return lgmp_halopop
+
+
+@jjit
+def _get_hmf_cdf_interp_tables(
+    hmf_params,
+    lgmp_min,
+    redshift,
+    lgmp_max=LGMH_MAX,
+):
+    dlgmp = lgmp_max - lgmp_min
+    lgmp_table = U_TABLE * dlgmp + lgmp_min
+
+    cdf_table = 10 ** predict_cuml_hmf(hmf_params, lgmp_table, redshift)
+    cdf_table = cdf_table - cdf_table[0]
+    cdf_table = cdf_table / cdf_table[-1]
+
+    return lgmp_table, cdf_table
+
+
+@jjit
+def _mc_host_halos_singlez_kern(
+    uran,
+    hmf_params,
+    lgmp_min,
+    redshift,
+    lgmp_max=LGMH_MAX,
+):
+    lgmp_table, cdf_table = _get_hmf_cdf_interp_tables(
         hmf_params,
         lgmp_min,
         redshift,
         lgmp_max=lgmp_max,
     )
-    return jnp.array(lgmp_halopop)
+    mc_lg_mp = jnp.interp(uran, cdf_table, lgmp_table)
+
+    return mc_lg_mp
 
 
 def mc_host_halos_hist_singlez(
@@ -81,7 +141,7 @@ def mc_host_halos_hist_singlez(
     volume_com_mpc,
     hmf_params=DEFAULT_HMF_PARAMS,
     lgmp_max=LGMH_MAX,
-    n_bins=20,
+    bins=20,
 ):
     """
     Generate a histogram of a Monte Carlo realization of the
@@ -101,8 +161,7 @@ def mc_host_halos_hist_singlez(
         redshift of the halo population
 
     volume_com_mpc: float
-        comoving volume of the generated population in units of Mpc^3;
-        larger values of volume_com produce more halos in the returned sample
+        comoving volume of the generated population, in Mpc^3
 
     hmf_params: namedtuple
         HMF parameters named tuple
@@ -110,8 +169,8 @@ def mc_host_halos_hist_singlez(
     lgmp_max: float
         base-10 log of the maximum mass
 
-    n_bins: int
-        number of histogram bins
+    bins: int or ndarray of shape (n_bins, )
+        number of histogram bins or specified bins to use for binning
 
     Returns
     -------
@@ -130,7 +189,7 @@ def mc_host_halos_hist_singlez(
         lgmp_max=lgmp_max,
     )
 
-    hist_data = np.histogram(mc_logmhalo, bins=n_bins, density=False)
+    hist_data = np.histogram(mc_logmhalo, bins=bins, density=False)
 
     dlogm_bin_edges = hist_data[1]
     dlogm_bins = 0.5 * (dlogm_bin_edges[1:] + dlogm_bin_edges[:-1])
@@ -245,38 +304,3 @@ def mc_host_halos_hist_singlez_out_of_core(
     logm_bins = 0.5 * (logm_bin_edges[1:] + logm_bin_edges[:-1])
 
     return halo_counts, logm_bins
-
-
-@jjit
-def _get_hmf_cdf_interp_tables(
-    hmf_params,
-    lgmp_min,
-    redshift,
-    lgmp_max=LGMH_MAX,
-):
-    dlgmp = lgmp_max - lgmp_min
-    lgmp_table = U_TABLE * dlgmp + lgmp_min
-
-    cdf_table = 10 ** predict_cuml_hmf(hmf_params, lgmp_table, redshift)
-    cdf_table = cdf_table - cdf_table[0]
-    cdf_table = cdf_table / cdf_table[-1]
-
-    return lgmp_table, cdf_table
-
-
-@jjit
-def _mc_host_halos_singlez_kern(
-    uran,
-    hmf_params,
-    lgmp_min,
-    redshift,
-    lgmp_max=LGMH_MAX,
-):
-    lgmp_table, cdf_table = _get_hmf_cdf_interp_tables(
-        hmf_params,
-        lgmp_min,
-        redshift,
-        lgmp_max=lgmp_max,
-    )
-    mc_lg_mp = jnp.interp(uran, cdf_table, lgmp_table)
-    return mc_lg_mp

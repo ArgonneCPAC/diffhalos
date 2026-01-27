@@ -1,195 +1,291 @@
 """ """
 
-from collections import namedtuple
-
 import numpy as np
+
 from jax import random as jran
+from jax import numpy as jnp
 
-from ...ccshmf import mc_subs
-from .. import mc_lightcone_halos as mclh
 from .. import mc_lightcone_subhalos as mclsh
+from ..utils import generate_mock_cenpop
+from ...ccshmf import mc_subs
+from ...mah.utils import apply_mah_rescaling
 
 
-def test_mc_lightcone_subhalo_mass_function_works_as_expected():
+def test_mc_lc_shmf_works_as_expected():
     ran_key = jran.key(0)
-    uran_key, counts_key = jran.split(ran_key, 2)
 
-    nhost = 10
+    n_tests = 5
+
+    nhost = 100
     lgmhost = np.linspace(13.0, 15.0, nhost)
     lgmp_min = 12.0
 
-    subhalo_counts_per_halo, nsubs_tot = mc_subs.get_mean_subhalo_counts_poisson(
-        counts_key,
-        lgmhost,
-        lgmp_min,
-    )
+    test_keys = jran.split(ran_key, n_tests)
+    for test_key in test_keys:
+        mc_lg_mu, lgmhost_pop, host_halo_indx, subs_per_halo = mclsh.mc_lc_shmf(
+            test_key,
+            lgmhost,
+            lgmp_min,
+        )
 
-    (
-        mc_lg_mu,
-        lgmhost_pop,
-        host_halo_indx,
-    ) = mclsh.mc_lightcone_subhalo_mass_function(
-        uran_key,
-        lgmhost,
-        lgmp_min,
-        subhalo_counts_per_halo,
-        int(nsubs_tot),
-    )
-
-    assert mc_lg_mu.size == lgmhost_pop.size == host_halo_indx.size == nsubs_tot
-    assert np.all(np.isfinite(mc_lg_mu))
-    assert np.all(np.isfinite(lgmhost_pop))
-    assert np.all(np.isfinite(host_halo_indx))
+        assert mc_lg_mu.size == lgmhost_pop.size == host_halo_indx.size
+        assert np.all(np.isfinite(mc_lg_mu))
+        assert np.all(np.isfinite(lgmhost_pop))
+        assert np.all(np.isfinite(host_halo_indx))
+        assert np.all(np.isfinite(subs_per_halo))
+        assert subs_per_halo.sum() == mc_lg_mu.size
 
 
-def test_mc_weighted_subhalo_lightcone_behaves_as_expected():
+def test_mc_lc_shmf_lgmp_min_parameter_behavior():
     ran_key = jran.key(0)
 
-    n_halos = 500
-    z_obs = np.linspace(0.45, 0.5, n_halos)
-    lgmp_max = 15.0
-    sky_area_degsq = 1.0
-    logt0 = np.log10(13.8)
+    n_tests = 5
+    lgmp_mins = np.linspace(9.0, 11.0, n_tests)
+
+    nhost = 100
+    lgmhost = np.linspace(11.5, 14.0, nhost)
+
+    for lgmp_min in lgmp_mins:
+        mc_lg_mu, lgmhost_pop, host_halo_indx, subs_per_halo = mclsh.mc_lc_shmf(
+            ran_key,
+            lgmhost,
+            lgmp_min,
+        )
+
+        assert mc_lg_mu.size == lgmhost_pop.size == host_halo_indx.size
+        assert np.all(np.isfinite(mc_lg_mu))
+        assert np.all(np.isfinite(lgmhost_pop))
+        assert np.all(np.isfinite(host_halo_indx))
+        assert np.all(np.isfinite(subs_per_halo))
+        assert subs_per_halo.sum() == mc_lg_mu.size
+
+
+def test_mc_lc_subhalos_works_as_expected():
+
+    ran_key = jran.key(0)
+
+    z_min = 0.2
+    z_max = 2.0
+    logmp_min = 11.0
+    logmp_max = 14.0
+    lgmp_min = 10.0
+    n_cens = 1_000
+
+    # use a mock host halo population for this test
+    cenpop = generate_mock_cenpop(z_min, z_max, logmp_min, logmp_max, n_cens=n_cens)
+
+    halopop = mclsh.mc_lc_subhalos(ran_key, cenpop, lgmp_min)
+
+    subhalo_fields = ("host_index_for_subs", "mah_params_subs", "logmu_obs")
+
+    for _field in subhalo_fields:
+        assert _field in halopop._fields
+        assert np.all(np.isfinite(halopop._asdict()[_field]))
+
+
+def test_mc_lc_subhalos_vs_subpop_from_mc_subs():
+
+    ran_key = jran.key(0)
+
+    z_min = 0.4
+    z_max = 0.5
+    logmp_min = 11.0
+    logmp_max = 14.0
+    lgmp_min = 10.0
+    n_cens = 2_000
+
+    # use a mock host halo population for this test
+    cenpop = generate_mock_cenpop(z_min, z_max, logmp_min, logmp_max, n_cens=n_cens)
+
+    n_tests = 5
+    test_keys = jran.split(ran_key, n_tests)
+    for test_key in test_keys:
+        lc_subpop = mclsh.mc_lc_subhalos(test_key, cenpop, lgmp_min)
+        mc_lg_mu_pop = mc_subs.generate_subhalopop(
+            test_key,
+            cenpop.logmp_obs,
+            lgmp_min,
+        )[0]
+
+        lg_mu_lc, lg_mu_bins = np.histogram(lc_subpop.logmu_obs, bins=100)
+        lg_mu_pop, _ = np.histogram(mc_lg_mu_pop, bins=lg_mu_bins)
+        msk_counts = lg_mu_pop > 500
+
+        fracdiff = (lg_mu_lc[msk_counts] - lg_mu_pop[msk_counts]) / lg_mu_pop[
+            msk_counts
+        ]
+        assert np.all(np.abs(fracdiff) < 0.2)
+
+        del lc_subpop, mc_lg_mu_pop
+
+
+def test_mah_params_rescaling():
+    """Assert that the rescaled MAH parameters produce
+    masses that are close to the expected ones"""
+
+    ran_key = jran.key(0)
+    satpop_key, mah_key = jran.split(ran_key, 2)
+
+    z_min = 0.4
+    z_max = 0.5
+    logmp_min = 11.0
+    logmp_max = 14.0
+    lgmp_min = 10.0
+    n_cens = 2_000
+
+    subhalo_model_key = mclsh.DEFAULT_DIFFMAHNET_SAT_MODEL
+
+    # use a mock host halo population for this test
+    cenpop = generate_mock_cenpop(z_min, z_max, logmp_min, logmp_max, n_cens=n_cens)
+
+    mc_lg_mu_shmf, _, _, n_mu_per_host = mc_subs.generate_subhalopop(
+        satpop_key,
+        cenpop.logmp_obs,
+        lgmp_min,
+    )
+
+    logmsub_obs_shmf = mc_lg_mu_shmf + jnp.repeat(cenpop.logmp_obs, n_mu_per_host)
+    t_obs = jnp.repeat(cenpop.t_obs, n_mu_per_host)
+
+    # get the rescaled MAH parameters and MAH's for all halos
+    logmp_obs_clipped = jnp.clip(
+        logmsub_obs_shmf,
+        mclsh.DEFAULT_LOGMSUB_CUTOFF,
+        mclsh.DEFAULT_LOGMSUB_HIMASS_CUTOFF,
+    )
+    mah_params, logmsub_obs_rescaled = apply_mah_rescaling(
+        mah_key,
+        logmsub_obs_shmf,
+        logmp_obs_clipped,
+        t_obs,
+        cenpop.logt0,
+        subhalo_model_key,
+    )
+    mc_lg_mu_rescaled = logmsub_obs_rescaled - jnp.repeat(
+        cenpop.logmp_obs, n_mu_per_host
+    )
+
+    assert np.allclose(logmsub_obs_rescaled, logmsub_obs_shmf, rtol=1e-5)
+    assert np.allclose(mc_lg_mu_rescaled, mc_lg_mu_shmf, rtol=1e-5)
+
+
+def test_mc_weighted_lc_subhalos_behaves_as_expected():
+    ran_key = jran.key(0)
+
+    z_min = 0.4
+    z_max = 0.5
+    logmp_min = 11.0
+    logmp_max = 14.0
+    lgmp_min = 10.0
+    n_cens = 2_000
+
     n_sub_per_host = mclsh.N_LGMU_PER_HOST
 
-    n_tests = 5
-    lgmp_min_arr = np.linspace(11.0, 13.0, n_tests)
-    for lgmp_min in lgmp_min_arr:
-        test_key, ran_key = jran.split(ran_key, 2)
+    # use a mock host halo population for this test
+    cenpop = generate_mock_cenpop(z_min, z_max, logmp_min, logmp_max, n_cens=n_cens)
+    halopop = mclsh.weighted_lc_subhalos(cenpop, ran_key, lgmp_min)
 
-        logmp_obs = np.linspace(lgmp_min, lgmp_max, n_halos)
+    weighted_lc_subhalo_fields = (
+        "logmp_obs",
+        "t_obs",
+        "logt0",
+        "nsubhalos",
+        "host_index_for_subs",
+        "mah_params_subs",
+        "logmu_obs",
+    )
 
-        cenpop = mclh.weighted_lightcone_host_halo(
-            test_key,
-            z_obs,
-            logmp_obs,
-            sky_area_degsq,
-        )
+    for _field in weighted_lc_subhalo_fields:
+        assert _field in halopop._fields
+        assert np.all(np.isfinite(halopop._asdict()[_field]))
 
-        satpop = mclsh.mc_weighted_subhalo_lightcone(
-            cenpop,
-            test_key,
-            lgmp_min,
-            logt0,
-        )
+    assert halopop.nsubhalos.shape == (n_cens * n_sub_per_host,)
+    assert halopop.logmu_obs.shape == (n_cens * n_sub_per_host,)
 
-        assert "nsubhalos" in satpop._fields
-        assert "logmu_subs" in satpop._fields
-        assert "host_index_for_sub" in satpop._fields
-        assert "mah_params_sub" in satpop._fields
+    assert halopop.host_index_for_subs.shape == (n_cens * n_sub_per_host,)
+    assert halopop.host_index_for_subs.dtype == np.int64
+    assert halopop.host_index_for_subs[0] == 0
+    assert halopop.host_index_for_subs[-1] == n_cens - 1
 
-        assert np.all(np.isfinite(satpop.nsubhalos))
-        assert satpop.nsubhalos.shape == (n_halos * n_sub_per_host,)
-
-        assert np.all(np.isfinite(satpop.logmu_subs))
-        assert satpop.logmu_subs.shape == (n_halos * n_sub_per_host,)
-
-        assert satpop.host_index_for_sub.shape == (n_halos * n_sub_per_host,)
-        assert satpop.host_index_for_sub.dtype == np.int64
-        assert satpop.host_index_for_sub[0] == 0
-        assert satpop.host_index_for_sub[-1] == n_halos - 1
-
-        assert np.all(np.isfinite(satpop.mah_params_sub))
-        for _key in satpop.mah_params_sub._fields:
-            _params = satpop.mah_params_sub._asdict()[_key]
-            assert np.all(np.isfinite(_params))
-            assert _params.size == n_halos * n_sub_per_host
+    for _key in halopop.mah_params_subs._fields:
+        _params = halopop.mah_params_subs._asdict()[_key]
+        assert np.all(np.isfinite(_params))
+        assert _params.size == n_cens * n_sub_per_host
 
 
-def test_mc_weighted_subhalo_lightcone_with_different_nsubs_per_host():
+def test_mc_weighted_lc_subhalos_with_different_nsubs_per_host():
     ran_key = jran.key(0)
 
-    n_halos = 500
-    z_obs = np.linspace(0.45, 0.5, n_halos)
-    lgmp_max = 15.0
-    sky_area_degsq = 1.0
-    logt0 = np.log10(13.8)
-    n_sub_per_host = 10
+    z_min = 0.4
+    z_max = 0.5
+    logmp_min = 11.0
+    logmp_max = 14.0
+    lgmp_min = 10.0
+    n_cens = 2_000
 
-    n_tests = 5
-    lgmp_min_arr = np.linspace(11.0, 13.0, n_tests)
-    for lgmp_min in lgmp_min_arr:
-        test_key, ran_key = jran.split(ran_key, 2)
+    n_sub_per_host = mclsh.N_LGMU_PER_HOST + 2
 
-        logmp_obs = np.linspace(lgmp_min, lgmp_max, n_halos)
+    # use a mock host halo population for this test
+    cenpop = generate_mock_cenpop(z_min, z_max, logmp_min, logmp_max, n_cens=n_cens)
+    halopop = mclsh.weighted_lc_subhalos(
+        cenpop, ran_key, lgmp_min, n_mu_per_host=n_sub_per_host
+    )
 
-        cenpop = mclh.weighted_lightcone_host_halo(
-            test_key,
-            z_obs,
-            logmp_obs,
-            sky_area_degsq,
-        )
+    weighted_lc_subhalo_fields = (
+        "logmp_obs",
+        "t_obs",
+        "logt0",
+        "nsubhalos",
+        "host_index_for_subs",
+        "mah_params_subs",
+        "logmu_obs",
+    )
 
-        satpop = mclsh.mc_weighted_subhalo_lightcone(
-            cenpop,
-            test_key,
-            lgmp_min,
-            logt0,
-            n_mu_per_host=n_sub_per_host,
-        )
+    for _field in weighted_lc_subhalo_fields:
+        assert _field in halopop._fields
+        assert np.all(np.isfinite(halopop._asdict()[_field]))
 
-        assert "nsubhalos" in satpop._fields
-        assert "logmu_subs" in satpop._fields
-        assert "host_index_for_sub" in satpop._fields
-        assert "mah_params_sub" in satpop._fields
+    assert halopop.nsubhalos.shape == (n_cens * n_sub_per_host,)
+    assert halopop.logmu_obs.shape == (n_cens * n_sub_per_host,)
 
-        assert np.all(np.isfinite(satpop.nsubhalos))
-        assert satpop.nsubhalos.shape == (n_halos * n_sub_per_host,)
+    assert halopop.host_index_for_subs.shape == (n_cens * n_sub_per_host,)
+    assert halopop.host_index_for_subs.dtype == np.int64
+    assert halopop.host_index_for_subs[0] == 0
+    assert halopop.host_index_for_subs[-1] == n_cens - 1
 
-        assert np.all(np.isfinite(satpop.logmu_subs))
-        assert satpop.logmu_subs.shape == (n_halos * n_sub_per_host,)
-
-        assert satpop.host_index_for_sub.shape == (n_halos * n_sub_per_host,)
-        assert satpop.host_index_for_sub.dtype == np.int64
-        assert satpop.host_index_for_sub[0] == 0
-        assert satpop.host_index_for_sub[-1] == n_halos - 1
-
-        assert np.all(np.isfinite(satpop.mah_params_sub))
-        for _key in satpop.mah_params_sub._fields:
-            _params = satpop.mah_params_sub._asdict()[_key]
-            assert np.all(np.isfinite(_params))
-            assert _params.size == n_halos * n_sub_per_host
+    for _key in halopop.mah_params_subs._fields:
+        _params = halopop.mah_params_subs._asdict()[_key]
+        assert np.all(np.isfinite(_params))
+        assert _params.size == n_cens * n_sub_per_host
 
 
-def test_mc_weighted_subhalo_lightcone_agrees_with_mc_subhalopop():
+def test_mc_weighted_lc_subhalos_agrees_with_mc_subhalopop():
 
     ran_key = jran.key(0)
-    uran_key, counts_key = jran.split(ran_key, 2)
 
-    logt0 = np.log10(13.8)
-    n_halos = 500
+    z_min = 0.4
+    z_max = 0.5
+    logmp_min = 11.0
+    logmp_max = 14.0
+    lgmp_min = 10.0
+    n_cens = 2_000
 
-    lgmhost_arr = np.linspace(11.0, 13.0, n_halos)
-    t_obs_arr = np.ones(n_halos) * 13.5
-    cenpop_dict = {"logmp_obs": lgmhost_arr, "t_obs": t_obs_arr}
-    cenpop = namedtuple("halopop", cenpop_dict.keys())(**cenpop_dict)
+    # use a mock host halo population for this test
+    cenpop = generate_mock_cenpop(z_min, z_max, logmp_min, logmp_max, n_cens=n_cens)
 
     n_tests = 5
     lgmp_min_arr = np.linspace(9.0, 10.0, n_tests)
     for lgmp_min in lgmp_min_arr:
-        satpop = mclsh.mc_weighted_subhalo_lightcone(
-            cenpop,
-            uran_key,
-            lgmp_min,
-            logt0,
-        )
+        halopop = mclsh.weighted_lc_subhalos(cenpop, ran_key, lgmp_min)
 
-        subhalo_counts_per_halo, nsubs_tot = mc_subs.get_mean_subhalo_counts_poisson(
-            counts_key,
-            lgmhost_arr,
-            lgmp_min,
-        )
-
-        mc_lg_mu = mc_subs.generate_subhalopop(
+        mc_lg_mu_pop = mc_subs.generate_subhalopop(
             ran_key,
-            lgmhost_arr,
+            cenpop.logmp_obs,
             lgmp_min,
-            subhalo_counts_per_halo,
-            int(subhalo_counts_per_halo.sum()),
         )[0]
 
         assert np.allclose(
-            mc_lg_mu.size,
-            satpop.nsubhalos.sum(),
+            mc_lg_mu_pop.size,
+            halopop.nsubhalos.sum(),
             rtol=0.1,
         )

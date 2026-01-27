@@ -7,11 +7,11 @@ import numpy as np
 
 from ..ccshmf_model import (
     DEFAULT_CCSHMF_PARAMS,
+    predict_cuml_cshmf,
+    predict_cuml_cshmf_halopop,
+    predict_diff_cshmf,
+    predict_diff_cshmf_halopop,
     compute_mean_subhalo_counts,
-    predict_ccshmf,
-    predict_ccshmf_halopop,
-    predict_differential_cshmf,
-    predict_differential_cshmf_halopop,
     subhalo_lightcone_weights,
 )
 
@@ -42,18 +42,18 @@ def test_predict_ccshmf_returns_finite_valued_expected_shape():
     lgmhost = 13.0
     nsubs = 100
     lgmuarr = np.linspace(-5, 0, nsubs)
-    pred = predict_ccshmf(DEFAULT_CCSHMF_PARAMS, lgmhost, lgmuarr)
+    pred = predict_cuml_cshmf(DEFAULT_CCSHMF_PARAMS, lgmhost, lgmuarr)
     assert pred.shape == lgmuarr.shape
     assert np.all(np.isfinite(pred))
 
     lgmu = -2.0
-    pred = predict_ccshmf(DEFAULT_CCSHMF_PARAMS, lgmhost, lgmu)
+    pred = predict_cuml_cshmf(DEFAULT_CCSHMF_PARAMS, lgmhost, lgmu)
     assert pred.shape == ()
     assert np.all(np.isfinite(pred))
 
     nhosts = 5
     lgmhostarr = np.linspace(12, 15, nhosts)
-    pred = predict_ccshmf(DEFAULT_CCSHMF_PARAMS, lgmhostarr, lgmu)
+    pred = predict_cuml_cshmf(DEFAULT_CCSHMF_PARAMS, lgmhostarr, lgmu)
     assert pred.shape == (nhosts,)
     assert np.all(np.isfinite(pred))
 
@@ -61,7 +61,7 @@ def test_predict_ccshmf_returns_finite_valued_expected_shape():
     nsubs = nhosts
     lgmhostarr = np.linspace(12, 15, nhosts)
     lgmuarr = np.linspace(-5, 0, nsubs)
-    pred = predict_ccshmf(DEFAULT_CCSHMF_PARAMS, lgmhostarr, lgmuarr)
+    pred = predict_cuml_cshmf(DEFAULT_CCSHMF_PARAMS, lgmhostarr, lgmuarr)
     assert pred.shape == (nhosts,)
     assert np.all(np.isfinite(pred))
 
@@ -70,7 +70,7 @@ def test_predict_ccshmf_halopop_returns_expected_shape():
     lgmhost = np.array([11.0, 13.0, 9.0])
     nsubs = 100
     lgmuarr = np.linspace(-5, 0, nsubs)
-    pred = predict_ccshmf_halopop(DEFAULT_CCSHMF_PARAMS, lgmhost, lgmuarr)
+    pred = predict_cuml_cshmf_halopop(DEFAULT_CCSHMF_PARAMS, lgmhost, lgmuarr)
     assert pred.shape == (lgmhost.size, nsubs)
     assert np.all(np.isfinite(pred))
 
@@ -79,7 +79,7 @@ def test_predict_differential_cshmf_returns_expected_shape():
     lgmhost = 11.0
     nsubs = 100
     lgmuarr = np.linspace(-5, 0, nsubs)
-    pred = predict_differential_cshmf(DEFAULT_CCSHMF_PARAMS, lgmhost, lgmuarr)
+    pred = predict_diff_cshmf(DEFAULT_CCSHMF_PARAMS, lgmhost, lgmuarr)
     assert pred.shape == lgmuarr.shape
     assert np.all(np.isfinite(pred))
 
@@ -88,7 +88,7 @@ def test_predict_differential_cshmf_halopop_returns_expected_shape():
     lgmhost = np.array([11.0, 13.0, 9.0])
     nsubs = 100
     lgmuarr = np.linspace(-5, 0, nsubs)
-    pred = predict_differential_cshmf_halopop(DEFAULT_CCSHMF_PARAMS, lgmhost, lgmuarr)
+    pred = predict_diff_cshmf_halopop(DEFAULT_CCSHMF_PARAMS, lgmhost, lgmuarr)
     assert pred.shape == (lgmhost.size, nsubs)
     assert np.all(np.isfinite(pred))
 
@@ -116,7 +116,7 @@ def test_predict_ccshmf_accurately_approximates_simulation_data():
                 cshmf_data_sample[:, 0],
                 cshmf_data_sample[:, 1],
             )
-            pred_lg_ccshmf = predict_ccshmf(
+            pred_lg_ccshmf = predict_cuml_cshmf(
                 DEFAULT_CCSHMF_PARAMS, target_lgmhost, target_lgmu_bins
             )
 

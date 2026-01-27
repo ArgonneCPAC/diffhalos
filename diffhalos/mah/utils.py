@@ -1,8 +1,16 @@
-"""Useful utilities for diffmahpop"""
+"""Useful utilities for mah related computations"""
+
+from functools import partial
+
+from jax import jit as jjit
+
+from ..mah.diffmahnet.diffmahnet import log_mah_kern
+from ..mah.diffmahnet_utils import mc_mah_cenpop
 
 __all__ = ("rescale_mah_parameters",)
 
 
+@jjit
 def rescale_mah_parameters(
     mah_params_uncorrected,
     logm_obs,
@@ -35,3 +43,36 @@ def rescale_mah_parameters(
     mah_params = mah_params_uncorrected._replace(logm0=logm0_rescaled)
 
     return mah_params
+
+
+@partial(jjit, static_argnames=["centrals_model_key"])
+def apply_mah_rescaling(
+    mah_key,
+    logmp_obs_mf,
+    logmp_obs_clipped,
+    t_obs,
+    logt0,
+    centrals_model_key,
+):
+
+    mah_params_uncorrected = mc_mah_cenpop(
+        logmp_obs_clipped,
+        t_obs,
+        mah_key,
+        centrals_model_key,
+    )
+
+    # compute the uncorrected observed masses
+    logmp_obs_uncorrected = log_mah_kern(mah_params_uncorrected, t_obs, logt0)
+
+    # rescale the mah parameters to the correct logm0
+    mah_params = rescale_mah_parameters(
+        mah_params_uncorrected,
+        logmp_obs_mf,
+        logmp_obs_uncorrected,
+    )
+
+    # compute observed mass with corrected parameters
+    logmp_obs = log_mah_kern(mah_params, t_obs, logt0)
+
+    return mah_params, logmp_obs

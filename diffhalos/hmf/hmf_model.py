@@ -1,25 +1,25 @@
 """
-The ``predict_cuml_hmf`` and ``predict_differential_hmf`` functions
+The ``predict_cuml_hmf`` and ``predict_diff_hmf`` functions
 give differentiable implementations for the cumulative and differential
 mass functions, respectively, for simulated host halos.
 These are both functions of mp,
 the peak historical mass of the main progenitor halo.
 """
 
-from dsps.cosmology import DEFAULT_COSMOLOGY, flat_wcdm
 from jax import grad
 from jax import jit as jjit
-from jax import numpy as jnp
 from jax import vmap
+from jax import numpy as jnp
 
+from .hmf_kernels import lg_hmf_kern
 from ..calibrations.hmf_cal import DEFAULT_HMF_PARAMS, HMF_Params  # noqa
-from ..defaults import FULL_SKY_AREA
-from ..utils.geometry_utils import (
-    compute_volume_from_sky_area,
+from ..cosmology import flat_wcdm, DEFAULT_COSMOLOGY
+from ..cosmology.geometry_utils import (
     spherical_shell_comoving_volume,
+    compute_volume_from_sky_area,
 )
 from ..utils.sigmoid_utils import _sig_slope, _sigmoid
-from .hmf_kernels import lg_hmf_kern
+from ..defaults import FULL_SKY_AREA
 
 YTP_XTP = 3.0
 X0_XTP = 3.0
@@ -29,7 +29,7 @@ N_HMF_GRID = 500
 
 __all__ = (
     "predict_cuml_hmf",
-    "predict_differential_hmf",
+    "predict_diff_hmf",
     "halo_lightcone_weights",
     "get_mean_nhalos_from_volume",
     "get_mean_nhalos_from_sky_area",
@@ -129,7 +129,7 @@ def _diff_hmf_grad_kern(params, logmp, redshift):
 
 
 _A = (None, 0, None)
-_predict_differential_hmf = jjit(
+_predict_diff_hmf = jjit(
     vmap(
         grad(_diff_hmf_grad_kern, argnums=1),
         in_axes=_A,
@@ -138,7 +138,7 @@ _predict_differential_hmf = jjit(
 
 
 @jjit
-def predict_differential_hmf(params, logmp, redshift):
+def predict_diff_hmf(params, logmp, redshift):
     """Predict the differential comoving number density of host halos
 
     Parameters
@@ -161,7 +161,7 @@ def predict_differential_hmf(params, logmp, redshift):
         Note that both number density and halo mass are defined in
         physical units (not h=1 units)
     """
-    hmf = jnp.log10(_predict_differential_hmf(params, logmp, redshift))
+    hmf = jnp.log10(_predict_diff_hmf(params, logmp, redshift))
     return hmf
 
 

@@ -1,9 +1,9 @@
 import numpy as np
-from dsps.cosmology import DEFAULT_COSMOLOGY
+from ..cosmo import DEFAULT_COSMOLOGY
 
 from ..geometry_utils import (
-    compute_volume_from_sky_area,
     spherical_shell_comoving_volume,
+    compute_volume_from_sky_area,
 )
 
 

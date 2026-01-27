@@ -3,28 +3,29 @@ Useful diffmahnet functions
 See https://diffmahnet.readthedocs.io/en/latest/installation.html
 """
 
-import glob
+import numpy as np
 import os
 import pathlib
+import glob
+
 from functools import partial
+from jax import jit as jjit
 
 import jax
 import jax.numpy as jnp
-import numpy as np
-from diffmah import DEFAULT_MAH_PARAMS, mah_halopop
+
+from diffmah import mah_halopop
+from diffmah import DEFAULT_MAH_PARAMS
+from diffmah.diffmah_kernels import DEFAULT_MAH_U_PARAMS
 from diffmah.diffmah_kernels import (
-    DEFAULT_MAH_U_PARAMS,
-    get_bounded_mah_params,
     get_unbounded_mah_params,
+    get_bounded_mah_params,
 )
-from jax import jit as jjit
 
 from . import diffmahnet
-from .utils import rescale_mah_parameters
+
 
 DEFAULT_MAH_UPARAMS = get_unbounded_mah_params(DEFAULT_MAH_PARAMS)
-
-LOGT0 = jnp.log10(13.8)
 
 __all__ = (
     "mc_mah_cenpop",
@@ -44,83 +45,6 @@ def mc_mah_cenpop(
     m_obs,
     t_obs,
     ran_key,
-    t_grid,
-    centrals_model_key=DEFAULT_DIFFMAHNET_CEN_MODEL,
-    logt0=LOGT0,
-):
-    """
-    Generate populations of central halo MAHs using``diffmahnet``.
-    This function generates MAH parameters that are 'corrected', so that
-    logm0 is rescaled to match the true observed mass at time of observation.
-
-    Parameters
-    ----------
-    m_obs: ndarray of shape (n_cens, )
-        grid of base-10 log of mass of the halos at observation, in Msun
-
-    t_obs: ndarray of shape (n_cens, )
-        grid of base-10 log of cosmic time at observation of each halo, in Gyr
-
-    ran_key: key
-        JAX random key
-
-    t_grid: ndarray of shape (n_cens, n_t)
-        cosmic time in time grid for each negerated MAH, in Gyr
-
-    centrals_model_key: str
-        model name for centrals
-
-    logt0: float
-        base-10 log of cosmic time today, in Gyr
-
-    Returns
-    -------
-    cen_mah: ndarray of shape (n_cens, n_t)
-        base-10 log of halo mass assembly histories,
-        for all MC realizations, in Msun
-
-    mah_params_corrected: namedtuple
-        diffmah parameters from normalizing flow,
-        each parameter is a ndarray of shape(n_cens, )
-    """
-
-    # compute the uncorrected MAHs and MAH parameters
-    (
-        logm_obs_uncorrected,
-        cenflow_diffmahparams,
-    ) = _mc_mah_cenpop_uncorrected(
-        m_obs,
-        t_obs,
-        ran_key,
-        t_grid,
-        logt0,
-        centrals_model_key,
-    )
-
-    # rescale the mah parameters to the correct logm0
-    mah_params_corrected = rescale_mah_parameters(
-        cenflow_diffmahparams,
-        m_obs,
-        logm_obs_uncorrected[:, -1],
-    )
-
-    # compute mah with corrected parameters
-    cen_mah = diffmahnet.log_mah_kern(
-        mah_params_corrected,
-        t_grid,
-        logt0,
-    )
-
-    return cen_mah, mah_params_corrected
-
-
-@partial(jjit, static_argnames=["centrals_model_key"])
-def _mc_mah_cenpop_uncorrected(
-    m_obs,
-    t_obs,
-    ran_key,
-    t_grid,
-    logt0,
     centrals_model_key,
 ):
     """
@@ -134,28 +58,18 @@ def _mc_mah_cenpop_uncorrected(
     m_obs: ndarray of shape (n_cens, )
         grid of base-10 log of mass of the halos at observation, in Msun
 
-    t_obs: ndarray of shape (n_cens, )
-        grid of base-10 log of cosmic time at observation of each halo, in Gyr
+    t_obs: ndarray of shape (n_subs, )
+        cosmic time at observation of each halo, in Gyr
 
     randkey: key
         JAX random key
-
-    t_grid: ndarray of shape (n_cens, n_t)
-        cosmic time in time grid for each negerated MAH, in Gyr
-
-    logt0: float
-        base-10 log of cosmic time today, in Gyr
 
     centrals_model_key: str
         model name for centrals
 
     Returns
     -------
-    cen_mah_uncorrected: ndarray of shape (n_cens, n_t)
-        base-10 log of halo mass assembly histories,
-        for all MC realizations, in Msun
-
-    mah_params_uncorrected: namedtuple
+    mah_params: namedtuple
         diffmah parameters from normalizing flow,
         each parameter is a ndarray of shape(n_cens, )
     """
@@ -165,18 +79,11 @@ def _mc_mah_cenpop_uncorrected(
 
     # get diffmah parameters from the normalizing flow
     keys = jax.random.split(ran_key, 2)
-    mah_params_uncorrected = mc_diffmahnet_cenpop(
+    mah_params = mc_diffmahnet_cenpop(
         centrals_model.get_params(), m_obs, t_obs, keys[0]
     )
 
-    # compute mah
-    cen_mah_uncorrected = diffmahnet.log_mah_kern(
-        mah_params_uncorrected,
-        t_grid,
-        logt0,
-    )
-
-    return cen_mah_uncorrected, mah_params_uncorrected
+    return mah_params
 
 
 @partial(jjit, static_argnames=["subhalo_model_key"])
@@ -184,83 +91,6 @@ def mc_mah_satpop(
     m_obs,
     t_obs,
     ran_key,
-    t_grid,
-    subhalo_model_key=DEFAULT_DIFFMAHNET_SAT_MODEL,
-    logt0=LOGT0,
-):
-    """
-    Generate populations of subhalo MAHs using``diffmahnet``.
-    This function generates MAH parameters that are 'corrected', so that
-    logm0 is rescaled to match the true observed mass at time of observation.
-
-    Parameters
-    ----------
-    m_obs: ndarray of shape (n_subs, )
-        grid of base-10 log of mass of the halos at observation, in Msun
-
-    t_obs: ndarray of shape (n_subs, )
-        grid of base-10 log of cosmic time at observation of each halo, in Gyr
-
-    ran_key: key
-        JAX random key
-
-    t_grid: ndarray of shape (n_subs, n_t)
-        cosmic time in time grid for each negerated MAH, in Gyr
-
-    subhalo_model_key: str
-        model name for subhalos
-
-    logt0: float
-        base-10 log of cosmic time today, in Gyr
-
-    Returns
-    -------
-    sat_mah: ndarray of shape (n_subs, n_t)
-        base-10 log of halo mass assembly histories,
-        for all MC realizations, in Msun
-
-    mah_params_corrected: namedtuple
-        diffmah parameters from normalizing flow,
-        each parameter is a ndarray of shape(n_subs, )
-    """
-
-    # compute the uncorrected MAHs and MAH parameters
-    (
-        logm_obs_uncorrected,
-        satflow_diffmahparams,
-    ) = _mc_mah_satpop_uncorrected(
-        m_obs,
-        t_obs,
-        ran_key,
-        t_grid,
-        logt0,
-        subhalo_model_key,
-    )
-
-    # rescale the mah parameters to the correct logm0
-    mah_params_corrected = rescale_mah_parameters(
-        satflow_diffmahparams,
-        m_obs,
-        logm_obs_uncorrected[:, -1],
-    )
-
-    # compute mah with corrected parameters
-    sat_mah = diffmahnet.log_mah_kern(
-        mah_params_corrected,
-        t_grid,
-        logt0,
-    )
-
-    return sat_mah, mah_params_corrected
-
-
-@partial(jjit, static_argnames=["subhalo_model_key"])
-def _mc_mah_satpop_uncorrected(
-    m_obs,
-    t_obs,
-    ran_key,
-    t_grid,
-    logt0,
     subhalo_model_key,
 ):
     """
@@ -275,27 +105,17 @@ def _mc_mah_satpop_uncorrected(
         grid of base-10 log of mass of the halos at observation, in Msun
 
     t_obs: ndarray of shape (n_subs, )
-        grid of base-10 log of cosmic time at observation of each halo, in Gyr
+        cosmic time at observation of each halo, in Gyr
 
     randkey: key
         JAX random key
-
-    t_grid: ndarray of shape (n_subs, n_t)
-        cosmic time in time grid for each negerated MAH, in Gyr
-
-    logt0: float
-        base-10 log of cosmic time today, in Gyr
 
     subhalo_model_key: str
         model name for subhalos
 
     Returns
     -------
-    cen_mah_uncorrected: ndarray of shape (n_subs, n_t)
-        base-10 log of halo mass assembly histories,
-        for all MC realizations, in Msun
-
-    mah_params_uncorrected: namedtuple
+    mah_params: namedtuple
         diffmah parameters from normalizing flow,
         each parameter is a ndarray of shape(n_subs, )
     """
@@ -305,18 +125,11 @@ def _mc_mah_satpop_uncorrected(
 
     # get diffmah parameters from the normalizing flow
     keys = jax.random.split(ran_key, 2)
-    mah_params_uncorrected = mc_diffmahnet_cenpop(
+    mah_params = mc_diffmahnet_cenpop(
         centrals_model.get_params(), m_obs, t_obs, keys[0]
     )
 
-    # compute mah
-    cen_mah_uncorrected = diffmahnet.log_mah_kern(
-        mah_params_uncorrected,
-        t_grid,
-        logt0,
-    )
-
-    return cen_mah_uncorrected, mah_params_uncorrected
+    return mah_params
 
 
 def get_mean_and_std_of_mah(mah):
@@ -359,7 +172,6 @@ def get_mah_from_unbounded_params(
     mah_params_unbound,
     logt0,
     t_grid,
-    logm_obs,
 ):
     """
     Helper function to generate the MAH from
@@ -378,9 +190,6 @@ def get_mah_from_unbounded_params(
     t_grid: ndarray of shape (n_t, )
         cosmic time grid at which to compute the MAH
 
-    logm_obs: float
-        base-10 log of observed halo mass, in Msun
-
     Returns
     -------
     log_mah: ndarray of shape (n_halo, n_t)
@@ -396,20 +205,7 @@ def get_mah_from_unbounded_params(
 
     mah_params_uncorrected = DEFAULT_MAH_PARAMS._make(mah_params_bound)
 
-    _, logm_obs_uncorrected = mah_halopop(
-        mah_params_uncorrected,
-        t_grid,
-        logt0,
-    )
-
-    # rescale the mah parameters to the correct logm0
-    mah_params = rescale_mah_parameters(
-        mah_params_uncorrected,
-        logm_obs,
-        logm_obs_uncorrected[:, -1],
-    )
-
-    _, log_mah = mah_halopop(mah_params, t_grid, logt0)
+    _, log_mah = mah_halopop(mah_params_uncorrected, t_grid, logt0)
 
     return log_mah
 

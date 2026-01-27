@@ -4,7 +4,8 @@ Useful default values
 
 import numpy as np
 from jax import numpy as jnp
-from dsps.cosmology import flat_wcdm, DEFAULT_COSMOLOGY
+
+from .cosmology import flat_wcdm, DEFAULT_COSMOLOGY
 
 # age of the Universe at z=0, in Gyr
 T0_GYR = 13.8

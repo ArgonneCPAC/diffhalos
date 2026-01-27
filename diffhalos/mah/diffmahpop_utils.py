@@ -4,14 +4,15 @@ See https://github.com/ArgonneCPAC/diffmah/tree/main/diffmah/diffmahpop_kernels
 """
 
 import jax.numpy as jnp
-from diffmah.diffmah_kernels import _log_mah_kern
-from diffmah.diffmahpop_kernels.bimod_censat_params import DEFAULT_DIFFMAHPOP_PARAMS
-from diffmah.diffmahpop_kernels.mc_bimod_cens import mc_cenpop
-from diffmah.diffmahpop_kernels.mc_bimod_sats import mc_satpop
 from jax import jit as jjit
 from jax import vmap
 
-from .utils import rescale_mah_parameters
+from diffmah.diffmahpop_kernels.mc_bimod_cens import mc_cenpop
+from diffmah.diffmahpop_kernels.mc_bimod_sats import mc_satpop
+from diffmah.diffmah_kernels import _log_mah_kern
+from diffmah.diffmahpop_kernels.bimod_censat_params import (
+    DEFAULT_DIFFMAHPOP_PARAMS,
+)
 
 LOGT0 = jnp.log10(13.8)
 
@@ -23,6 +24,7 @@ __all__ = (
 log_mah_kern_vmap = jjit(vmap(_log_mah_kern, in_axes=(0, None, None)))
 
 
+@jjit
 def mc_mah_cenpop(
     m_obs,
     t_obs,
@@ -68,7 +70,7 @@ def mc_mah_cenpop(
     """
 
     # predict uncorrected MAHs
-    mah_params_uncorrected, _, logm_obs_uncorrected = mc_cenpop(
+    mah_params, _, cen_mah = mc_cenpop(
         params,
         t_grid,
         m_obs,
@@ -77,19 +79,10 @@ def mc_mah_cenpop(
         logt0,
     )
 
-    # rescale the mah parameters to the correct logm0
-    mah_params_corrected = rescale_mah_parameters(
-        mah_params_uncorrected,
-        m_obs,
-        logm_obs_uncorrected[:, -1],
-    )
-
-    # get the corrected MAHs
-    cen_mah = log_mah_kern_vmap(mah_params_corrected, t_grid, logt0)
-
-    return cen_mah, mah_params_corrected
+    return cen_mah, mah_params
 
 
+@jjit
 def mc_mah_satpop(
     m_obs,
     t_obs,
@@ -135,7 +128,7 @@ def mc_mah_satpop(
     """
 
     # predict uncorrected MAHs
-    mah_params_uncorrected, _, logm_obs_uncorrected = mc_satpop(
+    mah_params, _, sat_mah = mc_satpop(
         params,
         t_grid,
         m_obs,
@@ -144,14 +137,4 @@ def mc_mah_satpop(
         logt0,
     )
 
-    # rescale the mah parameters to the correct logm0
-    mah_params_corrected = rescale_mah_parameters(
-        mah_params_uncorrected,
-        m_obs,
-        logm_obs_uncorrected[:, -1],
-    )
-
-    # get the corrected MAHs
-    sat_mah = log_mah_kern_vmap(mah_params_corrected, t_grid, logt0)
-
-    return sat_mah, mah_params_corrected
+    return sat_mah, mah_params

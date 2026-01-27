@@ -1,13 +1,14 @@
-import glob
-import pathlib
-
 import jax
-import jax.numpy as jnp
+import pathlib
+import glob
+
 import numpy as np
-from diffmah import DEFAULT_MAH_PARAMS
-from diffmah.diffmah_kernels import get_bounded_mah_params, get_unbounded_mah_params
+import jax.numpy as jnp
 
 from . import diffmahnet
+
+from diffmah import DEFAULT_MAH_PARAMS
+from diffmah.diffmah_kernels import get_unbounded_mah_params, get_bounded_mah_params
 
 DEFAULT_MAH_UPARAMS = get_unbounded_mah_params(DEFAULT_MAH_PARAMS)
 
