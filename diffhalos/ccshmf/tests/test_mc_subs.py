@@ -128,7 +128,7 @@ def test_generate_subhalopop_hist_vs_theory_comparison():
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
 
-            _filter = np.where((logmu_pop > -5.0) * (logmu_pop < -2.0))[0]
+            _filter = np.where(logmu_pop < -2.0)[0]
 
             assert np.allclose(
                 np.log10(cshmf_pop_hist)[_filter],
