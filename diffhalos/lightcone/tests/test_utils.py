@@ -2,18 +2,7 @@
 
 import numpy as np
 
-from ..utils import get_tobs_from_zobs, generate_mock_cenpop
-
-
-def test_get_tobs_from_zobs_evaluates():
-
-    z_obs = np.linspace(0.1, 2.0, 100)
-
-    t_obs, t_0 = get_tobs_from_zobs(z_obs)
-
-    assert np.all(np.isfinite(t_obs))
-    assert np.isfinite(t_0)
-    assert t_obs[-1] <= t_0
+from ..utils import generate_mock_cenpop
 
 
 def test_generate_mock_cenpop_behaves_as_expected():

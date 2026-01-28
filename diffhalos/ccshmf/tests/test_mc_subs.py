@@ -7,7 +7,6 @@ from jax import random as jran
 from jax import numpy as jnp
 
 from ..ccshmf_model import predict_diff_cshmf
-
 from ..mc_subs import (
     generate_subhalopop_kern,
     generate_subhalopop_vmap,
@@ -17,6 +16,7 @@ from ..mc_subs import (
     compute_mean_subhalo_counts,
     generate_subhalopop_hist,
 )
+from ..utils import match_cenpop_to_subpop
 
 
 def test_generate_subhalopop_kern_behaves_as_expected():
@@ -86,13 +86,18 @@ def test_generate_subhalopop_behaves_as_expected():
     nhost = 100
     lgmhost_arr = np.linspace(10.0, 12.0, nhost)
 
-    mc_lg_mu, lgmhost_pop, host_halo_indx, subhalo_counts_per_halo = (
-        generate_subhalopop(
-            ran_key,
-            lgmhost_arr,
-            lgmp_min,
-            ccshmf_params=DEFAULT_CCSHMF_PARAMS,
-        )
+    mc_lg_mu, subhalo_counts_per_halo = generate_subhalopop(
+        ran_key,
+        lgmhost_arr,
+        lgmp_min,
+        ccshmf_params=DEFAULT_CCSHMF_PARAMS,
+    )
+
+    nsub_tot = int(subhalo_counts_per_halo.sum())
+    lgmhost_pop, host_halo_indx = match_cenpop_to_subpop(
+        lgmhost_arr,
+        subhalo_counts_per_halo,
+        nsub_tot,
     )
 
     assert np.all(np.isfinite(mc_lg_mu))
