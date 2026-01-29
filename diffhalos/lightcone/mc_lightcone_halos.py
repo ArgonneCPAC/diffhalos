@@ -17,6 +17,7 @@ from jax import vmap
 from diffmah.diffmah_kernels import _log_mah_kern
 
 from ..cosmology import flat_wcdm, DEFAULT_COSMOLOGY
+from ..cosmology.cosmo_basics import get_tobs_from_zobs
 from ..hmf.hmf_model import halo_lightcone_weights
 from ..hmf import mc_hosts
 from ..mah.utils import apply_mah_rescaling
@@ -82,10 +83,10 @@ def mc_lc_hmf(
 
     Returns
     -------
-    z_halopop: ndarray of shape (n_halos, )
+    z_cenpop: ndarray of shape (n_halos, )
         redshifts distributed randomly within the lightcone volume
 
-    logmp_halopop: ndarray of shape (n_halos, )
+    logmp_cenpop: ndarray of shape (n_halos, )
         halo masses derived by Monte Carlo sampling the halo mass function
         at the appropriate redshift for each point
     """
@@ -127,15 +128,15 @@ def mc_lc_hmf(
 
     # assign redshift via inverse transformation sampling of the halo counts CDF
     uran_z = jran.uniform(z_key, minval=0, maxval=1, shape=(nhalos_tot,))
-    z_halopop = jnp.interp(uran_z, cdf_grid, z_grid)
+    z_cenpop = jnp.interp(uran_z, cdf_grid, z_grid)
 
     # randoms used in inverse transformation sampling halo mass
     uran_m = jran.uniform(m_key, minval=0, maxval=1, shape=(nhalos_tot,))
 
     # draw a halo mass from the HMF at the particular redshift of each halo
-    logmp_halopop = mc_logmp_vmap(uran_m, hmf_params, lgmp_min, z_halopop, lgmp_max)
+    logmp_cenpop = mc_logmp_vmap(uran_m, hmf_params, lgmp_min, z_cenpop, lgmp_max)
 
-    return z_halopop, logmp_halopop
+    return z_cenpop, logmp_cenpop
 
 
 def mc_lc_halos(
@@ -204,21 +205,21 @@ def mc_lc_halos(
     Returns
     -------
     cenpop: namedtuple
-        central halo population with fields:
-        z_obs: ndarray of shape (n_halos, )
-            lightcone redshift
+        host halo population with fields:
+            z_obs: ndarray of shape (n_halos, )
+                lightcone redshift
 
-        logmp_obs: ndarray of shape (n_halos, )
-            halo mass at the lightcone redshift, in Msun
+            logmp_obs: ndarray of shape (n_halos, )
+                halo mass at the lightcone redshift, in Msun
 
-        mah_params: namedtuple of ndarray's with shape (n_halos, n_mah_params)
-            diffmah parameters for each host halo in the lightcone
+            mah_params: namedtuple of ndarray's with shape (n_halos, n_mah_params)
+                diffmah parameters for each host halo in the lightcone
 
-        logmp0: narray of shape (n_halos, )
-            base-10 log of halo mass at z=0, in Msun
+            logmp0: narray of shape (n_halos, )
+                base-10 log of halo mass at z=0, in Msun
 
-        logt0: float
-            base-10 log of cosmic time at today, in Gyr
+            logt0: float
+                base-10 log of cosmic time at today, in Gyr
     """
 
     # generate mc realization of the halo mass function
@@ -235,8 +236,7 @@ def mc_lc_halos(
         n_hmf_grid=n_hmf_grid,
     )
 
-    t_obs = flat_wcdm.age_at_z(z_obs, *cosmo_params)
-    t_0 = flat_wcdm.age_at_z0(*cosmo_params)
+    t_obs, t_0 = get_tobs_from_zobs(z_obs, cosmo_params=cosmo_params)
     logt0 = jnp.log10(t_0)
 
     # get rescaled mah parameters and mah's
@@ -256,9 +256,9 @@ def mc_lc_halos(
     # create output namedtuple
     fields = ("z_obs", "t_obs", "logmp_obs", "mah_params", "logmp0", "logt0")
     values = (z_obs, t_obs, logmp_obs, mah_params, logmp0, logt0)
-    cenpop_out = namedtuple("halopop", fields)(*values)
+    cenpop = namedtuple("cenpop", fields)(*values)
 
-    return cenpop_out
+    return cenpop
 
 
 @partial(jjit, static_argnames=["centrals_model_key"])
@@ -311,24 +311,25 @@ def weighted_lc_halos(
 
     Returns
     -------
-    cenpop_out: namedtuple with fields:
-        z_obs: ndarray of shape (n_halo, )
-            redshift values
+    cenpop: namedtuple
+        host halo population with fields:
+            z_obs: ndarray of shape (n_halo, )
+                redshift values
 
-        t_obs: ndarray of shape (n_halo, )
-            cosmic time at observation, in Gyr
+            t_obs: ndarray of shape (n_halo, )
+                cosmic time at observation, in Gyr
 
-        logmp_obs: ndarray of shape (n_halo, )
-            base-10 log of halo mass at observation, in Msun
+            logmp_obs: ndarray of shape (n_halo, )
+                base-10 log of halo mass at observation, in Msun
 
-        mah_params: namedtuple of ndarrays of shape (n_halo, )
-            mah parameters
+            mah_params: namedtuple of ndarrays of shape (n_halo, )
+                mah parameters
 
-        logmp0: ndarray of shape (n_halo, )
-            base-10 log of halo mass at z=0, in Msun
+            logmp0: ndarray of shape (n_halo, )
+                base-10 log of halo mass at z=0, in Msun
 
-        nhalos: ndarray of shape (n_halo, )
-            weighted number of halos at each grid point
+            nhalos: ndarray of shape (n_halo, )
+                weighted number of halos at each grid point
     """
     # get halo weights
     nhalo_weights = halo_lightcone_weights(
@@ -339,8 +340,7 @@ def weighted_lc_halos(
         cosmo_params=cosmo_params,
     )
 
-    t_obs = flat_wcdm.age_at_z(z_obs, *cosmo_params)
-    t_0 = flat_wcdm.age_at_z0(*cosmo_params)
+    t_obs, t_0 = get_tobs_from_zobs(z_obs, cosmo_params=cosmo_params)
     logt0 = jnp.log10(t_0)
 
     # get rescaled mah parameters and mah's
@@ -360,6 +360,6 @@ def weighted_lc_halos(
     # create output namedtuple
     fields = ("z_obs", "t_obs", "logmp_obs", "mah_params", "logmp0", "logt0", "nhalos")
     values = (z_obs, t_obs, logmp_obs, mah_params, logmp0, logt0, nhalo_weights)
-    cenpop_out = namedtuple("halopop", fields)(*values)
+    cenpop = namedtuple("cenpop", fields)(*values)
 
-    return cenpop_out
+    return cenpop
