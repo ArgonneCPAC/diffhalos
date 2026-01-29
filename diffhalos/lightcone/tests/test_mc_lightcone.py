@@ -45,3 +45,62 @@ def test_mc_lc_mf_behaves_as_expected():
     assert lgmhost_pop[0] == logmp_cenpop[0]
     assert lgmhost_pop[-1] == logmp_cenpop[-1]
     assert host_halo_indx[-1] == logmp_cenpop.size - 1
+
+
+def test_lc_mc_bahaves_as_expected():
+    ran_key = jran.key(0)
+
+    lgmp_min = 12.0
+    lgmsub_min = 10.0
+    z_min = 1.2
+    z_max = 1.5
+    sky_area_degsq = 10.0
+
+    halopop = mclc.mc_lc(
+        ran_key,
+        lgmp_min,
+        lgmsub_min,
+        z_min,
+        z_max,
+        sky_area_degsq,
+    )
+
+    for _field in halopop._fields:
+        assert np.all(np.isfinite(halopop._asdict()[_field]))
+
+    n_host = halopop.logmp_obs.size
+    n_subs = halopop.logmu_obs.size
+    for _param in halopop.mah_params._fields:
+        assert halopop.mah_params._asdict()[_param].size == n_host + n_subs
+
+    assert halopop.halo_indx.size == n_host + n_subs
+
+
+def test_weighted_mc_bahaves_as_expected():
+    ran_key = jran.key(0)
+
+    z_obs = np.linspace(0.2, 1.5, 100)
+    logmp_obs = np.linspace(11.0, 14.0, 100)
+
+    lgmsub_min = 10.0
+    sky_area_degsq = 10.0
+
+    halopop = mclc.weighted_lc(
+        ran_key,
+        z_obs,
+        logmp_obs,
+        lgmsub_min,
+        sky_area_degsq,
+    )
+
+    for _field in halopop._fields:
+        assert np.all(np.isfinite(halopop._asdict()[_field]))
+
+    n_host = halopop.logmp_obs.size
+    n_subs = n_host * halopop.nsub_per_host
+    for _param in halopop.mah_params._fields:
+        assert halopop.mah_params._asdict()[_param].size == n_host + n_subs
+
+    assert halopop.halo_indx.size == n_host + n_subs
+
+    assert halopop.nhalos.size == n_host + n_subs
