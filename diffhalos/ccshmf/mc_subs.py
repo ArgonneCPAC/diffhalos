@@ -24,6 +24,7 @@ from .ccshmf_model import (
     get_lgmu_cutoff,
     compute_mean_subhalo_counts,
 )
+from .utils import match_cenpop_to_subpop
 
 N_LGMU_TABLE = 100
 U_TABLE = np.linspace(1, 0, N_LGMU_TABLE)
@@ -60,13 +61,8 @@ def generate_subhalopop(
     mc_lg_mu: ndarray of shape (n_mu, )
         base-10 log of mu=Msub/Mhost of the Monte Carlo subhalo population
 
-    lgmhost_pop: ndarray of shape (n_mu*n_host, )
-        base-10 log of Mhost of the Monte Carlo subhalo population, in Msun
-
-    host_halo_indx: ndarray of shape (n_mu*n_host, )
-        index of the input host halo of each generated subhalo,
-        so that lgmhost_pop = lgmhost_arr[host_halo_indx];
-        thus all values satisfy 0 <= host_halo_indx < nhosts
+    subhalo_counts_per_halo: ndarray of shape (n_host, )
+        number of subhalos generated per host halo
     """
     lgmhost_arr = jnp.atleast_1d(lgmhost_arr)
 
@@ -85,15 +81,7 @@ def generate_subhalopop(
 
     # host halo population that matches the subhalo sample
     lgmhost_pop = jnp.repeat(
-        lgmhost_arr,
-        subhalo_counts_per_halo,
-        total_repeat_length=nsub_tot,
-    )
-    halo_ids = jnp.arange(lgmhost_arr.size).astype(int)
-    host_halo_indx = jnp.repeat(
-        halo_ids,
-        subhalo_counts_per_halo,
-        total_repeat_length=nsub_tot,
+        lgmhost_arr, subhalo_counts_per_halo, total_repeat_length=nsub_tot
     )
 
     # sample mu values for subhalos
@@ -104,7 +92,7 @@ def generate_subhalopop(
         ccshmf_params,
     )
 
-    return mc_lg_mu, lgmhost_pop, host_halo_indx, subhalo_counts_per_halo
+    return mc_lg_mu, subhalo_counts_per_halo
 
 
 @jjit
