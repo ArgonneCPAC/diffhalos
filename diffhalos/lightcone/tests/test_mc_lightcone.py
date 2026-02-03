@@ -78,8 +78,9 @@ def test_mc_lc_behaves_as_expected():
 def test_weighted_lc_behaves_as_expected():
     ran_key = jran.key(0)
 
-    z_obs = np.linspace(0.2, 1.5, 100)
-    logmp_obs = np.linspace(11.0, 14.0, 100)
+    n_host = 100
+    z_obs = np.linspace(0.2, 1.5, n_host)
+    logmp_obs = np.linspace(11.0, 14.0, n_host)
 
     lgmsub_min = 10.0
     sky_area_degsq = 10.0
@@ -95,7 +96,6 @@ def test_weighted_lc_behaves_as_expected():
     for _field in halopop._fields:
         assert np.all(np.isfinite(halopop._asdict()[_field]))
 
-    n_host = halopop.logmp_obs.size
     n_subs = n_host * halopop.nsub_per_host
     n_tot = n_host + n_subs
     for _param in halopop.mah_params._fields:

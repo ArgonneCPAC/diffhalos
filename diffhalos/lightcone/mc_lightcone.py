@@ -267,9 +267,7 @@ def mc_lc(
 
     # combine halo and subhalo mah_params
     mah_params_names = cenpop.mah_params._fields
-    mah_params_tot = np.zeros(
-        (len(mah_params_names), cenpop.logmp_obs.size + subpop.logmu_obs.size)
-    )
+    mah_params_tot = np.zeros((len(mah_params_names), n_host + n_sub))
     for i, _param in enumerate(mah_params_names):
         mah_params_tot[i, :] = np.concatenate(
             (
@@ -428,6 +426,7 @@ def weighted_lc(
 
     # create the index array: [...host_indx..., ...subhalo_indx...]
     n_host = cenpop.logmp_obs.size
+    n_sub = subpop.logmp_obs.size
     host_indx = jnp.arange(n_host).astype(int)
     subhalo_indx = jnp.repeat(host_indx, subpop.nsub_per_host)
     halo_indx = jnp.concatenate((host_indx, subhalo_indx)).astype(int)
@@ -443,11 +442,12 @@ def weighted_lc(
     nhalos_host_subs = jnp.repeat(cenpop.nhalos, subpop.nsub_per_host)
     nhalos_host_all = jnp.concatenate((cenpop.nhalos, nhalos_host_subs))
 
+    logmp_obs_all = jnp.concatenate((cenpop.logmp_obs, subpop.logmp_obs))
+    cenpop = cenpop._replace(logmp_obs=logmp_obs_all)
+
     # combine halo and subhalo mah_params
     mah_params_names = cenpop.mah_params._fields
-    mah_params_tot = np.zeros(
-        (len(mah_params_names), cenpop.logmp_obs.size + subpop.logmu_obs.size)
-    )
+    mah_params_tot = np.zeros((len(mah_params_names), n_host + n_sub))
     for i, _param in enumerate(mah_params_names):
         mah_params_tot[i, :] = np.concatenate(
             (
