@@ -1,11 +1,10 @@
 """ """
 
 import numpy as np
-
 from jax import random as jran
 
-from .. import mc_lightcone as mclc
 from ...ccshmf.utils import match_cenpop_to_subpop
+from .. import mc_lightcone as mclc
 
 
 def test_mc_lc_mf_behaves_as_expected():
@@ -47,7 +46,7 @@ def test_mc_lc_mf_behaves_as_expected():
     assert host_halo_indx[-1] == logmp_cenpop.size - 1
 
 
-def test_lc_mc_bahaves_as_expected():
+def test_mc_lc_behaves_as_expected():
     ran_key = jran.key(0)
 
     lgmp_min = 12.0
@@ -76,7 +75,7 @@ def test_lc_mc_bahaves_as_expected():
     assert halopop.halo_indx.size == n_host + n_subs
 
 
-def test_weighted_mc_bahaves_as_expected():
+def test_weighted_lc_behaves_as_expected():
     ran_key = jran.key(0)
 
     z_obs = np.linspace(0.2, 1.5, 100)

@@ -7,18 +7,17 @@ from jax import config
 
 config.update("jax_enable_x64", True)
 
-import numpy as np
 from collections import namedtuple
 
+import numpy as np
 from jax import numpy as jnp
 from jax import random as jran
 
+from ..ccshmf import DEFAULT_CCSHMF_PARAMS
+from ..cosmology import DEFAULT_COSMOLOGY
+from ..hmf import mc_hosts
 from . import mc_lightcone_halos as mclch
 from . import mc_lightcone_subhalos as mclcsh
-
-from ..hmf import mc_hosts
-from ..cosmology import DEFAULT_COSMOLOGY
-from ..ccshmf import DEFAULT_CCSHMF_PARAMS
 
 __all__ = ("mc_lc_mf", "mc_lc", "weighted_lc")
 
@@ -430,9 +429,16 @@ def weighted_lc(
     # create the index array: [...host_indx..., ...subhalo_indx...]
     n_host = cenpop.logmp_obs.size
     host_indx = jnp.arange(n_host).astype(int)
-    n_sub = int(n_host * subpop.nsub_per_host)
     subhalo_indx = jnp.repeat(host_indx, subpop.nsub_per_host)
     halo_indx = jnp.concatenate((host_indx, subhalo_indx)).astype(int)
+
+    z_obs_subs = jnp.repeat(cenpop.z_obs, subpop.nsub_per_host)
+    z_obs_all = jnp.concatenate((cenpop.z_obs, z_obs_subs))
+    cenpop = cenpop._replace(z_obs=z_obs_all)
+
+    t_obs_subs = jnp.repeat(cenpop.t_obs, subpop.nsub_per_host)
+    t_obs_all = jnp.concatenate((cenpop.t_obs, t_obs_subs))
+    cenpop = cenpop._replace(t_obs=t_obs_all)
 
     # combine halo and subhalo mah_params
     mah_params_names = cenpop.mah_params._fields
@@ -454,11 +460,14 @@ def weighted_lc(
     # combine halo and subhalo weights
     cenpop = cenpop._replace(nhalos=np.concatenate((cenpop.nhalos, subpop.nsubhalos)))
 
+    logmu_obs_host = jnp.zeros(n_host)
+    logmu_obs_all = jnp.concatenate((logmu_obs_host, subpop.logmu_obs))
+
     # create the output namedtuple containing host and subhalo information;
     # this will contain all host halo information, updated to include
     # the subhalo information and some fields are updated to new shapes
     halopop = namedtuple(
         "weighted_lc", [*cenpop._fields, "nsub_per_host", "logmu_obs", "halo_indx"]
-    )(*cenpop, subpop.nsub_per_host, subpop.logmu_obs, halo_indx)
+    )(*cenpop, subpop.nsub_per_host, logmu_obs_all, halo_indx)
 
     return halopop
