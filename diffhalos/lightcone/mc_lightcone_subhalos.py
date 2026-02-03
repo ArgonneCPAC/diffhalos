@@ -15,7 +15,6 @@ from jax import random as jran
 from ..ccshmf.ccshmf_model import DEFAULT_CCSHMF_PARAMS, subhalo_lightcone_weights
 from ..ccshmf.mc_subs import generate_subhalopop
 from ..mah.utils import apply_mah_rescaling
-from ..utils.namedtuple_utils import add_field_to_namedtuple
 
 __all__ = ("mc_lc_shmf", "mc_lc_subhalos", "weighted_lc_subhalos")
 
@@ -237,6 +236,9 @@ def weighted_lc_subhalos(
             logmu_obs: ndarray of shape (n_subs, )
                 base-10 log of mu=Msub/Mhost for each subhalo in the lightcone
 
+            logmp_obs: ndarray of shape (n_subs, )
+                base-10 log of Mpeak/Msun of each subhalo
+
             nsub_per_host: int
                 number of subhalo points generated per host halo
     """
@@ -275,8 +277,14 @@ def weighted_lc_subhalos(
     logmu_obs = logmsub_obs - jnp.repeat(cenpop.logmp_obs, n_mu_per_host)
 
     # add subhalo weights to the dictionary
-    fields = ("nsubhalos", "mah_params_subs", "logmu_obs", "nsub_per_host")
-    data = (nsubhalo_weights, mah_params_subs, logmu_obs, n_mu_per_host)
+    fields = (
+        "nsubhalos",
+        "mah_params_subs",
+        "logmu_obs",
+        "logmp_obs",
+        "nsub_per_host",
+    )
+    data = (nsubhalo_weights, mah_params_subs, logmu_obs, logmsub_obs, n_mu_per_host)
     subpop = namedtuple("subpop", fields)(*data)
 
     return subpop
