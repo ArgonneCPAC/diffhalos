@@ -115,3 +115,33 @@ def test_weighted_lc_behaves_as_expected():
     assert np.isfinite(halopop.logt0)
     assert halopop.nsub_per_host.shape == ()
     assert np.isfinite(halopop.nsub_per_host)
+
+
+def test_weighted_lc_logmp0_is_consistent_with_logmp_obs():
+    """Enforce self-consistent behavior for logmp0 and logmp_obs columns
+    centrals: logmp_obs <= logmp0
+    satellites: logmp_obs == logmp0
+
+    """
+    ran_key = jran.key(0)
+
+    n_host = 100
+    z_obs = np.linspace(0.2, 1.5, n_host)
+    logmp_obs = np.linspace(11.0, 14.0, n_host)
+
+    lgmsub_min = 10.0
+    sky_area_degsq = 10.0
+
+    halopop = mclc.weighted_lc(
+        ran_key,
+        z_obs,
+        logmp_obs,
+        lgmsub_min,
+        sky_area_degsq,
+    )
+
+    # centrals: logmp_obs <= logmp0
+    assert np.all(halopop.logmp0[:n_host] >= halopop.logmp_obs[:n_host])
+
+    # satellites: logmp_obs == logmp0
+    assert np.allclose(halopop.logmp0[n_host:], halopop.logmp_obs[n_host:])
