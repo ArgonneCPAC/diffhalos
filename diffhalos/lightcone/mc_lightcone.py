@@ -440,6 +440,9 @@ def weighted_lc(
     t_obs_all = jnp.concatenate((cenpop.t_obs, t_obs_subs))
     cenpop = cenpop._replace(t_obs=t_obs_all)
 
+    nhalos_host_subs = jnp.repeat(cenpop.nhalos, subpop.nsub_per_host)
+    nhalos_host_all = jnp.concatenate((cenpop.nhalos, nhalos_host_subs))
+
     # combine halo and subhalo mah_params
     mah_params_names = cenpop.mah_params._fields
     mah_params_tot = np.zeros(
@@ -467,7 +470,8 @@ def weighted_lc(
     # this will contain all host halo information, updated to include
     # the subhalo information and some fields are updated to new shapes
     halopop = namedtuple(
-        "weighted_lc", [*cenpop._fields, "nsub_per_host", "logmu_obs", "halo_indx"]
-    )(*cenpop, subpop.nsub_per_host, logmu_obs_all, halo_indx)
+        "weighted_lc",
+        [*cenpop._fields, "nhalos_host", "nsub_per_host", "logmu_obs", "halo_indx"],
+    )(*cenpop, nhalos_host_all, subpop.nsub_per_host, logmu_obs_all, halo_indx)
 
     return halopop
