@@ -42,9 +42,9 @@ def stratified_xy_grid(n_per_dim, ran_key):
 
 
 @partial(jjit, static_argnames=["n_per_dim"])
-def stratified_grid_scaled(n_per_dim, ran_key, zmin, zmax, mmin, mmax):
+def redshift_mass_grid(n_per_dim, ran_key, z_min, z_max, lgm_min, lgm_max):
     """
-    Stratified grid with noise
+    Stratified grid of redshift and halo mass
 
     Parameters
     ----------
@@ -54,16 +54,16 @@ def stratified_grid_scaled(n_per_dim, ran_key, zmin, zmax, mmin, mmax):
     ran_key: jax.random.key(seed)
         random key
 
-    zmin: float
+    z_min: float
         minimum redshift
 
-    zmax: float
-        minimum redshift
+    z_max: float
+        maximum redshift
 
-    mmin: float
+    lgm_min: float
         base-10 log of minimum mass, in Msun
 
-    mmax: float
+    lgm_max: float
         base-10 log of maximum mass, in Msun
 
     Returns
@@ -71,11 +71,12 @@ def stratified_grid_scaled(n_per_dim, ran_key, zmin, zmax, mmin, mmax):
     z_grid: ndarray of shape (n_per_dim^2, )
         redshift grid points
 
-    m_grid: ndarray of shape (n_per_dim^2, )
+    lgm_grid: ndarray of shape (n_per_dim^2, )
         base-10 log of mass grid points, in Msun
+
     """
     xy_grid = stratified_xy_grid(n_per_dim, ran_key)
-    z_grid = map_intervals(xy_grid[:, 0], 0, 1, zmin, zmax)
-    m_grid = map_intervals(xy_grid[:, 1], 0, 1, mmin, mmax)
+    z_grid = map_intervals(xy_grid[:, 0], 0, 1, z_min, z_max)
+    lgm_grid = map_intervals(xy_grid[:, 1], 0, 1, lgm_min, lgm_max)
 
-    return z_grid, m_grid
+    return z_grid, lgm_grid
