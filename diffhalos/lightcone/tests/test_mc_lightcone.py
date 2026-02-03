@@ -76,6 +76,7 @@ def test_mc_lc_behaves_as_expected():
 
 
 def test_weighted_lc_behaves_as_expected():
+    """Check each returned column is finite and has the expected shape"""
     ran_key = jran.key(0)
 
     n_host = 100
@@ -93,16 +94,24 @@ def test_weighted_lc_behaves_as_expected():
         sky_area_degsq,
     )
 
-    for _field in halopop._fields:
-        assert np.all(np.isfinite(halopop._asdict()[_field]))
-
     n_subs = n_host * halopop.nsub_per_host
     n_tot = n_host + n_subs
+
+    # Check mah_params for shape and finite
+    assert len(halopop.mah_params) == 5
     for arr in halopop.mah_params:
-        assert arr.size == n_tot
+        assert np.all(np.isfinite(arr))
+        assert arr.shape == (n_tot,)
 
-    assert halopop.halo_indx.size == n_tot
+    # Check other columns for shape and finite
+    skip_list = ("logt0", "mah_params", "nsub_per_host")
+    for name, val in zip(halopop._fields, halopop):
+        if name not in skip_list:
+            assert val.shape == (n_tot,), name
+            assert np.all(np.isfinite(val))
 
-    assert halopop.nhalos.size == n_tot
-
-    assert halopop.logmp_obs.shape == (n_tot,)
+    # Check scalar columns for shape and finite
+    assert halopop.logt0.shape == ()
+    assert np.isfinite(halopop.logt0)
+    assert halopop.nsub_per_host.shape == ()
+    assert np.isfinite(halopop.nsub_per_host)

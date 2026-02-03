@@ -10,6 +10,7 @@ config.update("jax_enable_x64", True)
 from collections import namedtuple
 
 import numpy as np
+from diffmah.diffmah_kernels import _log_mah_kern
 from jax import numpy as jnp
 from jax import random as jran
 
@@ -272,7 +273,7 @@ def mc_lc(
         mah_params_tot[i, :] = np.concatenate(
             (
                 cenpop.mah_params._asdict()[_param],
-                subpop.mah_params_subs._asdict()[_param],
+                subpop.mah_params._asdict()[_param],
             )
         )
     mah_params_ntup = namedtuple("mah_params", cenpop.mah_params._fields)(
@@ -422,7 +423,7 @@ def weighted_lc(
         logmsub_cutoff_himass=logmsub_cutoff_himass,
         subhalo_model_key=subhalo_model_key,
     )
-    # ("nsubhalos", "mah_params_subs", "logmu_obs", "nsub_per_host")
+    # ("nsubhalos", "mah_params", "logmu_obs", "nsub_per_host")
 
     # create the index array: [...host_indx..., ...subhalo_indx...]
     n_host = cenpop.logmp_obs.size
@@ -445,6 +446,11 @@ def weighted_lc(
     logmp_obs_all = jnp.concatenate((cenpop.logmp_obs, subpop.logmp_obs))
     cenpop = cenpop._replace(logmp_obs=logmp_obs_all)
 
+    # compute MAH values at z=0 for subs
+    logmp0_subs = _log_mah_kern(subpop.mah_params, 10**cenpop.logt0, cenpop.logt0)
+    logmp0_all = jnp.concatenate((cenpop.logmp0, logmp0_subs))
+    cenpop = cenpop._replace(logmp0=logmp0_all)
+
     # combine halo and subhalo mah_params
     mah_params_names = cenpop.mah_params._fields
     mah_params_tot = np.zeros((len(mah_params_names), n_host + n_sub))
@@ -452,7 +458,7 @@ def weighted_lc(
         mah_params_tot[i, :] = np.concatenate(
             (
                 cenpop.mah_params._asdict()[_param],
-                subpop.mah_params_subs._asdict()[_param],
+                subpop.mah_params._asdict()[_param],
             )
         )
     mah_params_ntup = namedtuple("mah_params", cenpop.mah_params._fields)(
