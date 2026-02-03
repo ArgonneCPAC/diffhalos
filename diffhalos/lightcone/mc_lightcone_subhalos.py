@@ -5,15 +5,15 @@ from jax import config
 
 config.update("jax_enable_x64", True)
 
+from collections import namedtuple
+from functools import partial
+
 from jax import jit as jjit
 from jax import numpy as jnp
 from jax import random as jran
 
-from collections import namedtuple
-from functools import partial
-
+from ..ccshmf.ccshmf_model import DEFAULT_CCSHMF_PARAMS, subhalo_lightcone_weights
 from ..ccshmf.mc_subs import generate_subhalopop
-from ..ccshmf.ccshmf_model import subhalo_lightcone_weights, DEFAULT_CCSHMF_PARAMS
 from ..mah.utils import apply_mah_rescaling
 from ..utils.namedtuple_utils import add_field_to_namedtuple
 

@@ -5,23 +5,21 @@ from jax import config
 
 config.update("jax_enable_x64", True)
 
+from collections import namedtuple
 from functools import partial
 
-from collections import namedtuple
-
+from diffmah.diffmah_kernels import _log_mah_kern
 from jax import jit as jjit
 from jax import numpy as jnp
 from jax import random as jran
 from jax import vmap
 
-from diffmah.diffmah_kernels import _log_mah_kern
-
-from ..cosmology import flat_wcdm, DEFAULT_COSMOLOGY
+from ..cosmology import DEFAULT_COSMOLOGY, flat_wcdm
 from ..cosmology.cosmo_basics import get_tobs_from_zobs
-from ..hmf.hmf_model import halo_lightcone_weights
-from ..hmf import mc_hosts
-from ..mah.utils import apply_mah_rescaling
 from ..cosmology.geometry_utils import compute_volume_from_sky_area
+from ..hmf import mc_hosts
+from ..hmf.hmf_model import halo_lightcone_weights
+from ..mah.utils import apply_mah_rescaling
 
 N_HMF_GRID = 2_000
 DEFAULT_LOGMP_CUTOFF = 10.0
