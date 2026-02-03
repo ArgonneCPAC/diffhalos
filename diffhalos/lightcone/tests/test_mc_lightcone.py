@@ -98,8 +98,8 @@ def test_weighted_lc_behaves_as_expected():
 
     n_subs = n_host * halopop.nsub_per_host
     n_tot = n_host + n_subs
-    for _param in halopop.mah_params._fields:
-        assert halopop.mah_params._asdict()[_param].size == n_tot
+    for arr in halopop.mah_params:
+        assert arr.size == n_tot
 
     assert halopop.halo_indx.size == n_tot
 
