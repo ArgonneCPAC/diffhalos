@@ -163,7 +163,7 @@ def mc_lc_subhalos(
     mc_lg_mu = logmsub_obs - jnp.repeat(cenpop.logmp_obs, n_mu_per_host)
 
     # add the subhalo data to the halo population namedtuple
-    fields = ("nsub_per_host", "mah_params_subs", "logmu_obs")
+    fields = ("nsub_per_host", "mah_params", "logmu_obs")
     data = (n_mu_per_host, mah_params_subs, mc_lg_mu)
     subpop = namedtuple("subpop", fields)(*data)
 
@@ -279,7 +279,7 @@ def weighted_lc_subhalos(
     # add subhalo weights to the dictionary
     fields = (
         "nsubhalos",
-        "mah_params_subs",
+        "mah_params",
         "logmu_obs",
         "logmp_obs",
         "nsub_per_host",

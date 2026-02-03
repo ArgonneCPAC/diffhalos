@@ -1,15 +1,14 @@
 """ """
 
 import numpy as np
-
-from jax import random as jran
 from jax import numpy as jnp
+from jax import random as jran
 
+from ...ccshmf import mc_subs
+from ...ccshmf.utils import match_cenpop_to_subpop
+from ...mah.utils import apply_mah_rescaling
 from .. import mc_lightcone_subhalos as mclsh
 from ..utils import generate_mock_cenpop
-from ...ccshmf import mc_subs
-from ...mah.utils import apply_mah_rescaling
-from ...ccshmf.utils import match_cenpop_to_subpop
 
 
 def test_mc_lc_shmf_works_as_expected():
@@ -95,10 +94,8 @@ def test_mc_lc_subhalos_works_as_expected():
     for _field in subpop._fields:
         assert np.all(np.isfinite(subpop._asdict()[_field]))
 
-    for _field in subpop.mah_params_subs._fields:
-        assert (
-            subpop.mah_params_subs._asdict()[_field].shape[0] == subpop.logmu_obs.size
-        )
+    for _field in subpop.mah_params._fields:
+        assert subpop.mah_params._asdict()[_field].shape[0] == subpop.logmu_obs.size
 
 
 def test_mc_lc_subhalos_vs_subpop_from_mc_subs():
@@ -220,8 +217,8 @@ def test_mc_weighted_lc_subhalos_behaves_as_expected():
     assert host_index_for_subs.dtype == np.int64
     assert host_index_for_subs[0] == 0
     assert host_index_for_subs[-1] == n_cens - 1
-    for _key in subpop.mah_params_subs._fields:
-        assert subpop.mah_params_subs._asdict()[_key].size == n_cens * n_sub_per_host
+    for arr in subpop.mah_params:
+        assert arr.size == n_cens * n_sub_per_host
 
 
 def test_mc_weighted_lc_subhalos_with_different_nsubs_per_host():
@@ -259,8 +256,8 @@ def test_mc_weighted_lc_subhalos_with_different_nsubs_per_host():
     assert host_index_for_subs.dtype == np.int64
     assert host_index_for_subs[0] == 0
     assert host_index_for_subs[-1] == n_cens - 1
-    for _key in subpop.mah_params_subs._fields:
-        assert subpop.mah_params_subs._asdict()[_key].size == n_cens * n_sub_per_host
+    for _key in subpop.mah_params._fields:
+        assert subpop.mah_params._asdict()[_key].size == n_cens * n_sub_per_host
 
 
 def test_mc_weighted_lc_subhalos_agrees_with_mc_subhalopop():
