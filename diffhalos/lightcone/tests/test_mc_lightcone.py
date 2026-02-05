@@ -1,10 +1,18 @@
 """ """
 
 import numpy as np
+
 from jax import random as jran
+from jax import numpy as jnp
 
 from ...ccshmf.utils import match_cenpop_to_subpop
 from .. import mc_lightcone as mclc
+from .. import mc_lightcone_halos as mclch
+from .. import mc_lightcone_subhalos as mclcsh
+from ...mah.diffmahnet.diffmahnet import log_mah_kern
+from ...mah.diffmahnet_utils import mc_mah_cenpop
+from ...ccshmf.ccshmf_model import subhalo_lightcone_weights
+from diffmah.diffmah_kernels import _log_mah_kern
 
 
 def test_mc_lc_mf_behaves_as_expected():
@@ -121,7 +129,7 @@ def test_weighted_lc_logmp0_is_consistent_with_logmp_obs():
     """Enforce self-consistent behavior for logmp0 and logmp_obs columns
     centrals: logmp_obs <= logmp0
     satellites: logmp_obs == logmp0
-
+    We perform these checks only for subhalos with t_peak < t_obs
     """
     ran_key = jran.key(0)
 
@@ -144,14 +152,19 @@ def test_weighted_lc_logmp0_is_consistent_with_logmp_obs():
     assert np.all(halopop.logmp0[:n_host] >= halopop.logmp_obs[:n_host])
 
     # satellites: logmp_obs == logmp0
-    assert np.allclose(halopop.logmp0[n_host:], halopop.logmp_obs[n_host:])
+    _filter_t_peak_t_obs = np.where(
+        halopop.t_obs[n_host:] > halopop.mah_params.t_peak[n_host:]
+    )[0]
+    assert np.allclose(
+        halopop.logmp0[n_host:][_filter_t_peak_t_obs],
+        halopop.logmp_obs[n_host:][_filter_t_peak_t_obs],
+    )
 
 
 def test_weighted_lc_tpeak_subs():
-    """Enforce self-consistent behavior for logmp0 and logmp_obs columns
-    centrals: logmp_obs <= logmp0
-    satellites: logmp_obs == logmp0
-
+    """Enforce self-consistent behavior for t_peak and t_obs columns
+    satellites: t_peak <= t_obs
+    for at least some satellites: t_peak != t_obs
     """
     ran_key = jran.key(0)
 
@@ -171,7 +184,93 @@ def test_weighted_lc_tpeak_subs():
     )
 
     # satellites: t_peak <= t_obs
-    assert np.all(halopop.mah_params.t_peak[n_host:] <= halopop.t_obs[n_host:])
+    # ensure that the fraction of subs for which this is false is < 10%
+    _filter_t_peak_t_obs = np.where(
+        halopop.t_obs[n_host:] < halopop.mah_params.t_peak[n_host:]
+    )[0]
+    assert len(_filter_t_peak_t_obs) / float(halopop.nsub_per_host * n_host) < 0.1
 
     # at least SOME satellites should have t_peak != t_obs
-    assert np.any(halopop.mah_params.t_peak[n_host:] < halopop.t_obs[n_host:])
+    assert np.any(halopop.mah_params.t_peak[n_host:] != halopop.t_obs[n_host:])
+
+    # make sure it is the same subhalos that have t_peak>t_obs and logm_obs!=logm0
+    _filter_m_obs_m0 = np.where(halopop.logmp0[n_host:] != halopop.logmp_obs[n_host:])[
+        0
+    ]
+    assert np.all(_filter_m_obs_m0 == _filter_t_peak_t_obs)
+
+
+def test_weighted_lc_tpeak_clip():
+    """Enforce self-consistent behavior for t_peak and t_obs columns
+    satellites: t_peak <= t_obs
+    by clipping t_peak at t_obs in the diffmahnet parameters
+    """
+    ran_key = jran.key(0)
+    cen_key, sub_key = jran.split(ran_key, 2)
+
+    n_host = 100
+    z_obs = np.linspace(0.2, 1.5, n_host)
+    logmp_obs = np.linspace(11.0, 14.0, n_host)
+
+    lgmsub_min = 10.0
+    sky_area_degsq = 10.0
+
+    cenpop = mclch.weighted_lc_halos(
+        cen_key,
+        z_obs,
+        logmp_obs,
+        sky_area_degsq,
+    )
+
+    # number of host halos
+    n_host = cenpop.logmp_obs.size
+
+    # get mu values
+    lgmu = subhalo_lightcone_weights(
+        cenpop.logmp_obs,
+        lgmsub_min,
+        mclcsh.N_LGMU_PER_HOST,
+        mclcsh.DEFAULT_CCSHMF_PARAMS,
+    )[1].reshape(n_host * mclcsh.N_LGMU_PER_HOST)
+
+    # get the subhalo mass and time of observation for MAH computations
+    logmsub_obs = lgmu + jnp.repeat(cenpop.logmp_obs, mclcsh.N_LGMU_PER_HOST)
+    t_obs = jnp.repeat(cenpop.t_obs, mclcsh.N_LGMU_PER_HOST)
+
+    # get the rescaled mah parameters and mah values at t_obs
+    logmsub_obs_clipped = jnp.clip(
+        logmsub_obs, mclcsh.DEFAULT_LOGMSUB_CUTOFF, mclcsh.DEFAULT_LOGMSUB_HIMASS_CUTOFF
+    )
+    mah_params_uncorrected = mc_mah_cenpop(
+        logmsub_obs_clipped,
+        t_obs,
+        sub_key,
+        mclcsh.DEFAULT_DIFFMAHNET_SAT_MODEL,
+    )
+
+    # clip t_peak values for subs's mah parameters
+    t_peak_clip = jnp.clip(mah_params_uncorrected.t_peak, 0.0, t_obs)
+    mah_params_uncorrected = mah_params_uncorrected._replace(t_peak=t_peak_clip)
+
+    # compute the uncorrected observed masses
+    logmp_obs_uncorrected = log_mah_kern(mah_params_uncorrected, t_obs, cenpop.logt0)
+
+    # rescale the mah parameters to the correct logm0
+    delta_logm_obs = logmp_obs_uncorrected - logmsub_obs
+    logm0_rescaled = mah_params_uncorrected.logm0 - delta_logm_obs
+    mah_params_subs = mah_params_uncorrected._replace(logm0=logm0_rescaled)
+
+    # compute observed mass with corrected parameters
+    logmsub_obs = log_mah_kern(mah_params_subs, t_obs, cenpop.logt0)
+
+    # compute mass of subs at z=0
+    logmp0_subs = _log_mah_kern(mah_params_subs, 10**cenpop.logt0, cenpop.logt0)
+
+    # satellites: t_peak <= t_obs
+    assert np.all(mah_params_subs.t_peak <= t_obs)
+
+    # at least SOME satellites should have t_peak != t_obs
+    assert np.any(mah_params_subs.t_peak != t_obs)
+
+    # satellites: logmp_obs == logmp0
+    assert np.allclose(logmp0_subs, logmsub_obs)

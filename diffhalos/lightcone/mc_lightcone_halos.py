@@ -8,11 +8,12 @@ config.update("jax_enable_x64", True)
 from collections import namedtuple
 from functools import partial
 
-from diffmah.diffmah_kernels import _log_mah_kern
 from jax import jit as jjit
 from jax import numpy as jnp
 from jax import random as jran
 from jax import vmap
+
+from diffmah.diffmah_kernels import _log_mah_kern
 
 from ..cosmology import DEFAULT_COSMOLOGY, flat_wcdm
 from ..cosmology.cosmo_basics import get_tobs_from_zobs
@@ -341,7 +342,7 @@ def weighted_lc_halos(
     t_obs, t_0 = get_tobs_from_zobs(z_obs, cosmo_params=cosmo_params)
     logt0 = jnp.log10(t_0)
 
-    # get rescaled mah parameters and mah's
+    # get rescaled mah parameters and mah values at t_obs
     logmp_obs_clipped = jnp.clip(logmp_obs, logmp_cutoff, logmp_cutoff_himass)
     mah_params, logmp_obs = apply_mah_rescaling(
         ran_key,
@@ -352,7 +353,7 @@ def weighted_lc_halos(
         centrals_model_key,
     )
 
-    # compute MAH values today
+    # compute mah values today
     logmp0 = _log_mah_kern(mah_params, 10**logt0, logt0)
 
     # create output namedtuple

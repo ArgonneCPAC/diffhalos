@@ -7,12 +7,13 @@ from jax import config
 
 config.update("jax_enable_x64", True)
 
+import numpy as np
 from collections import namedtuple
 
-import numpy as np
-from diffmah.diffmah_kernels import _log_mah_kern
 from jax import numpy as jnp
 from jax import random as jran
+
+from diffmah.diffmah_kernels import _log_mah_kern
 
 from ..ccshmf import DEFAULT_CCSHMF_PARAMS
 from ..cosmology import DEFAULT_COSMOLOGY
@@ -410,7 +411,6 @@ def weighted_lc(
         logmp_cutoff_himass=logmp_cutoff_himass,
         centrals_model_key=centrals_model_key,
     )
-    # fields = ("z_obs", "t_obs", "logmp_obs", "mah_params", "logmp0", "logt0", "nhalos")
 
     # generate a weighted subhalo lightcone
     subpop = mclcsh.weighted_lc_subhalos(
@@ -423,9 +423,8 @@ def weighted_lc(
         logmsub_cutoff_himass=logmsub_cutoff_himass,
         subhalo_model_key=subhalo_model_key,
     )
-    # ("nsubhalos", "mah_params", "logmu_obs", "nsub_per_host")
 
-    # create the index array: [...host_indx..., ...subhalo_indx...]
+    # create the index array
     n_host = cenpop.logmp_obs.size
     n_sub = subpop.logmp_obs.size
     host_indx = jnp.arange(n_host).astype(int)
@@ -446,7 +445,7 @@ def weighted_lc(
     logmp_obs_all = jnp.concatenate((cenpop.logmp_obs, subpop.logmp_obs))
     cenpop = cenpop._replace(logmp_obs=logmp_obs_all)
 
-    # compute MAH values at z=0 for subs
+    # compute mah values at z=0 for subs
     logmp0_subs = _log_mah_kern(subpop.mah_params, 10**cenpop.logt0, cenpop.logt0)
     logmp0_all = jnp.concatenate((cenpop.logmp0, logmp0_subs))
     cenpop = cenpop._replace(logmp0=logmp0_all)

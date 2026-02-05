@@ -260,8 +260,7 @@ def weighted_lc_subhalos(
     logmsub_obs = lgmu + jnp.repeat(cenpop.logmp_obs, n_mu_per_host)
     t_obs = jnp.repeat(cenpop.t_obs, n_mu_per_host)
 
-    #################
-    # get the rescaled mah parameters and mah's
+    # get the rescaled mah parameters and mah values at t_obs
     logmsub_obs_clipped = jnp.clip(logmsub_obs, logmsub_cutoff, logmsub_cutoff_himass)
     mah_params_subs, logmsub_obs = apply_mah_rescaling(
         ran_key,
@@ -271,19 +270,12 @@ def weighted_lc_subhalos(
         cenpop.logt0,
         subhalo_model_key,
     )
-    #################
 
-    # compute the rescaled mu values
+    # compute the rescaled mu values at t_obs
     logmu_obs = logmsub_obs - jnp.repeat(cenpop.logmp_obs, n_mu_per_host)
 
     # add subhalo weights to the dictionary
-    fields = (
-        "nsubhalos",
-        "mah_params",
-        "logmu_obs",
-        "logmp_obs",
-        "nsub_per_host",
-    )
+    fields = ("nsubhalos", "mah_params", "logmu_obs", "logmp_obs", "nsub_per_host")
     data = (nsubhalo_weights, mah_params_subs, logmu_obs, logmsub_obs, n_mu_per_host)
     subpop = namedtuple("subpop", fields)(*data)
 

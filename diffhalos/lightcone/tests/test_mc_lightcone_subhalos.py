@@ -4,6 +4,8 @@ import numpy as np
 from jax import numpy as jnp
 from jax import random as jran
 
+from diffmah.diffmah_kernels import _log_mah_kern
+
 from ...ccshmf import mc_subs
 from ...ccshmf.utils import match_cenpop_to_subpop
 from ...mah.utils import apply_mah_rescaling
@@ -268,7 +270,6 @@ def test_mc_weighted_lc_subhalos_agrees_with_mc_subhalopop():
     z_max = 0.5
     logmp_min = 11.0
     logmp_max = 14.0
-    lgmp_min = 10.0
     n_cens = 2_000
 
     # use a mock host halo population for this test
