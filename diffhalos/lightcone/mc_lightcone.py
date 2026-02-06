@@ -7,13 +7,12 @@ from jax import config
 
 config.update("jax_enable_x64", True)
 
-import numpy as np
 from collections import namedtuple
 
+import numpy as np
+from diffmah.diffmah_kernels import _log_mah_kern
 from jax import numpy as jnp
 from jax import random as jran
-
-from diffmah.diffmah_kernels import _log_mah_kern
 
 from ..ccshmf import DEFAULT_CCSHMF_PARAMS
 from ..cosmology import DEFAULT_COSMOLOGY

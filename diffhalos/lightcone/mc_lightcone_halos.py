@@ -8,12 +8,11 @@ config.update("jax_enable_x64", True)
 from collections import namedtuple
 from functools import partial
 
+from diffmah.diffmah_kernels import _log_mah_kern
 from jax import jit as jjit
 from jax import numpy as jnp
 from jax import random as jran
 from jax import vmap
-
-from diffmah.diffmah_kernels import _log_mah_kern
 
 from ..cosmology import DEFAULT_COSMOLOGY, flat_wcdm
 from ..cosmology.cosmo_basics import get_tobs_from_zobs

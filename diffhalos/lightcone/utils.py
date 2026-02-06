@@ -3,8 +3,8 @@
 from collections import namedtuple
 from functools import partial
 
-from jax import numpy as jnp
 from jax import jit as jjit
+from jax import numpy as jnp
 
 from ..cosmology import DEFAULT_COSMOLOGY
 from ..cosmology.cosmo_basics import get_tobs_from_zobs
