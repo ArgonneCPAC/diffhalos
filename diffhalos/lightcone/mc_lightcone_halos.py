@@ -32,6 +32,17 @@ mc_logmp_vmap = jjit(vmap(mc_hosts._mc_host_halos_singlez_kern, in_axes=_AXES))
 
 __all__ = ("mc_lc_hmf", "mc_lc_halos", "weighted_lc_halos")
 
+_CENPOP_FIELDS = (
+    "z_obs",
+    "t_obs",
+    "logmp_obs",
+    "mah_params",
+    "logmp0",
+    "logt0",
+    "nhalos",
+)
+CenPop = namedtuple("CenPop", _CENPOP_FIELDS)
+
 
 def mc_lc_hmf(
     ran_key,
@@ -356,8 +367,7 @@ def weighted_lc_halos(
     logmp0 = _log_mah_kern(mah_params, 10**logt0, logt0)
 
     # create output namedtuple
-    fields = ("z_obs", "t_obs", "logmp_obs", "mah_params", "logmp0", "logt0", "nhalos")
     values = (z_obs, t_obs, logmp_obs, mah_params, logmp0, logt0, nhalo_weights)
-    cenpop = namedtuple("cenpop", fields)(*values)
+    cenpop = CenPop(*values)
 
     return cenpop

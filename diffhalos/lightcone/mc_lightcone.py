@@ -293,10 +293,13 @@ def mc_lc(
 
 def weighted_lc(
     ran_key,
-    z_obs,
-    logmp_obs,
-    lgmsub_min,
+    n_host_halos,
+    z_min,
+    z_max,
+    lgmp_min,
+    lgmp_max,
     sky_area_degsq,
+    *,
     cosmo_params=DEFAULT_COSMOLOGY,
     hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
     logmp_cutoff=mclch.DEFAULT_LOGMP_CUTOFF,
@@ -307,94 +310,165 @@ def weighted_lc(
     logmsub_cutoff_himass=mclcsh.DEFAULT_LOGMSUB_HIMASS_CUTOFF,
     centrals_model_key=mclch.DEFAULT_DIFFMAHNET_CEN_MODEL,
     subhalo_model_key=mclcsh.DEFAULT_DIFFMAHNET_SAT_MODEL,
+    lgmsub_min=None,
 ):
     """
-    Generates a weighted lightcone population of halos+subhalos with MAHs,
-    on an input grid of redshift and mass
+    Generate a mass-function-weighted lightcone of halos+subhalos and their
+    mass assembly histories.
 
     Parameters
     ----------
     ran_key: jran.key
         random key
 
-    z_obs: ndarray of shape (n_host, )
-        observed redshifts of galaxies
+    n_host_halos : int
+        Number of host halos in the weighted lightcone
 
-    logmp_obs: ndarray of shape (n_host, )
-        base-10 log of observed halo masses, in Msun
+    z_min, z_max : float
+        min/max redshift
 
-    lgmsub_min: float
-        base-10 log of the minimum mass, in Msun
+    lgmp_min,lgmp_max : float
+        log10 of min/max halo mass in units of Msun
 
     sky_area_degsq: float
-        sky area, in deg^2
+        sky area in deg^2
 
-    cosmo_params: namedtuple
+    cosmo_params: namedtuple, optional kwarg
         cosmological parameters
 
-    hmf_params: namedtuple
+    hmf_params: namedtuple, optional kwarg
         halo mass function parameters
 
-    logmp_cutoff: float
+    logmp_cutoff: float, optional kwarg
         base-10 log of minimum halo mass for which
         DiffmahPop is used to generate MAHs, in Msun;
         for logmp < logmp_cutoff, P(θ_MAH | logmp) = P(θ_MAH | logmp_cutoff)
 
-    logmp_cutoff_himass: float
+    logmp_cutoff_himass: float, optional kwarg
         base-10 log of maximum halo mass for which
         DiffmahPop is used to generate MAHs, in Msun
 
-    n_mu_per_host: int
+    n_mu_per_host: int, optional kwarg
         number of mu=Msub/Mhost values to use per host halo;
         note that for the weighted version of the lightcone,
         each host gets assigned the same number of subhalos
 
-    cshmf_params: namedtuple
+    cshmf_params: namedtuple, optional kwarg
         CCSHMF parameters
 
-    logmsub_cutoff: float
+    logmsub_cutoff: float, optional kwarg
         base-10 log of minimum subhalo mass for which
         diffmahnet is used to generate MAHs, in Msun;
         for logmsub < logmsub_cutoff, P(θ_MAH | logmsub) = P(θ_MAH | logmsub_cutoff)
 
-    logmsub_cutoff_himass: float
+    logmsub_cutoff_himass: float, optional kwarg
         base-10 log of maximum subhalo mass for which
         diffmahnet is used to generate MAHs, in Msun
 
-    centrals_model_key: str
+    centrals_model_key: str, optional kwarg
         diffmahnet model to use for centrals
 
-    subhalo_model_key: str
+    subhalo_model_key: str, optional kwarg
         diffmahnet model to use for satellites
+
+    lgmsub_min: float, optional kwarg
+        base-10 log of the minimum subhalo mass, in Msun
+        If none, will be set to lgmp_min-ε
 
     Returns
     -------
     halopop: namedtuple
-        halo population with fields:
-            z_obs: ndarray of shape (n_host, )
+        Population of n_halos_tot halos and subhalos
+            n_halos_tot = n_sub + n_host_halos
+            n_sub = nsub_per_host * n_host_halos
+
+        halopop fields:
+            z_obs: ndarray of shape (n_halos_tot, )
                 redshift values
 
-            t_obs: ndarray of shape (n_host, )
+            t_obs: ndarray of shape (n_halos_tot, )
                 cosmic time at observation, in Gyr
 
-            logmp_obs: ndarray of shape (n_host, )
+            logmp_obs: ndarray of shape (n_halos_tot, )
                 base-10 log of halo mass at observation, in Msun
 
-            mah_params: namedtuple of ndarrays of shape (n_host+n_sub, )
+            mah_params: namedtuple of ndarrays of shape (n_halos_tot, )
                 mah parameters
 
-            logmp0: ndarray of shape (n_host, )
+            logmp0: ndarray of shape (n_halos_tot, )
                 base-10 log of halo mass at z=0, in Msun
 
-            nhalos: ndarray of shape (n_host+n_sub, )
-                weighted number of halos at each grid point
+            logt0: float
+                Base-10 log of z=0 age of the Universe for the input cosmology
 
-            logmu_obs: ndarray of shape (n_sub, )
-                base-10 log of mu=Msub/Mhost for each generated subhalo
+            nhalos: ndarray of shape (n_halos_tot, )
+                weight of the (sub)halo
 
-            nsub_per_host: ndarray of shape (n_host, )
-                number of generated subhalo per host halo
+            nhalos_host: ndarray of shape (n_halos_tot, )
+                weight of the host halo
+                Equal to nhalos for central halos
+
+            nsub_per_host: int
+                number of subhalos per host halo
+                    n_sub = nsub_per_host * n_host_halos
+                    n_halos_tot = n_sub + n_host_halos
+
+            logmu_obs: ndarray of shape (n_halos_tot, )
+                base-10 log of mu=Msub/Mhost
+
+            halo_indx: ndarray of shape (n_halos_tot, )
+                index of the associated host halo
+                for central halos: halo_indx = range(n_halos_tot)
+
     """
+    lgm_key, redshift_key, halo_key = jran.split(ran_key, 3)
+    logmp_obs = jran.uniform(
+        lgm_key, minval=lgmp_min, maxval=lgmp_max, shape=(n_host_halos,)
+    )
+    z_obs = jran.uniform(
+        redshift_key, minval=z_min, maxval=z_max, shape=(n_host_halos,)
+    )
+
+    if lgmsub_min is None:
+        lgmsub_min = lgmp_min - 0.01
+
+    halopop = _weighted_lc_from_grid(
+        halo_key,
+        z_obs,
+        logmp_obs,
+        lgmsub_min,
+        sky_area_degsq,
+        cosmo_params,
+        hmf_params,
+        logmp_cutoff,
+        logmp_cutoff_himass,
+        n_mu_per_host,
+        ccshmf_params,
+        logmsub_cutoff,
+        logmsub_cutoff_himass,
+        centrals_model_key,
+        subhalo_model_key,
+    )
+    return halopop
+
+
+def _weighted_lc_from_grid(
+    ran_key,
+    z_obs,
+    logmp_obs,
+    lgmsub_min,
+    sky_area_degsq,
+    cosmo_params,
+    hmf_params,
+    logmp_cutoff,
+    logmp_cutoff_himass,
+    n_mu_per_host,
+    ccshmf_params,
+    logmsub_cutoff,
+    logmsub_cutoff_himass,
+    centrals_model_key,
+    subhalo_model_key,
+):
     # two random keys, one for the host and one for the subhalo population
     host_key, subhalo_key = jran.split(ran_key)
 

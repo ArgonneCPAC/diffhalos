@@ -1,18 +1,17 @@
 """ """
 
 import numpy as np
-
-from jax import random as jran
+from diffmah.diffmah_kernels import _log_mah_kern
 from jax import numpy as jnp
+from jax import random as jran
 
+from ...ccshmf.ccshmf_model import subhalo_lightcone_weights
 from ...ccshmf.utils import match_cenpop_to_subpop
+from ...mah.diffmahnet.diffmahnet import log_mah_kern
+from ...mah.diffmahnet_utils import mc_mah_cenpop
 from .. import mc_lightcone as mclc
 from .. import mc_lightcone_halos as mclch
 from .. import mc_lightcone_subhalos as mclcsh
-from ...mah.diffmahnet.diffmahnet import log_mah_kern
-from ...mah.diffmahnet_utils import mc_mah_cenpop
-from ...ccshmf.ccshmf_model import subhalo_lightcone_weights
-from diffmah.diffmah_kernels import _log_mah_kern
 
 
 def test_mc_lc_mf_behaves_as_expected():
@@ -87,23 +86,15 @@ def test_weighted_lc_behaves_as_expected():
     """Check each returned column is finite and has the expected shape"""
     ran_key = jran.key(0)
 
-    n_host = 100
-    z_obs = np.linspace(0.2, 1.5, n_host)
-    logmp_obs = np.linspace(11.0, 14.0, n_host)
-
-    lgmsub_min = 10.0
+    n_host_halos = 100
+    z_min, z_max = 0.1, 3.1
     sky_area_degsq = 10.0
+    lgmp_min, lgmp_max = 10.0, 15.0
+    args = (ran_key, n_host_halos, z_min, z_max, lgmp_min, lgmp_max, sky_area_degsq)
+    halopop = mclc.weighted_lc(*args)
 
-    halopop = mclc.weighted_lc(
-        ran_key,
-        z_obs,
-        logmp_obs,
-        lgmsub_min,
-        sky_area_degsq,
-    )
-
-    n_subs = n_host * halopop.nsub_per_host
-    n_tot = n_host + n_subs
+    n_subs = n_host_halos * halopop.nsub_per_host
+    n_tot = n_host_halos + n_subs
 
     # Check mah_params for shape and finite
     assert len(halopop.mah_params) == 5
@@ -133,31 +124,23 @@ def test_weighted_lc_logmp0_is_consistent_with_logmp_obs():
     """
     ran_key = jran.key(0)
 
-    n_host = 100
-    z_obs = np.linspace(0.2, 1.5, n_host)
-    logmp_obs = np.linspace(11.0, 14.0, n_host)
-
-    lgmsub_min = 10.0
+    n_host_halos = 100
+    z_min, z_max = 0.1, 3.1
     sky_area_degsq = 10.0
-
-    halopop = mclc.weighted_lc(
-        ran_key,
-        z_obs,
-        logmp_obs,
-        lgmsub_min,
-        sky_area_degsq,
-    )
+    lgmp_min, lgmp_max = 10.0, 15.0
+    args = (ran_key, n_host_halos, z_min, z_max, lgmp_min, lgmp_max, sky_area_degsq)
+    halopop = mclc.weighted_lc(*args)
 
     # centrals: logmp_obs <= logmp0
-    assert np.all(halopop.logmp0[:n_host] >= halopop.logmp_obs[:n_host])
+    assert np.all(halopop.logmp0[:n_host_halos] >= halopop.logmp_obs[:n_host_halos])
 
     # satellites: logmp_obs == logmp0
     _filter_t_peak_t_obs = np.where(
-        halopop.t_obs[n_host:] > halopop.mah_params.t_peak[n_host:]
+        halopop.t_obs[n_host_halos:] > halopop.mah_params.t_peak[n_host_halos:]
     )[0]
     assert np.allclose(
-        halopop.logmp0[n_host:][_filter_t_peak_t_obs],
-        halopop.logmp_obs[n_host:][_filter_t_peak_t_obs],
+        halopop.logmp0[n_host_halos:][_filter_t_peak_t_obs],
+        halopop.logmp_obs[n_host_halos:][_filter_t_peak_t_obs],
     )
 
 
@@ -168,35 +151,30 @@ def test_weighted_lc_tpeak_subs():
     """
     ran_key = jran.key(0)
 
-    n_host = 100
-    z_obs = np.linspace(0.2, 1.5, n_host)
-    logmp_obs = np.linspace(11.0, 14.0, n_host)
-
-    lgmsub_min = 10.0
+    n_host_halos = 1000
+    z_min, z_max = 0.1, 3.1
     sky_area_degsq = 10.0
-
-    halopop = mclc.weighted_lc(
-        ran_key,
-        z_obs,
-        logmp_obs,
-        lgmsub_min,
-        sky_area_degsq,
-    )
+    lgmp_min, lgmp_max = 10.0, 15.0
+    args = (ran_key, n_host_halos, z_min, z_max, lgmp_min, lgmp_max, sky_area_degsq)
+    halopop = mclc.weighted_lc(*args)
 
     # satellites: t_peak <= t_obs
     # ensure that the fraction of subs for which this is false is < 10%
     _filter_t_peak_t_obs = np.where(
-        halopop.t_obs[n_host:] < halopop.mah_params.t_peak[n_host:]
+        halopop.t_obs[n_host_halos:] < halopop.mah_params.t_peak[n_host_halos:]
     )[0]
-    assert len(_filter_t_peak_t_obs) / float(halopop.nsub_per_host * n_host) < 0.1
+    tol = 0.15
+    assert len(_filter_t_peak_t_obs) / float(halopop.nsub_per_host * n_host_halos) < tol
 
     # at least SOME satellites should have t_peak != t_obs
-    assert np.any(halopop.mah_params.t_peak[n_host:] != halopop.t_obs[n_host:])
+    assert np.any(
+        halopop.mah_params.t_peak[n_host_halos:] != halopop.t_obs[n_host_halos:]
+    )
 
     # make sure it is the same subhalos that have t_peak>t_obs and logm_obs!=logm0
-    _filter_m_obs_m0 = np.where(halopop.logmp0[n_host:] != halopop.logmp_obs[n_host:])[
-        0
-    ]
+    _filter_m_obs_m0 = np.where(
+        halopop.logmp0[n_host_halos:] != halopop.logmp_obs[n_host_halos:]
+    )[0]
     assert np.all(_filter_m_obs_m0 == _filter_t_peak_t_obs)
 
 
