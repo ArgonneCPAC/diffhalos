@@ -4,8 +4,6 @@ import numpy as np
 from jax import numpy as jnp
 from jax import random as jran
 
-from diffmah.diffmah_kernels import _log_mah_kern
-
 from ...ccshmf import mc_subs
 from ...ccshmf.utils import match_cenpop_to_subpop
 from ...mah.utils import apply_mah_rescaling
