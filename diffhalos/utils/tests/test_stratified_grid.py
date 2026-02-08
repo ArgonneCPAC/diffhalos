@@ -21,20 +21,20 @@ def test_stratified_xy_grid():
     assert np.allclose(xy_grid.mean(), 0.5, atol=0.1)
 
 
-def test_stratified_grid_scaled():
+def test_redshift_mass_grid():
     ran_key = jran.key(0)
     n_tests = 100
 
-    zmin, zmax = 1.0, 4.5
-    mmin, mmax = 11.5, 14.0
+    z_min, z_max = 1.0, 4.5
+    lgm_min, lgm_max = 11.5, 14.0
 
     for n_per_dim in (5, 50, 500):
         for __ in range(n_tests):
             ran_key, test_key = jran.split(ran_key, 2)
-            z_grid, m_grid = sg.stratified_grid_scaled(
-                n_per_dim, test_key, zmin, zmax, mmin, mmax
+            z_grid, lgm_grid = sg.redshift_mass_grid(
+                n_per_dim, test_key, z_min, z_max, lgm_min, lgm_max
             )
             assert z_grid.size == n_per_dim**2
-            assert m_grid.size == n_per_dim**2
-            assert np.all((z_grid >= zmin) * (z_grid <= zmax))
-            assert np.all((m_grid >= mmin) * (m_grid <= mmax))
+            assert lgm_grid.size == n_per_dim**2
+            assert np.all((z_grid >= z_min) * (z_grid <= z_max))
+            assert np.all((lgm_grid >= lgm_min) * (lgm_grid <= lgm_max))
