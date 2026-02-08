@@ -1,17 +1,16 @@
 """ """
 
 import numpy as np
-
-from jax import random as jran
 from jax import numpy as jnp
+from jax import random as jran
 
-from .. import mc_lightcone_halos as mclh
-from ...cosmology import flat_wcdm, DEFAULT_COSMOLOGY
-from ...hmf import hmf_model, mc_hosts
 from ...calibrations.hmf_cal import hacc_core_hmf_params as hchmf
-from ...utils.stratified_grid import stratified_grid_scaled
+from ...cosmology import DEFAULT_COSMOLOGY, flat_wcdm
+from ...hmf import hmf_model, mc_hosts
 from ...mah.diffmahnet.diffmahnet import log_mah_kern
 from ...mah.utils import apply_mah_rescaling
+from ...utils.stratified_grid import redshift_mass_grid
+from .. import mc_lightcone_halos as mclh
 
 
 def test_mc_lightcone_host_halo_mass_function():
@@ -249,7 +248,7 @@ def test_mc_weighted_halo_lightcone_stratified():
         z_min = jran.uniform(z_key, minval=0.1, maxval=1.0, shape=())
         z_max = z_min + 1
 
-        z_obs, logmp_obs = stratified_grid_scaled(
+        z_obs, logmp_obs = redshift_mass_grid(
             n_per_dim,
             test_key,
             z_min,
