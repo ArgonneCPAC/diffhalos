@@ -263,15 +263,114 @@ def mc_lc_halos(
     logmp0 = _log_mah_kern(mah_params, 10**logt0, logt0)
 
     # create output namedtuple
-    fields = ("z_obs", "t_obs", "logmp_obs", "mah_params", "logmp0", "logt0")
+    fields = CenPop._fields[:-1]
     values = (z_obs, t_obs, logmp_obs, mah_params, logmp0, logt0)
     cenpop = namedtuple("cenpop", fields)(*values)
 
     return cenpop
 
 
-@partial(jjit, static_argnames=["centrals_model_key"])
 def weighted_lc_halos(
+    ran_key,
+    n_halos,
+    z_min,
+    z_max,
+    lgmp_min,
+    lgmp_max,
+    sky_area_degsq,
+    *,
+    cosmo_params=DEFAULT_COSMOLOGY,
+    hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
+    logmp_cutoff=DEFAULT_LOGMP_CUTOFF,
+    logmp_cutoff_himass=DEFAULT_LOGMP_HIMASS_CUTOFF,
+    centrals_model_key=DEFAULT_DIFFMAHNET_CEN_MODEL,
+):
+    """
+    Generate a mass-function-weighted lightcone of halos and their
+    mass assembly histories.
+
+    Parameters
+    ----------
+    ran_key: jran.key
+        random key
+
+    n_halos : int
+        Number of host halos in the weighted lightcone
+
+    z_min, z_max : float
+        min/max redshift
+
+    lgmp_min,lgmp_max : float
+        log10 of min/max halo mass in units of Msun
+
+    sky_area_degsq: float
+        sky area in deg^2
+
+    cosmo_params: namedtuple, optional kwarg
+        cosmological parameters
+
+    hmf_params: namedtuple, optional kwarg
+        halo mass function parameters
+
+    logmp_cutoff: float, optional kwarg
+        base-10 log of minimum halo mass for which
+        DiffmahPop is used to generate MAHs, in Msun;
+        for logmp < logmp_cutoff, P(θ_MAH | logmp) = P(θ_MAH | logmp_cutoff)
+
+    logmp_cutoff_himass: float, optional kwarg
+        base-10 log of maximum halo mass for which
+        DiffmahPop is used to generate MAHs, in Msun
+
+    Returns
+    -------
+    halopop: namedtuple
+        Population of n_halos halos
+
+        halopop fields:
+            z_obs: ndarray of shape (n_halos, )
+                redshift values
+
+            t_obs: ndarray of shape (n_halos, )
+                cosmic time at observation, in Gyr
+
+            logmp_obs: ndarray of shape (n_halos, )
+                base-10 log of halo mass at observation, in Msun
+
+            mah_params: namedtuple of ndarrays of shape (n_halos, )
+                mah parameters
+
+            logmp0: ndarray of shape (n_halos, )
+                base-10 log of halo mass at z=0, in Msun
+
+            logt0: float
+                Base-10 log of z=0 age of the Universe for the input cosmology
+
+            nhalos: ndarray of shape (n_halos, )
+                weight of the (sub)halo
+
+    """
+    lgm_key, redshift_key, halo_key = jran.split(ran_key, 3)
+    logmp_obs = jran.uniform(
+        lgm_key, minval=lgmp_min, maxval=lgmp_max, shape=(n_halos,)
+    )
+    z_obs = jran.uniform(redshift_key, minval=z_min, maxval=z_max, shape=(n_halos,))
+
+    cenpop = _weighted_lc_halos_from_grid(
+        halo_key,
+        z_obs,
+        logmp_obs,
+        sky_area_degsq,
+        cosmo_params,
+        hmf_params,
+        logmp_cutoff,
+        logmp_cutoff_himass,
+        centrals_model_key,
+    )
+    return cenpop
+
+
+@partial(jjit, static_argnames=["centrals_model_key"])
+def _weighted_lc_halos_from_grid(
     ran_key,
     z_obs,
     logmp_obs,
@@ -282,64 +381,6 @@ def weighted_lc_halos(
     logmp_cutoff_himass=DEFAULT_LOGMP_HIMASS_CUTOFF,
     centrals_model_key=DEFAULT_DIFFMAHNET_CEN_MODEL,
 ):
-    """
-    Generates a weighted lightcone population of halos with MAHs,
-    on an input grid of redshift and mass
-
-    Parameters
-    ----------
-    ran_key: jran.key
-        random key
-
-    z_obs: ndarray of shape (n_halo, )
-        observed redshifts of galaxies
-
-    logmp_obs: ndarray of shape (n_halo, )
-        base-10 log of observed halo masses, in Msun
-
-    sky_area_degsq: float
-        sky area, in deg^2
-
-    cosmo_params: namedtuple
-        cosmological parameters
-
-    hmf_params: namedtuple
-        halo mass function parameters
-
-    logmp_cutoff: float
-        base-10 log of minimum halo mass for which
-        DiffmahPop is used to generate MAHs, in Msun;
-        for logmp < logmp_cutoff, P(θ_MAH | logmp) = P(θ_MAH | logmp_cutoff)
-
-    logmp_cutoff_himass: float
-        base-10 log of maximum halo mass for which
-        DiffmahPop is used to generate MAHs, in Msun
-
-    centrals_model_key: str
-        diffmahnet model to use for centrals
-
-    Returns
-    -------
-    cenpop: namedtuple
-        host halo population with fields:
-            z_obs: ndarray of shape (n_halo, )
-                redshift values
-
-            t_obs: ndarray of shape (n_halo, )
-                cosmic time at observation, in Gyr
-
-            logmp_obs: ndarray of shape (n_halo, )
-                base-10 log of halo mass at observation, in Msun
-
-            mah_params: namedtuple of ndarrays of shape (n_halo, )
-                mah parameters
-
-            logmp0: ndarray of shape (n_halo, )
-                base-10 log of halo mass at z=0, in Msun
-
-            nhalos: ndarray of shape (n_halo, )
-                weighted number of halos at each grid point
-    """
     # get halo weights
     nhalo_weights = halo_lightcone_weights(
         logmp_obs,

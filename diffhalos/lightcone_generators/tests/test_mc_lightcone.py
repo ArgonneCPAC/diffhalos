@@ -193,7 +193,7 @@ def test_weighted_lc_tpeak_clip():
     lgmsub_min = 10.0
     sky_area_degsq = 10.0
 
-    cenpop = mclch.weighted_lc_halos(
+    cenpop = mclch._weighted_lc_halos_from_grid(
         cen_key,
         z_obs,
         logmp_obs,

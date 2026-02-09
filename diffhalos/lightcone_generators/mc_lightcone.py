@@ -473,7 +473,7 @@ def _weighted_lc_from_grid(
     host_key, subhalo_key = jran.split(ran_key)
 
     # generate a weighted host halo lightcone
-    cenpop = mclch.weighted_lc_halos(
+    cenpop = mclch._weighted_lc_halos_from_grid(
         host_key,
         z_obs,
         logmp_obs,
