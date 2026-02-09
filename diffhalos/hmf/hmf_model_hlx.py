@@ -19,26 +19,26 @@ from jax import lax
 
 import halox
 
-from ..cosmology import flat_wcdm
 
+from ..cosmology import DEFAULT_COSMOLOGY_JAXCOSMO, flat_wcdm
 from ..cosmology.geometry_utils import (
     spherical_shell_comoving_volume,
     compute_volume_from_sky_area,
 )
+from ..cosmology.cosmo_conversion import jaxcosmo_to_dsps_cosmology
+
 from ..defaults import FULL_SKY_AREA
 from ..utils.integration import cumtrapz
 
-from ..cosmology import DEFAULT_COSMOLOGY_JAXCOSMO
-from ..cosmology.cosmo_conversion import jaxcosmo_to_dsps_cosmology
 
 from ..defaults import DELTA_C
 
-N_HMF_GRID = 500
-N_K_INT_HMF = 5000
+N_HMF_GRID = 200
+N_K_INT_HMF = 2000
 
 LG_HMF_CUML_MIN = -16.0
 
-LOGMP_TABLE_NMASS = 500
+LOGMP_TABLE_NMASS = 300
 LOGMP_TABLE_MIN = 6.0
 LOGMP_TABLE_MAX = 17.0
 LOGMP_TABLE = jnp.linspace(
@@ -143,7 +143,7 @@ def _cuml_hmf_interp(
     # cuml_hmf_max = 10 ** jnp.interp(logmp_max, LOGMP_TABLE, cuml_hmf_table)
     # cuml_hmf_tot = cuml_hmf_min - cuml_hmf_max
     cuml_hmf_tot = 10 ** cuml_hmf_table.at[0].get() - 10 ** cuml_hmf_table.at[-1].get()
-    cuml_hmf = cuml_hmf_tot - jnp.interp(logmp, LOGMP_TABLE, cuml_hmf_table)
+    cuml_hmf = cuml_hmf_tot - 10 ** jnp.interp(logmp, LOGMP_TABLE, cuml_hmf_table)
 
     return cuml_hmf
 
@@ -215,35 +215,36 @@ def predict_cuml_hmf(
     return lg_cuml_hmf
 
 
-"""
-Predict the cumulative HMF on a grid of redshifts,
-by vmapping ``predict_cuml_hmf`` over redshift
-"""
-predict_cuml_hmf_multiz = jjit(
-    vmap(
-        predict_cuml_hmf,
-        in_axes=(None, None, 0, None),
-    )
-)
+# """
+# Predict the cumulative HMF on a grid of redshifts,
+# by vmapping ``predict_cuml_hmf`` over redshift
+# """
+# predict_cuml_hmf_multiz = jjit(
+#     vmap(
+#         predict_cuml_hmf,
+#         in_axes=(None, None, 0, None),
+#     )
+# )
 
 
-@jjit
-def _diff_hmf_grad_kern(cosmo_params, logmp, redshift, delta_c):
-    cuml_nd_pred = 10 ** predict_cuml_hmf(
-        cosmo_params,
-        logmp,
-        redshift,
-        delta_c=delta_c,
-    )
-    return -cuml_nd_pred
+# @jjit
+# def _diff_hmf_grad_kern(cosmo_params, logmp, redshift, delta_c):
+#     cuml_nd_pred = 10 ** predict_cuml_hmf(
+#         cosmo_params,
+#         logmp,
+#         redshift,
+#         delta_c=delta_c,
+#     )
+#     return -cuml_nd_pred
 
 
-_dn_dlgm_kern = jjit(grad(_diff_hmf_grad_kern, argnums=1))
+# _dn_dlgm_kern = jjit(grad(_diff_hmf_grad_kern, argnums=1))
 
 
 @jjit
 def _dn_dm_dz_kern(lgm, z, cosmo_params, delta_c):
-    dn_dm_dv = _dn_dlgm_kern(cosmo_params, lgm, z, delta_c)
+    # dn_dm_dv = _dn_dlgm_kern(cosmo_params, lgm, z, delta_c)
+    dn_dm_dv = 10 ** predict_diff_hmf(cosmo_params, lgm, z, delta_c)
     dsps_cosmo = jaxcosmo_to_dsps_cosmology(cosmo_params)
     dv_dz = flat_wcdm.differential_comoving_volume_at_z(z, *dsps_cosmo)
     dn_dm_dz = dn_dm_dv * dv_dz
@@ -312,6 +313,12 @@ def halo_lightcone_weights(
     )
 
     # at each grid point, compute <Nhalos> for the shell volume
+    ############# vmapping unified computation #############
+    nhalos_per_mpc3 = _get_nhalos_per_mpc3(
+        z_grid, lgmp_min, lgmp_max, cosmo_params, delta_c
+    )
+    nhalos_per_shell = vol_shell_grid_mpc * nhalos_per_mpc3
+    ##########################################
     ############# vmapping #############
     # nd_lgmp_min = 10 ** predict_cuml_hmf_multiz(cosmo_params, lgmp_min, z_grid, delta_c)
     # nd_lgmp_max = 10 ** predict_cuml_hmf_multiz(cosmo_params, lgmp_max, z_grid, delta_c)
@@ -320,25 +327,25 @@ def halo_lightcone_weights(
     ##########################################
 
     ############# using lax.scan #############
-    @jjit
-    def _nhalos_scan_func(carry, z):
-        jax.clear_caches()
-        gc.collect()
+    # @jjit
+    # def _nhalos_scan_func(carry, z):
+    #     jax.clear_caches()
+    #     gc.collect()
 
-        i_res = carry
+    #     i_res = carry
 
-        nd_lgmp_min = 10 ** predict_cuml_hmf(cosmo_params, lgmp_min, z, delta_c)
-        nd_lgmp_max = 10 ** predict_cuml_hmf(cosmo_params, lgmp_max, z, delta_c)
-        nhalos_per_mpc3 = nd_lgmp_min - nd_lgmp_max
-        nhalos_per_shell = vol_shell_grid_mpc[i_res] * nhalos_per_mpc3
+    #     nd_lgmp_min = 10 ** predict_cuml_hmf(cosmo_params, lgmp_min, z, delta_c)
+    #     nd_lgmp_max = 10 ** predict_cuml_hmf(cosmo_params, lgmp_max, z, delta_c)
+    #     nhalos_per_mpc3 = nd_lgmp_min - nd_lgmp_max
+    #     nhalos_per_shell = vol_shell_grid_mpc[i_res] * nhalos_per_mpc3
 
-        carry = i_res + 1
+    #     carry = i_res + 1
 
-        return carry, nhalos_per_shell
+    #     return carry, nhalos_per_shell
 
-    i_res = 0
-    scan_init = i_res
-    nhalos_per_shell = lax.scan(_nhalos_scan_func, scan_init, z_grid)[1]
+    # i_res = 0
+    # scan_init = i_res
+    # nhalos_per_shell = lax.scan(_nhalos_scan_func, scan_init, z_grid)[1]
     ##########################################
 
     ############# using lax.map #############
@@ -369,6 +376,18 @@ def halo_lightcone_weights(
     nhalos = nhalos_tot * weights
 
     return nhalos
+
+
+@jjit
+def _get_nhalos_per_mpc3_kern(z, lgmp_min, lgmp_max, cosmo_params, delta_c):
+    nd_lgmp_min = 10 ** predict_cuml_hmf(cosmo_params, lgmp_min, z, delta_c)
+    nd_lgmp_max = 10 ** predict_cuml_hmf(cosmo_params, lgmp_max, z, delta_c)
+    nhalos_per_mpc3 = nd_lgmp_min - nd_lgmp_max
+
+    return nhalos_per_mpc3
+
+
+_get_nhalos_per_mpc3 = jjit(vmap(_get_nhalos_per_mpc3_kern, in_axes=(0, *[None] * 4)))
 
 
 @jjit

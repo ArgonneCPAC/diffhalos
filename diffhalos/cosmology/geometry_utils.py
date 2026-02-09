@@ -5,7 +5,8 @@ from jax import jit as jjit
 from jax import numpy as jnp
 from jax import vmap
 
-from ..cosmology import flat_wcdm
+from .cosmo_dsps import flat_wcdm
+from .cosmo_conversion import jaxcosmo_to_dsps_cosmology
 from ..defaults import FULL_SKY_AREA
 
 _Z = (0, None, None, None, None)
@@ -40,6 +41,7 @@ def spherical_shell_comoving_volume(z_grid, cosmo_params):
     z_grid = jnp.atleast_1d(z_grid)
 
     # Compute comoving distance to each grid point
+    cosmo_params = jaxcosmo_to_dsps_cosmology(cosmo_params)
     r_grid = flat_wcdm.comoving_distance(z_grid, *cosmo_params)
 
     # Compute ΔR = (∂R/∂z)*Δz

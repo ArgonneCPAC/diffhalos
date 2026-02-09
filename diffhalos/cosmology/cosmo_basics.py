@@ -2,13 +2,13 @@
 
 from jax import jit as jjit
 
-from ..cosmology import flat_wcdm, DEFAULT_COSMOLOGY
+from .cosmo_dsps import flat_wcdm, DEFAULT_COSMOLOGY_DSPS
 
 __all__ = ("get_tobs_from_zobs",)
 
 
 @jjit
-def get_tobs_from_zobs(z_obs, cosmo_params=DEFAULT_COSMOLOGY):
+def get_tobs_from_zobs(z_obs, cosmo_params=DEFAULT_COSMOLOGY_DSPS):
     """
     Compute cosmic time at observation and at today,
     provided the corresponding redshifts

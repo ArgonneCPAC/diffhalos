@@ -42,7 +42,7 @@ def test_diff_hmf_evaluations():
 def test_halo_lightcone_weights():
     lgmp_min, lgmp_max = 11, 15
     z_min, z_max = 0.02, 3.0
-    n_per_dim = 100
+    n_per_dim = 200
     lgmp_grid = np.linspace(lgmp_min, lgmp_max, n_per_dim)
     z_grid = np.linspace(z_min, z_max, n_per_dim)
 
