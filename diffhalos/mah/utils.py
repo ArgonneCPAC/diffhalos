@@ -45,21 +45,20 @@ def rescale_mah_parameters(
     return mah_params
 
 
-@partial(jjit, static_argnames=["centrals_model_key"])
+@partial(jjit, static_argnames=["mah_model_key"])
 def apply_mah_rescaling(
     mah_key,
     logmp_obs_mf,
     logmp_obs_clipped,
     t_obs,
     logt0,
-    centrals_model_key,
+    mah_model_key,
 ):
-
     mah_params_uncorrected = mc_mah_cenpop(
         logmp_obs_clipped,
         t_obs,
         mah_key,
-        centrals_model_key,
+        mah_model_key,
     )
 
     # compute the uncorrected observed masses
