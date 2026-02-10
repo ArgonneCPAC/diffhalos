@@ -1,3 +1,8 @@
+0.1.0 (2026-02-10)
+-------------------
+- Implement lightcone_generators functionality (https://github.com/ArgonneCPAC/diffhalos/pull/29)
+
+
 0.0.4 (2026-01-18)
 -------------------
 - Fix bug in README.rst (https://github.com/ArgonneCPAC/diffhalos/pull/21)
