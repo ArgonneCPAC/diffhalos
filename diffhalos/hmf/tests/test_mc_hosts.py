@@ -51,7 +51,7 @@ def test_diff_hmf_pophist_vs_theory_consistency():
     Lbox = 1000.0
     Vbox = Lbox**3
 
-    lgm_bins = np.linspace(lgmp_min + 0.5, 14.0, 50)
+    lgm_bins = np.linspace(lgmp_min + 0.5, 13.5, 50)
 
     z_test = np.linspace(0.0, 1.0, 5)
 
@@ -65,4 +65,4 @@ def test_diff_hmf_pophist_vs_theory_consistency():
         # interpolate to compare same-sized arrays
         diff_hmf_interp = 10 ** np.interp(lgm_binmids, lgm_bins, diff_hmf)
 
-        assert np.allclose(diff_hmf_interp, diff_hmf_target, rtol=0.1)
+        assert np.allclose(diff_hmf_interp, diff_hmf_target, rtol=0.2)

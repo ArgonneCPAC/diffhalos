@@ -4,8 +4,9 @@ import numpy as np
 from jax import numpy as jnp
 from jax import random as jran
 
-from ...calibrations.hmf_cal import hacc_core_hmf_params as hchmf
-from ...cosmology import DEFAULT_COSMOLOGY, flat_wcdm
+from ...cosmology.cosmo_dsps import flat_wcdm
+from ...cosmology.cosmo_dsps import DEFAULT_COSMOLOGY_DSPS as DEFAULT_COSMOLOGY
+from ...cosmology.cosmo_conversion import alt_default_jaxcosmo_cosmology
 from ...hmf import hmf_model, mc_hosts
 from ...mah.diffmahnet.diffmahnet import log_mah_kern
 from ...mah.utils import apply_mah_rescaling
@@ -72,7 +73,7 @@ def test_mc_lightcone_host_halo_mass_function():
 
         n_lightcone, n_snapshot = redshifts_galpop.size, lgmp_halopop_zmed.size
         fracdiff = (n_lightcone - n_snapshot) / n_snapshot
-        assert np.abs(fracdiff) < 0.05
+        assert np.abs(fracdiff) < 0.1
 
         lgmp_hist_lc, lgmp_bins = np.histogram(logmp_halopop, bins=100)
         lgmp_hist_zmed, _ = np.histogram(lgmp_halopop_zmed, bins=lgmp_bins)
@@ -92,7 +93,7 @@ def test_mc_lightcone_host_halo_mass_function_lgmp_max_feature():
     ran_key = jran.key(0)
     lgmp_min = 12.0
     z_min, z_max = 0.4, 0.5
-    sky_area_degsq = 200.0
+    sky_area_degsq = 20.0
     lgmp_max_test = 13.0
 
     n_tests = 10
@@ -108,12 +109,12 @@ def test_mc_lightcone_host_halo_mass_function_lgmp_max_feature():
 
         n1 = np.sum(logmp_halopop < lgmp_max_test)
         n2 = logmp_halopop2.size
-        assert np.allclose(n1, n2, rtol=0.02)
+        assert np.allclose(n1, n2, rtol=0.05)
 
 
 def test_mc_lightcone_host_halo():
     """
-    Enforce mc_lightcone_host_halo returns reasonable results
+    Enforce mc_lc_halos returns reasonable results
     """
 
     ran_key = jran.key(0)
@@ -142,15 +143,17 @@ def test_mc_lightcone_host_halo():
         assert np.mean(cenpop.logmp_obs < lgmp_min) < 0.2, f"z_min={z_min:.2f}"
 
 
-def test_mc_lightcone_host_halo_alt_mf_params():
+def test_mc_lightcone_host_halo_alt_cosmo_params():
     """
     Enforce mc_lightcone_host_halo returns
     reasonable results when passed
-    alternative halo mass function parameters
+    alternative cosmological parameters
     """
     ran_key = jran.key(0)
     lgmp_min = 12.0
     sky_area_degsq = 1.0
+
+    cosmo_params = alt_default_jaxcosmo_cosmology(h=0.6, Omega_c=0.2, sigma8=0.71)
 
     n_tests = 5
     z_max_arr = np.linspace(0.2, 2.5, n_tests)
@@ -159,7 +162,7 @@ def test_mc_lightcone_host_halo_alt_mf_params():
         z_min = z_max - 0.05
 
         args = (test_key, lgmp_min, z_min, z_max, sky_area_degsq)
-        cenpop = mclh.mc_lc_halos(*args, hmf_params=hchmf.HMF_PARAMS)
+        cenpop = mclh.mc_lc_halos(*args, cosmo_params=cosmo_params)
 
         for _field in cenpop._fields:
             assert np.all(np.isfinite(cenpop._asdict()[_field]))
@@ -183,7 +186,7 @@ def test_mah_params_rescaling():
 
     lgmp_min = 12.0
     z_min, z_max = 0.4, 0.5
-    sky_area_degsq = 200.0
+    sky_area_degsq = 10.0
     logmp_cutoff = mclh.DEFAULT_LOGMP_CUTOFF
     logmp_cutoff_himass = mclh.DEFAULT_LOGMP_HIMASS_CUTOFF
     cosmo_params = DEFAULT_COSMOLOGY

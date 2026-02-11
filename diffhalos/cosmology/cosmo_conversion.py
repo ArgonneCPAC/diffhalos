@@ -25,7 +25,7 @@ def jaxcosmo_to_dsps_cosmology(jax_cosmo):
     Parameters
     ----------
     jax_cosmo: jax-cosmo parameters object
-        cosmological paramteters parameters
+        cosmological paramteters
 
     Returns
     -------
@@ -78,7 +78,7 @@ def dsps_to_jaxcosmo_cosmology(
     Returns
     -------
     jaxcosmo: jax-cosmo parameters object
-        cosmological paramteters parameters
+        cosmological paramteters
     """
     jax_cosmo = partial(
         Cosmology,
@@ -90,6 +90,72 @@ def dsps_to_jaxcosmo_cosmology(
         sigma8=sigma8,
         w0=dsps_cosmo.w0,
         wa=dsps_cosmo.wa,
+        gamma=gamma,
+    )()
+
+    return jax_cosmo
+
+
+@jjit
+def alt_default_jaxcosmo_cosmology(
+    Omega_c=DEFAULT_COSMOLOGY_JAXCOSMO.Omega_c,
+    Omega_b=DEFAULT_COSMOLOGY_JAXCOSMO.Omega_b,
+    Omega_k=DEFAULT_COSMOLOGY_JAXCOSMO.Omega_k,
+    h=DEFAULT_COSMOLOGY_JAXCOSMO.h,
+    n_s=DEFAULT_COSMOLOGY_JAXCOSMO.n_s,
+    sigma8=DEFAULT_COSMOLOGY_JAXCOSMO.sigma8,
+    w0=DEFAULT_COSMOLOGY_JAXCOSMO.w0,
+    wa=DEFAULT_COSMOLOGY_JAXCOSMO.wa,
+    gamma=DEFAULT_COSMOLOGY_JAXCOSMO.gamma,
+):
+    """
+    Alter the default jax-cosmo type cosmology
+    to have different parameters
+
+    Parameters
+    ----------
+    Omega_c: float
+        cold dark matter density fraction
+
+    Omega_b: float
+        baryonic matter density fraction
+
+    Omega_k: float
+        curvature density fraction
+
+    h: float
+        Hubble constant divided by 100 km/s/Mpc
+
+    n_s: float
+        primordial scalar perturbation spectral index
+
+    sigma8: float
+        variance of matter density perturbations at an 8 Mpc/h scale
+
+    w0: float
+        first order term of dark energy equation
+
+    wa: float
+        second order term of dark energy equation of state
+
+    gamma: float
+        index of the growth rate
+
+    Returns
+    -------
+    jaxcosmo: jax-cosmo parameters object
+        cosmological paramteters
+    """
+    jax_cosmo = partial(
+        Cosmology,
+        Omega_c=Omega_c,
+        Omega_b=Omega_b,
+        Omega_k=Omega_k,
+        h=h,
+        n_s=n_s,
+        sigma8=sigma8,
+        w0=w0,
+        wa=wa,
         gamma=gamma,
     )()
 

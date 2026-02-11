@@ -36,3 +36,35 @@ def test_dsps_to_jaxcosmo_cosmology():
             assert dsps_cosmo._asdict()[_param] == jaxcosmo_param
         else:
             assert dsps_cosmo._asdict()[_param] == getattr(jax_cosmo, _param)
+
+
+def test_alt_default_jaxcosmo_cosmology():
+    jax_cosmo_def = cosmo_conversion.DEFAULT_COSMOLOGY_JAXCOSMO
+    jax_cosmo_alt = cosmo_conversion.alt_default_jaxcosmo_cosmology(
+        Omega_c=0.2, sigma8=0.71, h=0.65
+    )
+
+    JAXCOSMO_COSMO_PARAMS_LIST = (
+        "Omega_c",
+        "Omega_b",
+        "h",
+        "n_s",
+        "sigma8",
+        "Omega_k",
+        "w0",
+        "wa",
+    )
+
+    _params_changed = ("Omega_c", "sigma8", "h")
+
+    for _param in JAXCOSMO_COSMO_PARAMS_LIST:
+        _val_def = getattr(jax_cosmo_def, _param)
+        _val_alt = getattr(jax_cosmo_alt, _param)
+
+        assert np.isfinite(_val_def)
+        assert np.isfinite(_val_alt)
+
+        if _param in _params_changed:
+            assert _val_def != _val_alt
+        else:
+            assert _val_def == _val_alt

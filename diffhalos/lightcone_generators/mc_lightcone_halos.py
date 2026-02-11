@@ -14,20 +14,20 @@ from jax import numpy as jnp
 from jax import random as jran
 from jax import vmap
 
-from ..cosmology import DEFAULT_COSMOLOGY, flat_wcdm
+from ..cosmology.cosmo_jax import DEFAULT_COSMOLOGY_JAXCOSMO as DEFAULT_COSMOLOGY
 from ..cosmology.cosmo_basics import get_tobs_from_zobs
 from ..cosmology.geometry_utils import compute_volume_from_sky_area
-from ..hmf import mc_hosts
-from ..hmf.hmf_model import halo_lightcone_weights
+from ..hmf import mc_hosts, hmf_model
 from ..mah.utils import apply_mah_rescaling
+from ..defaults import DELTA_C
 
-N_HMF_GRID = 2_000
+N_HMF_GRID = 500
 DEFAULT_LOGMP_CUTOFF = 10.0
 DEFAULT_LOGMP_HIMASS_CUTOFF = 14.5
 
 DEFAULT_DIFFMAHNET_CEN_MODEL = "cenflow_v2_0_64bit.eqx"
 
-_AXES = (0, None, None, 0, None)
+_AXES = (0, None, None, 0, None, None)
 mc_logmp_vmap = jjit(vmap(mc_hosts._mc_host_halos_singlez_kern, in_axes=_AXES))
 
 __all__ = ("mc_lc_hmf", "mc_lc_halos", "weighted_lc_halos")
@@ -51,9 +51,9 @@ def mc_lc_hmf(
     z_max,
     sky_area_degsq,
     cosmo_params=DEFAULT_COSMOLOGY,
-    hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
     lgmp_max=mc_hosts.LGMH_MAX,
     n_hmf_grid=N_HMF_GRID,
+    delta_c=DELTA_C,
 ):
     """
     Generate a Monte Carlo realization of a lightcone of
@@ -77,18 +77,17 @@ def mc_lc_hmf(
     sky_area_degsq: float
         sky area, in deg^2
 
-    cosmo_params: namedtuple
-        dsps.cosmology.flat_wcdm cosmology
-        cosmo_params = (Om0, w0, wa, h)
-
-    hmf_params: namedtuple
-        halo mass function parameters
+    cosmo_params: jax-cosmo parameters object
+        cosmological parameters
 
     lgmp_max: float
         base-10 log of maximum halo mass, in Msun
 
     n_hmf_grid: int
         number of redshift grid points for HMF computations
+
+    delta_c: float
+        overdensity threshold
 
     Returns
     -------
@@ -114,19 +113,9 @@ def mc_lc_hmf(
     )
 
     # at each grid point, compute <Nhalos> for the shell volume
-    mean_nhalos = mc_hosts._compute_nhalos_tot(
-        hmf_params,
-        lgmp_min,
-        z_grid,
-        volume_com_mpc,
+    mean_nhalos = compute_mean_halo(
+        cosmo_params, lgmp_min, lgmp_max, z_grid, volume_com_mpc, delta_c
     )
-    mean_nhalos_lgmax = mc_hosts._compute_nhalos_tot(
-        hmf_params,
-        lgmp_max,
-        z_grid,
-        volume_com_mpc,
-    )
-    mean_nhalos = mean_nhalos - mean_nhalos_lgmax
 
     # at each grid point, compute a Poisson realization of <Nhalos>
     nhalos_tot = jran.poisson(halo_counts_key, mean_nhalos).sum()
@@ -142,10 +131,38 @@ def mc_lc_hmf(
     # randoms used in inverse transformation sampling halo mass
     uran_m = jran.uniform(m_key, minval=0, maxval=1, shape=(nhalos_tot,))
 
-    # draw a halo mass from the HMF at the particular redshift of each halo
-    logmp_cenpop = mc_logmp_vmap(uran_m, hmf_params, lgmp_min, z_cenpop, lgmp_max)
+    # draw halo masses from the HMF CDF
+    logmp_cenpop = mc_logmp_vmap(
+        uran_m, cosmo_params, lgmp_min, z_cenpop, lgmp_max, delta_c
+    )
 
     return z_cenpop, logmp_cenpop
+
+
+@jjit
+def _compute_mean_halo_kern(
+    cosmo_params,
+    lgmp_min,
+    lgmp_max,
+    z,
+    volume_com_mpc,
+    delta_c,
+):
+    # at each grid point, compute <Nhalos> for the shell volume
+    mean_nhalos = hmf_model._compute_nhalos_tot(
+        cosmo_params, lgmp_min, z, volume_com_mpc, delta_c=delta_c
+    )
+    mean_nhalos_lgmax = hmf_model._compute_nhalos_tot(
+        cosmo_params, lgmp_max, z, volume_com_mpc, delta_c=delta_c
+    )
+    mean_nhalos = mean_nhalos - mean_nhalos_lgmax
+
+    return mean_nhalos
+
+
+compute_mean_halo = jjit(
+    vmap(_compute_mean_halo_kern, in_axes=(None, None, None, 0, 0, None))
+)
 
 
 def mc_lc_halos(
@@ -155,12 +172,12 @@ def mc_lc_halos(
     z_max,
     sky_area_degsq,
     cosmo_params=DEFAULT_COSMOLOGY,
-    hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
     logmp_cutoff=DEFAULT_LOGMP_CUTOFF,
     logmp_cutoff_himass=DEFAULT_LOGMP_HIMASS_CUTOFF,
     lgmp_max=mc_hosts.LGMH_MAX,
     n_hmf_grid=N_HMF_GRID,
     centrals_model_key=DEFAULT_DIFFMAHNET_CEN_MODEL,
+    delta_c=DELTA_C,
 ):
     """
     Generate a halo lightcone, including MAHs,
@@ -186,12 +203,8 @@ def mc_lc_halos(
     nhalos_tot: int
         total number of halos to generate in the lightcone
 
-    cosmo_params: namedtuple
-        dsps.cosmology.flat_wcdm cosmology
-        cosmo_params = (Om0, w0, wa, h)
-
-    hmf_params: namedtuple
-        halo mass function parameters
+    cosmo_params: jax-cosmo parameters object
+        cosmological parameters
 
     logmp_cutoff: float
         base-10 log of minimum halo mass for which
@@ -210,6 +223,9 @@ def mc_lc_halos(
 
     centrals_model_key: str
         diffmahnet model to use for centrals
+
+    delta_c: float
+        overdensity threshold
 
     Returns
     -------
@@ -240,9 +256,9 @@ def mc_lc_halos(
         z_max,
         sky_area_degsq,
         cosmo_params=cosmo_params,
-        hmf_params=hmf_params,
         lgmp_max=lgmp_max,
         n_hmf_grid=n_hmf_grid,
+        delta_c=delta_c,
     )
 
     t_obs, t_0 = get_tobs_from_zobs(z_obs, cosmo_params=cosmo_params)
@@ -280,10 +296,10 @@ def weighted_lc_halos(
     sky_area_degsq,
     *,
     cosmo_params=DEFAULT_COSMOLOGY,
-    hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
     logmp_cutoff=DEFAULT_LOGMP_CUTOFF,
     logmp_cutoff_himass=DEFAULT_LOGMP_HIMASS_CUTOFF,
     centrals_model_key=DEFAULT_DIFFMAHNET_CEN_MODEL,
+    delta_c=DELTA_C,
 ):
     """
     Generate a mass-function-weighted lightcone of halos and their
@@ -306,11 +322,8 @@ def weighted_lc_halos(
     sky_area_degsq: float
         sky area in deg^2
 
-    cosmo_params: namedtuple, optional kwarg
+    cosmo_params: jax-cosmo parameters object
         cosmological parameters
-
-    hmf_params: namedtuple, optional kwarg
-        halo mass function parameters
 
     logmp_cutoff: float, optional kwarg
         base-10 log of minimum halo mass for which
@@ -320,6 +333,9 @@ def weighted_lc_halos(
     logmp_cutoff_himass: float, optional kwarg
         base-10 log of maximum halo mass for which
         DiffmahPop is used to generate MAHs, in Msun
+
+    delta_c: float
+        overdensity threshold
 
     Returns
     -------
@@ -361,10 +377,10 @@ def weighted_lc_halos(
         logmp_obs,
         sky_area_degsq,
         cosmo_params,
-        hmf_params,
         logmp_cutoff,
         logmp_cutoff_himass,
         centrals_model_key,
+        delta_c,
     )
     return cenpop
 
@@ -376,18 +392,18 @@ def _weighted_lc_halos_from_grid(
     logmp_obs,
     sky_area_degsq,
     cosmo_params=DEFAULT_COSMOLOGY,
-    hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
     logmp_cutoff=DEFAULT_LOGMP_CUTOFF,
     logmp_cutoff_himass=DEFAULT_LOGMP_HIMASS_CUTOFF,
     centrals_model_key=DEFAULT_DIFFMAHNET_CEN_MODEL,
+    delta_c=DELTA_C,
 ):
     # get halo weights
-    nhalo_weights = halo_lightcone_weights(
+    nhalo_weights = hmf_model.halo_lightcone_weights(
         logmp_obs,
         z_obs,
         sky_area_degsq,
-        hmf_params=hmf_params,
         cosmo_params=cosmo_params,
+        delta_c=delta_c,
     )
 
     t_obs, t_0 = get_tobs_from_zobs(z_obs, cosmo_params=cosmo_params)
