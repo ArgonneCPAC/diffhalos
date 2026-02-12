@@ -103,7 +103,7 @@ def predict_diff_hmf(
     hmf *= cosmo_params.h**3
 
     # convert dlnM to dlogM
-    hmf /= jnp.log(10.0)
+    hmf *= jnp.log(10.0)
 
     # take the log10 of the cumulative HMF
     lg_hmf = jnp.log10(hmf)
