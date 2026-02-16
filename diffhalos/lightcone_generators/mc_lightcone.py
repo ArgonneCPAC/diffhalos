@@ -403,10 +403,20 @@ def weighted_lc(
 
             nhalos: ndarray of shape (n_halos_tot, )
                 weight of the (sub)halo
+                the nhalos value has a different interpretation for hosts and subs
+                For host halos, this is the multiplicity factor by which
+                each halo should be upweighted in order for the generated lightcone
+                to have the correct host halo mass function across redshift
+                For subhalos, this is the multiplicity factor associated with the
+                conditional subhalo mass function, N_sub(logmp | Mhost)
+                Thus when computing the (unconditional) (sub)halo mass function,
+                the host halos should be weighted by nhalos,
+                but subhalos should be weighted by nhalos*nhalos_host.
 
             nhalos_host: ndarray of shape (n_halos_tot, )
-                weight of the host halo
-                Equal to nhalos for central halos
+                Multiplicity factor of the host halo
+                Equals nhalos for central halos
+                For subhalos, halopop.nhalos_host = halopop.nhalos[halopop.halo_indx]
 
             nsub_per_host: int
                 number of subhalos per host halo

@@ -204,9 +204,9 @@ def weighted_lc_subhalos(
         base-10 log of the minimum mass, in Msun
 
     n_mu_per_host: int
-        number of mu=Msub/Mhost values to use per host halo;
+        number of subhalos in the grid of subs per host halo;
         note that for the weighted version of the lightcone,
-        each host gets assigned the same number of subhalos
+        each host gets assigned the same number of representative subhalos
 
     cshmf_params: namedtuple
         CCSHMF parameters
@@ -228,7 +228,9 @@ def weighted_lc_subhalos(
     subpop: namedtuple
         subhalo population with fields:
             nsubhalos: ndarray of shape (n_nub, )
-                subhalo weighted counts
+                Multiplicity factor by which each subhalo should be upweighted
+                in order for the generated lightcone to have the correct
+                number of subhalos conditional subhalo mass function
 
             mah_params_subs: namedtuple of ndarray's with shape (n_subs, n_mah_params)
                 diffmah parameters for each subhalo in the lightcone
@@ -240,7 +242,8 @@ def weighted_lc_subhalos(
                 base-10 log of Mpeak/Msun of each subhalo
 
             nsub_per_host: int
-                number of subhalo points generated per host halo
+                number of representative subhalos per host halo
+                equal to the input n_mu_per_host
     """
 
     # number of host halos
