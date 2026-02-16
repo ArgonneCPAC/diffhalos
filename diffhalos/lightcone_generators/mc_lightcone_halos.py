@@ -346,7 +346,9 @@ def weighted_lc_halos(
                 Base-10 log of z=0 age of the Universe for the input cosmology
 
             nhalos: ndarray of shape (n_halos, )
-                weight of the (sub)halo
+                Multiplicity factor by which each halo should be upweighted
+                in order for the generated lightcone to have the correct
+                host halo mass function across redshift
 
     """
     lgm_key, redshift_key, halo_key = jran.split(ran_key, 3)
