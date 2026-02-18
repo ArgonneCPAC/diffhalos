@@ -1,0 +1,96 @@
+"""Define various loss functions"""
+
+from jax import jit as jjit
+from jax import vmap
+
+from ..hmf_models.diffsky_hmf import (
+    wrapper_ndarray_diffsky_diff_hmf,
+)
+from ..fitting_tools.utils import mse
+
+__all__ = ("mse_loss_hmf_params", "mse_loss_diff_hmf_curve")
+
+
+@jjit
+def mse_loss_hmf_params(preds, target_data):
+    """
+    Mean squared error loss function
+    on the halo mass function parameters directly
+
+    Parameters
+    ----------
+    preds: ndarray of shape (n_cosmo, n_hmf_params,)
+        prediction by neural network model,
+        at a given state;
+        in this case the predicted HMF parameters
+
+    target_data: ndarray of shape (n_cosmo, n_hmf_params,)
+        target data for loss calculation
+        against current optimizer's state;
+        in this case the target HMF parameters
+
+    Returns
+    -------
+    mse_val: float
+        mean squared error value between
+        nn's prediction and target data
+    """
+
+    mse_val = mse(preds, target_data)
+
+    return mse_val
+
+
+@jjit
+def mse_loss_diff_hmf_curve(
+    preds,
+    target_data,
+    logmp,
+    z,
+):
+    """
+    Mean squared error loss function
+    on the halo mass funcion curve
+
+    Parameters
+    ----------
+    preds: ndarray of shape (n_cosmo, n_hmf_params,)
+        prediction by neural network model,
+        at a given state;
+        in this case the predicted HMF parameters
+
+    target_data: ndarray of shape (n_cosmo, n_redshift, n_halo,)
+        target data for loss calculation
+        against current optimizer's state;
+        in this case the target HMF parameters
+
+    logmp: ndarray of shape (n_cosmo, n_redshift, n_halo,)
+        base-10 log of halo mass per cosmology and redshift
+
+    z: ndarray of shape (n_redshift, )
+        redshift values considered
+
+    Returns
+    -------
+    mse: float
+        mean squared error value between
+        nn's prediction and target data
+    """
+    mse_val = 0.0
+    for i, zi in enumerate(z):
+        loghmf_preds = _get_diff_hmf_vmap(
+            preds,
+            logmp[:, i, :],
+            zi,
+        )
+        mse_val += mse(loghmf_preds, target_data[:, i, :])
+
+    return mse_val
+
+
+_get_diff_hmf_vmap = jjit(
+    vmap(
+        wrapper_ndarray_diffsky_diff_hmf,
+        in_axes=(0, 0, None),
+    )
+)

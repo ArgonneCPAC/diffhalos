@@ -1,0 +1,22 @@
+#!/bin/bash -l
+
+#PBS -A galsampler
+#PBS -l select=1:mpiprocs=1
+#PBS -l walltime=02:00:00
+#PBS -N job_name
+#PBS -e err.txt
+#PBS -o out.txt
+
+# The rest is an example of how an MPI job might be set up
+echo Working directory is $PBS_O_WORKDIR
+cd $PBS_O_WORKDIR
+
+echo Jobid: $PBS_JOBID
+echo Running on host `hostname`
+echo Running on nodes `cat $PBS_NODEFILE`
+
+# Load software
+conda activate <environment_to_activate>
+
+# Run python script
+python <script_to_run>
