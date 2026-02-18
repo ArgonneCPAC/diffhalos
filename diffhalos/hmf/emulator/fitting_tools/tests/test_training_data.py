@@ -2,11 +2,8 @@
 
 import numpy as np
 
-from ..training_data_generator import (
-    get_hmf_training_data,
-)
-
-from ...param_utils.cosmo_params import DEFAULT_COSMO_PRIORS, DEFAULT_COSMOLOGY
+from ..training_data_generator import get_hmf_training_data
+from .....cosmology.cosmo_params import DEFAULT_COSMO_PRIORS, DEFAULT_COSMOLOGY
 
 
 def test_get_diff_hmf_training_data():

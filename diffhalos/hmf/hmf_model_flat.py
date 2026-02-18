@@ -14,7 +14,7 @@ from jax import jit as jjit
 from jax import vmap
 
 from .hmf_kernels import lg_hmf_kern
-from ..calibrations.hmf_cal import DEFAULT_HMF_PARAMS, HMF_Params  # noqa
+from ..calibrations.hmf_cal import DEFAULT_HMF_PARAMS, HMF_Params
 from ..utils.sigmoid_utils import _sig_slope, _sigmoid
 
 YTP_XTP = 3.0
@@ -40,20 +40,20 @@ def predict_cuml_hmf(params, logmp, redshift):
 
     Parameters
     ----------
-    params : namedtuple
-        Fitting function parameters.
-        Use DEFAULT_HMF_PARAMS for SMDPL-calibrated behavior.
+    params: namedtuple
+        flat HMF parameters namedtuple
 
-    logmp : array, shape (n_halos, )
-        Base-10 log of halo mass in units of Msun (not Msun/h)
+    logmp: array of shape (n_halos, )
+        base-10 log of halo mass, in Msun
 
-    redshift : float
+    redshift: float
+        redshift value
 
     Returns
     -------
-    lg_cuml_hmf : array, shape (n_halos, )
-        Base-10 log of cumulative comoving number density n(>logmp)
-        in units of comoving (1/Mpc)**3
+    lg_cuml_hmf: array of shape (n_halos, )
+        base-10 log of cumulative comoving number density n(>logmp),
+        in comoving (1/Mpc)**3
 
         Note that both number density and halo mass are defined in
         physical units (not h=1 units)
@@ -114,20 +114,20 @@ def predict_diff_hmf(params, logmp, redshift):
 
     Parameters
     ----------
-    params : namedtuple
-        Fitting function parameters.
-        Use DEFAULT_HMF_PARAMS for SMDPL-calibrated behavior.
+    params: namedtuple
+        flat HMF parameters namedtuple
 
-    logmp : array, shape (n_halos, )
-        Base-10 log of halo mass in units of Msun
+    logmp: array of shape (n_halos, )
+        base-10 log of halo mass, in Msun
 
-    redshift : float
+    redshift: float
+        redshift value
 
     Returns
     -------
-    hmf : array, shape (n_halos, )
-        Differential comoving number density dn(logmp)/dlogmp
-        in units of comoving (1/Mpc)**3 / dex
+    hmf: array of shape (n_halos, )
+        Differential comoving number density dn(logmp)/dlogmp,
+        in comoving (1/Mpc)**3 / dex
 
         Note that both number density and halo mass are defined in
         physical units (not h=1 units)
@@ -147,23 +147,22 @@ def wrapper_ndarray_diffsky_diff_hmf(params, logmp, redshift):
 
     Parameters
     ----------
-    params: ndarray of shape (n_hmf_params,)
-        halo mass function parameters
+    params: ndarray of shape (n_hmf_params, )
+        halo mass function parameters as an array
 
-    logmp: ndarray of shape (n_halos,)
-        Base-10 log of halo mass, in Msun
+    logmp: ndarray of shape (n_halos, )
+        base-10 log of halo mass, in Msun
 
     redshift: float
         redshift value
 
     Returns
     -------
-    lg_hmf: ndarray of shape (n_halos,)
+    lg_hmf: ndarray of shape (n_halos, )
         base-10 log of differential comoving halo mass function,
-        in units of comoving (1/Mpc)**3
+        in comoving (1/Mpc)**3
     """
-    # params_ntup = diffsky_params_obj.array_to_ntup(params)
-    params_ntup = HMF_Params(*params)
+    params_ntup = FlatHMFParams(*params)
     diff_hmf = _diffsky_diff_from_cuml_hmf_flat_jax_grad(
         params_ntup,
         logmp,

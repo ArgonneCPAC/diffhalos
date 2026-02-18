@@ -1,7 +1,7 @@
 """Fitting tools for halo mass function"""
 
-from .diff_hmf_fitter import diff_hmf_fitter
-from .cuml_hmf_fitter import cuml_hmf_fitter
+from .hmf_diff_fitter import diff_hmf_fitter
+from .hmf_cuml_fitter import cuml_hmf_fitter
 
 from diffsky.mass_functions.hmf_model import DEFAULT_HMF_PARAMS as P_INIT
 

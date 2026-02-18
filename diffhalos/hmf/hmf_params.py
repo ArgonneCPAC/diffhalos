@@ -1,18 +1,13 @@
 """HMF parameter utils"""
 
-import jax
-from jax import numpy as jnp
-from jax.tree_util import tree_flatten, tree_unflatten
-
 import numpy as np
 import typing
 from collections import namedtuple
 
-__all__ = (
-    "get_hmf_param_names",
-    "define_diffsky_hmf_params_namedtuple",
-    "diffsky_HMF_params_constructor",
-)
+
+from ..calibrations.hmf_cal import DEFAULT_HMF_PARAMS
+
+__all__ = ("get_hmf_param_names", "define_diffsky_hmf_params_namedtuple")
 
 
 HMF_PARAM_FIELDS_DIFFSKY = (
@@ -82,6 +77,19 @@ YTP_Params_diffsky = namedtuple("Ytp_Params", YTP_PARAM_FIELDS_DIFFSKY)
 X0_Params_diffsky = namedtuple("X0_Params", X0_PARAM_FIELDS_DIFFSKY)
 LO_Params_diffsky = namedtuple("Lo_Params", LO_PARAM_FIELDS_DIFFSKY)
 HI_Params_diffsky = namedtuple("Hi_Params", HI_PARAM_FIELDS_DIFFSKY)
+
+YTP_PARAMS_ARRAY_DEFAULT = np.asarray(DEFAULT_HMF_PARAMS.ytp_params)
+X0_PARAMS_ARRAY_DEFAULT = np.asarray(DEFAULT_HMF_PARAMS.x0_params)
+LO_PARAMS_ARRAY_DEFAULT = np.asarray(DEFAULT_HMF_PARAMS.lo_params)
+HI_PARAMS_ARRAY_DEFAULT = np.asarray(DEFAULT_HMF_PARAMS.hi_params)
+HMF_PARAMS_ARRAY_DEFAULT = np.concatenate(
+    [
+        YTP_PARAMS_ARRAY_DEFAULT,
+        X0_PARAMS_ARRAY_DEFAULT,
+        LO_PARAMS_ARRAY_DEFAULT,
+        HI_PARAMS_ARRAY_DEFAULT,
+    ]
+)
 
 
 class Ytp_Params(typing.NamedTuple):
@@ -183,16 +191,12 @@ def get_hmf_param_names():
 
 
 def define_diffsky_hmf_params_namedtuple(
-    params,
+    params=HMF_PARAMS_ARRAY_DEFAULT,
     hmf_param_names=HMF_PARAM_FIELDS_DIFFSKY,
     ytp_param_names=YTP_PARAM_FIELDS_DIFFSKY,
     x0_param_names=X0_PARAM_FIELDS_DIFFSKY,
     lo_param_names=LO_PARAM_FIELDS_DIFFSKY,
     hi_param_names=HI_PARAM_FIELDS_DIFFSKY,
-    ytp_params=None,
-    x0_params=None,
-    lo_params=None,
-    hi_params=None,
 ):
     """
     Helper function to define a diffksy compatible
@@ -209,26 +213,22 @@ def define_diffsky_hmf_params_namedtuple(
         hmf parameter names in same order as
         the values stored in ``params``
 
-    ytp_params: ndarray of shape (n_ytp_params,)
-        ``y_tp`` parameter values,
-        if ``params`` not provided
+    ytp_param_names: tuple
+        hmf parameter ``ytp`` names like in ``Ytp_Params``
 
-    x0_params: ndarray of shape (n_x0_params,)
-        ``x0`` parameter values,
-        if ``params`` not provided
+    x0_param_names: tuple
+        hmf parameter ``x0`` names like in ``X0_Params``
 
-    lo_params: ndarray of shape (n_lo_params,)
-        ``lo`` parameter values,
-        if ``params`` not provided
+    lo_param_names: tuple
+        hmf parameter ``lo`` names like in ``Lo_Params``
 
-    hi_params: ndarray of shape (n_hi_params,)
-        ``hi`` parameter values,
-        if ``params`` not provided
+    hi_param_names: tuple
+        hmf parameter ``hi`` names like in ``Hi_Params``
 
     Returns
     -------
     hmf_ntup: namedtuple
-        HMF parameters for Diffsky model predictions
+        HMF parameters for diffsky model predictions
     """
     icur = 0
     for _param in hmf_param_names:
@@ -269,63 +269,3 @@ def define_diffsky_hmf_params_namedtuple(
     hmf_ntup = HMF_Params_diffsky(*hmf_args)
 
     return hmf_ntup
-
-
-class diffsky_HMF_params_constructor:
-    def __init__(self):
-        """
-        Define an object to hold diffsky parameters
-        both as a named tuple and an array,
-        in order to able to transform from one to the other
-        in a way that is jax-friendly and can be used with jax.jit
-        """
-        self.pytree_struct = [
-            Ytp_Params(*[1, 2, 3, 4, 5]),
-            X0_Params(*[1, 2, 3, 4, 5]),
-            Lo_Params(*[1, 2, 3, 4]),
-            HI_Params(*[1, 2, 3, 4, 5]),
-        ]
-        _, self.schema = tree_flatten(self.pytree_struct)
-
-    def array_to_ntup(self, params_array):
-        """
-        Convert an array of parameter values into a
-        named tuple following the correct order of parameters
-        """
-        params_ntup = HMF_Params(*tree_unflatten(self.schema, params_array))
-        return params_ntup
-
-    def ntup_to_array(self, params_ntup):
-        params_array, _ = tree_flatten(params_ntup)
-        return params_array
-
-
-def flatten_tuples(t):
-    for x in t:
-        if isinstance(x, tuple):
-            yield from flatten_tuples(x)
-        else:
-            yield x
-
-
-def tuple_to_jax_array(t):
-    res = tuple(flatten_tuples(t))
-    return jnp.asarray(res)
-
-
-hmf_params_obj = diffsky_HMF_params_constructor()
-
-
-def array_to_tuple(a, t):
-    T = t(*hmf_params_obj.array_to_ntup(a))
-    return T
-
-
-def register_tuple(named_tuple_class):
-    jax.tree_util.register_pytree_node(
-        named_tuple_class,
-        # tell JAX how to unpack the NamedTuple to an iterable
-        lambda x: (tuple_to_jax_array(x), None),
-        # tell JAX how to pack it back into the proper NamedTuple structure
-        lambda _, x: array_to_tuple(x, named_tuple_class),
-    )

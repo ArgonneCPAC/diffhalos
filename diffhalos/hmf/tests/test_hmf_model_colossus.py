@@ -4,7 +4,7 @@ import numpy as np
 
 from colossus.cosmology import cosmology
 
-from ..colossus_hmf import colossus_diff_hmf, colossus_cuml_hmf
+from ..hmf_model_colossus import colossus_diff_hmf, colossus_cuml_hmf
 
 
 def test_colossus_hmf_call():
@@ -23,8 +23,6 @@ def test_colossus_hmf_call():
             cosmo,
             mdef="200m",
             model="tinker08",
-            q_out="dndlog10M",
-            h_units=False,
             hmf_cut=hmf_cut,
         )
 
@@ -50,8 +48,6 @@ def test_colossus_hmf_cuml():
             cosmo,
             mdef="200m",
             model="tinker08",
-            q_out="dndlog10M",
-            h_units=False,
             hmf_cut=hmf_cut,
         )
 

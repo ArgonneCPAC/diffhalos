@@ -2,9 +2,10 @@
 
 import numpy as np
 
+from jax import random as jran
+
 from diffsky.experimental import mc_lightcone_halos as mclh
 from diffsky.mass_functions import mc_hosts as diffsky_mc_hosts
-from jax import random as jran
 
 from .. import hmf_model
 from ...cosmology import DEFAULT_COSMOLOGY

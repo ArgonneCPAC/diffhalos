@@ -6,13 +6,10 @@ import os
 
 from diffsky.mass_functions.hmf_model import DEFAULT_HMF_PARAMS as P_INIT
 
-from ..hmf_models.colossus_hmf import colossus_diff_hmf, colossus_cuml_hmf
-from ..fitting_tools import hmf_fitter
-from ..param_utils.defaults import DEFAULT_COSMOLOGY, DEFAULT_COSMO_PRIORS
-from ..param_utils.cosmo_params import (
-    define_colossus_cosmology,
-    sample_cosmo_params,
-)
+from . import hmf_fitter
+from ...hmf_model_colossus import colossus_diff_hmf, colossus_cuml_hmf
+from ....cosmology.defaults import DEFAULT_COSMOLOGY, DEFAULT_COSMO_PRIORS
+from ....cosmology.cosmo_params import define_colossus_cosmology, sample_cosmo_params
 
 
 __all__ = (

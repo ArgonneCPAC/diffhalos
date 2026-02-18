@@ -1,14 +1,37 @@
-"""Define various loss functions"""
+"""Useful utilities for fitting"""
 
+from jax import numpy as jnp
 from jax import jit as jjit
 from jax import vmap
 
-from ..hmf_models.diffsky_hmf import (
-    wrapper_ndarray_diffsky_diff_hmf,
-)
-from ..fitting_tools.utils import mse
+from ...hmf_model_flat import wrapper_ndarray_diffsky_diff_hmf
 
-__all__ = ("mse_loss_hmf_params", "mse_loss_diff_hmf_curve")
+
+__all__ = ("mse", "mse_loss_hmf_params", "mse_loss_diff_hmf_curve")
+
+
+@jjit
+def mse(pred, target):
+    """
+    Mean squared error loss function for optimization
+
+    Parameters
+    ----------
+    pred: ndarray of shape (n_data,)
+        predicted values by the model
+
+    target: ndarray of shape (n_data,)
+        target data
+
+    Returns
+    -------
+    mse_val: float
+        mse value
+    """
+    diff = pred - target
+    mse_val = jnp.mean(diff**2)
+
+    return mse_val
 
 
 @jjit

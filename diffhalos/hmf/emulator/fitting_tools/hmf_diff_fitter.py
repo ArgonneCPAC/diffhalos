@@ -1,4 +1,4 @@
-"""Helper fitting tools for cumulative halo mass function fits"""
+"""Helper fitting tools for differential halo mass function fits"""
 
 from jax import jit as jjit
 from jax import value_and_grad
@@ -10,21 +10,20 @@ from diffsky.mass_functions.fitting_utils.fitting_helpers import (
 from diffsky.mass_functions.hmf_model import DEFAULT_HMF_PARAMS as P_INIT
 from diffsky.mass_functions.hmf_model import HMF_Params
 
-from ..hmf_models.diffsky_hmf import diffsky_cuml_hmf
-from .utils import mse
+from ...hmf_model import predict_diff_hmf
+from .loss_functions import mse
 
-__all__ = ("cuml_hmf_fitter",)
+__all__ = ("diff_hmf_fitter",)
 
 
-def cuml_hmf_fitter(
+def diff_hmf_fitter(
     loss_data,
     n_steps=200,
     step_size=0.01,
     n_warmup=1,
     p_init=P_INIT,
 ):
-    """
-    Runs a fitter to the cumulative
+    """Runs a fitter to the differential
     diffsky halo mass function
 
     Parameters
@@ -77,7 +76,6 @@ def cuml_hmf_fitter(
     )
     p_best, loss, loss_hist, params_hist, fit_terminates = _res
     p_best = HMF_Params(*p_best)
-
     return p_best, loss, loss_hist, params_hist, fit_terminates
 
 
@@ -85,7 +83,7 @@ def cuml_hmf_fitter(
 def _loss_func_single_redshift(params, loss_data):
     """computes loss at a single redshift point"""
     redshift, target_lgmp, target_hmf = loss_data
-    pred_hmf = diffsky_cuml_hmf(params, target_lgmp, redshift)
+    pred_hmf = predict_diff_hmf(params, target_lgmp, redshift)
     loss = mse(pred_hmf, target_hmf)
     return loss
 

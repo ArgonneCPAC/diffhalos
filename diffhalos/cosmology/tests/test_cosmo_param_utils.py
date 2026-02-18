@@ -2,8 +2,7 @@
 
 import numpy as np
 
-from ..cosmo_params import sample_cosmo_params
-from ..defaults import DEFAULT_COSMO_PRIORS
+from ..cosmo_params import sample_cosmo_params, DEFAULT_COSMO_PRIORS
 
 
 def test_sample_cosmo_params():

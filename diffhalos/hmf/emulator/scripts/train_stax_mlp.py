@@ -3,8 +3,10 @@
 import configparser
 import argparse
 
+from ..fitting_tools import training_data_generator
+
 from ..neural_net.mlp_stax import MLP_stax
-from ..neural_net import training_data_generator, loss_functions
+from ..neural_net import loss_functions
 from ..utils import MyConfigParser
 
 """Read the arguments passed in command line"""

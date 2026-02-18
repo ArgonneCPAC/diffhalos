@@ -5,7 +5,7 @@ from collections import OrderedDict
 import configparser
 import argparse
 
-from ..neural_net import training_data_generator
+from ..fitting_tools import training_data_generator
 from ..utils import MyConfigParser
 
 

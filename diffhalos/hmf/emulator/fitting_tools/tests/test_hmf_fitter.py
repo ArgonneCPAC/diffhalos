@@ -3,13 +3,10 @@
 import numpy as np
 
 
-from ...neural_net.training_data_generator import get_hmf_training_data
-from ...param_utils.cosmo_params import sample_cosmo_params
-from ...param_utils.defaults import DEFAULT_COSMO_PRIORS, DEFAULT_COSMOLOGY
-from ..hmf_fitter import (
-    fit_hmf_single_cosmo,
-    fit_hmf_multi_cosmo,
-)
+from ..hmf_fitter import fit_hmf_single_cosmo, fit_hmf_multi_cosmo
+from ..training_data_generator import get_hmf_training_data
+from .....cosmology.cosmo_params import sample_cosmo_params
+from .....cosmology.defaults import DEFAULT_COSMO_PRIORS, DEFAULT_COSMOLOGY
 
 
 def test_adam_cuml_hmf_single_cosmo_fitter():

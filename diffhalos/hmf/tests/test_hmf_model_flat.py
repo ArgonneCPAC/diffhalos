@@ -73,3 +73,14 @@ def test_diff_hmf_evaluations():
     )
     assert res.shape == lgmp_arr.shape
     assert np.all(np.isfinite(res))
+
+
+def test_wrapper_ndarray_diffsky_diff_hmf_evaluates():
+
+    params = np.asarray(hmf_model_flat.DEFAULT_FLAT_HMF_PARAMS)
+    lgmp_arr = np.linspace(-6, 0, 500)
+    redshift = 0.2
+
+    lg_hmf = hmf_model_flat.wrapper_ndarray_diffsky_diff_hmf(params, lgmp_arr, redshift)
+
+    assert np.all(np.isfinite(lg_hmf))
