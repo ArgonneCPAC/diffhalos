@@ -86,7 +86,7 @@ HI_Params_diffsky = namedtuple("Hi_Params", HI_PARAM_FIELDS_DIFFSKY)
 
 class Ytp_Params(typing.NamedTuple):
     """
-    Structure of diffsky parameters named tuple
+    Structure of diffsky Ytp parameters namedtuple
     """
 
     ytp_ytp: float
@@ -98,7 +98,7 @@ class Ytp_Params(typing.NamedTuple):
 
 class X0_Params(typing.NamedTuple):
     """
-    Structure of diffsky parameters named tuple
+    Structure of diffsky X0 parameters namedtuple
     """
 
     x0_ytp: float
@@ -110,7 +110,7 @@ class X0_Params(typing.NamedTuple):
 
 class Lo_Params(typing.NamedTuple):
     """
-    Structure of diffsky parameters named tuple
+    Structure of diffsky Lo parameters namedtuple
     """
 
     lo_x0: float
@@ -121,7 +121,7 @@ class Lo_Params(typing.NamedTuple):
 
 class HI_Params(typing.NamedTuple):
     """
-    Structure of diffsky parameters named tuple
+    Structure of diffsky parameters namedtuple
     """
 
     hi_ytp: float
@@ -133,7 +133,7 @@ class HI_Params(typing.NamedTuple):
 
 class HMF_Params(typing.NamedTuple):
     """
-    Structure of diffsky parameters named tuple
+    Structure of diffsky parameters as namedtuple
     """
 
     ytp_params: Ytp_Params
@@ -144,7 +144,7 @@ class HMF_Params(typing.NamedTuple):
 
 class HMF_Params_Flat(typing.NamedTuple):
     """
-    Structure of diffsky parameters named tuple
+    Structure of diffsky parameters in namedtuple
     """
 
     ytp_ytp: float
@@ -277,7 +277,7 @@ class diffsky_HMF_params_constructor:
         Define an object to hold diffsky parameters
         both as a named tuple and an array,
         in order to able to transform from one to the other
-        in a way that is jax-friendly and can be used with jit etc
+        in a way that is jax-friendly and can be used with jax.jit
         """
         self.pytree_struct = [
             Ytp_Params(*[1, 2, 3, 4, 5]),
@@ -329,34 +329,3 @@ def register_tuple(named_tuple_class):
         # tell JAX how to pack it back into the proper NamedTuple structure
         lambda _, x: array_to_tuple(x, named_tuple_class),
     )
-
-
-# def flatten_func(obj):
-#     """
-#     Object that flattens the parameters
-#     as needed to be used with jax
-#     """
-#     _children, aux_data = tree_flatten(obj.pytree_struct)
-#     children = np.asarray(_children)
-
-#     return (children, aux_data)
-
-
-# def unflatten_func(aux_data, children):
-#     """
-#     Object that unflattens the parameters
-#     as needed to be used with jax
-#     """
-#     obj = object.__new__(diffsky_HMF_params_constructor)
-#     obj.params_array = children
-#     (schema,) = aux_data
-#     obj.params_ntup = tree_unflatten(schema, children)
-#     return obj
-
-
-# def jax_register_hmf_params_obj():
-#     jax.tree_util.register_pytree_node(
-#         diffsky_HMF_params_constructor,
-#         flatten_func,
-#         unflatten_func,
-#     )
