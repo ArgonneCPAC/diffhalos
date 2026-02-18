@@ -58,7 +58,7 @@ def fit_hmf_single_cosmo(
         tuple containing the following
 
         p_best: namedtuple
-            ``HMF_Params`` named tuple with the
+            ``HMF_Params`` namedtuple with the
             best-fit diffsky HMF parameters
 
         loss: float
@@ -143,7 +143,7 @@ def fit_hmf_multi_cosmo(
         as tuples with the following
 
         p_best: namedtuple
-            ``HMF_Params`` named tuple with the
+            ``HMF_Params`` namedtuple with the
             best-fit diffsky HMF parameters
 
         loss: float

@@ -4,6 +4,8 @@ import numpy as np
 from time import time
 import pickle
 import os
+import glob
+import pathlib
 
 from jax import jit as jjit
 from jax import random as jran
@@ -15,6 +17,14 @@ from jax.example_libraries import optimizers as jax_opt
 from ..utils import format_time
 
 __all__ = ("MLP_stax",)
+
+
+# load pretrained models
+PRETRAINED_PATH = pathlib.Path(__file__).parent / "pretrained_models"
+PRETRAINED_MODEL_NAMES = glob.glob(str(PRETRAINED_PATH / "*_opt_final.pkl"))
+PRETRAINED_MODEL_NAMES = [str(pathlib.Path(x).name) for x in PRETRAINED_PATH]
+
+DEFAULT_MLP_MODEL = ""
 
 
 class MLP_stax:
@@ -31,7 +41,6 @@ class MLP_stax:
     ):
         """
         Build the MLP using JAX's stax library.
-        By default this uses the Selu activation function.
         See https://docs.jax.dev/en/latest/jax.example_libraries.stax.html.
 
         Parameters
@@ -39,11 +48,12 @@ class MLP_stax:
         n_targets: int
             size of targets layer
 
-        hidden_layers: tuple(int)
+        hidden_layers: list(int) or tuple(int)
             number of neurons per hidden layer
 
         activation: function
-            activation function to use
+            activation function to use;
+            default is the Selu activation function
 
         Returns
         -------
@@ -68,6 +78,9 @@ class MLP_stax:
             *struct,
             stax.Dense(n_targets),
         )
+
+        self.n_targets = n_targets
+        self.hidden_layers = hidden_layers
 
         return self.net_init, self.net_apply
 
@@ -125,8 +138,7 @@ class MLP_stax:
         # features layer added
         if init_state is None:
             _, self.net_params_init = self.net_init(
-                net_init_key,
-                input_shape=(-1, n_features),
+                net_init_key, input_shape=(-1, n_features)
             )
             opt_state = self.opt_init(self.net_params_init)
         else:
@@ -145,6 +157,8 @@ class MLP_stax:
         self,
         input_data,
         target_data,
+        loss_function=None,
+        loss_args=None,
         batch_size=None,
         num_batches=None,
         num_epochs=None,
@@ -163,6 +177,12 @@ class MLP_stax:
             target data to compare against;
             if None, the first item in ``self.loss_args`` is used
 
+        loss_function: callable
+            loss function to optimize
+
+        loss_args: tuple
+            arguments to pass to ``loss_function``
+
         batch_size: int
             size of a batch
 
@@ -179,13 +199,19 @@ class MLP_stax:
         -------
         loss_history: list
             loss value at each step of the training process
-
-        delta_time: float
-            time it took to complete the training
         """
         self.batch_size = batch_size
         self.num_batches = num_batches
         self.num_epochs = num_epochs
+
+        if self.loss_function is None:
+            if loss_function is None:
+                raise Exception("Loss function must be provided")
+            else:
+                self.loss_function = loss_function
+
+        if loss_args is not None:
+            self.loss_args = loss_args
 
         @jjit
         def _loss_fun(net_params, input_data, target_data):
@@ -195,13 +221,13 @@ class MLP_stax:
 
             Parameters
             ----------
-            net_params: namedtuple or ndarray of shape (n_params,)
+            net_params: namedtuple or ndarray of shape (n_params, )
                 optimizer's current state
 
-            input_data: ndarray of shape (n_features,)
+            input_data: ndarray of shape (n_features, )
                 input data for model calculation
 
-            target_data: ndarray of shape (n_target,)
+            target_data: ndarray of shape (n_target, )
                 target data for loss calculation
                 against current optimizer's state
 
@@ -211,11 +237,7 @@ class MLP_stax:
                 value of loss
             """
             preds = self.net_apply(net_params, input_data)
-            loss = self.loss_function(
-                preds,
-                target_data,
-                *self.loss_args,
-            )
+            loss = self.loss_function(preds, target_data, *self.loss_args)
 
             return loss
 
@@ -273,20 +295,15 @@ class MLP_stax:
                 x_train = input_data[ibatch : ibatch + batch_size, :]
                 targets = target_data[ibatch : ibatch + batch_size, :]
 
-                loss, opt_state = _train_step(
-                    istep,
-                    opt_state,
-                    x_train,
-                    targets,
-                )
+                loss, opt_state = _train_step(istep, opt_state, x_train, targets)
                 loss_history.append(float(loss))
                 istep += 1
 
         time_end = time()
-        self.delta_t_sec = time_end - time_start
-        self.delta_t = format_time(time_end - time_start)
+        self.train_dt_sec = time_end - time_start
+        self.train_dt = format_time(time_end - time_start)
         if timeit:
-            print("Training completed after %s" % self.delta_t)
+            print("Training completed after %s" % self.train_dt)
 
         # training results
         self.opt_state_final = opt_state
@@ -296,8 +313,8 @@ class MLP_stax:
 
     def save_model(
         self,
-        savedir=None,
-        save_base_name=None,
+        savedir=PRETRAINED_PATH,
+        save_base_name=DEFAULT_MLP_MODEL,
         verbose=False,
     ):
         """
@@ -347,14 +364,14 @@ class MLP_stax:
         for _layer in n_neuron_per_layer[1:]:
             _layers += ",{}".format(_layer)
 
-        # ! Note: (_info_delta_t,...,_info_mlp_layers) must be first
+        # ! Note: (_info_train_dt,...,_info_mlp_layers) must be first
         #         and rows up to, and including, _info_mlp_layers
         #         must be skipped when loading the model from files
-        _info_delta_t = np.array(["train time:", self.delta_t])
+        _info_train_dt = np.array(["train time:", self.train_dt])
         _info_mlp_n_params = np.array(["number of model parameters:", n_mlp_params])
         _info_mlp_n_layers = np.array(["number of layers:", len(_layers)])
         _info_mlp_layers = np.array(["neurons per layer:", _layers])
-        _info_delta_t_sec = np.array(["train time (sec):", self.delta_t_sec])
+        _info_train_dt_sec = np.array(["train time (sec):", self.train_dt_sec])
         _info_batch_size = np.array(["batch size:", str(self.batch_size)])
         _info_num_batches = np.array(["n_batches:", str(self.num_batches)])
         _info_num_epochs = np.array(["n_epochs:", str(self.num_epochs)])
@@ -362,11 +379,11 @@ class MLP_stax:
         _info_opt_seed = np.array(["optimizer seed:", str(self.opt_seed)])
         additional_info = np.column_stack(
             (
-                _info_delta_t,
+                _info_train_dt,
                 _info_mlp_n_params,
                 _info_mlp_n_layers,
                 _info_mlp_layers,
-                _info_delta_t_sec,
+                _info_train_dt_sec,
                 _info_batch_size,
                 _info_num_batches,
                 _info_num_epochs,
@@ -385,8 +402,8 @@ class MLP_stax:
 
     def load_model(
         self,
-        savedir=None,
-        save_base_name=None,
+        savedir=PRETRAINED_PATH,
+        save_base_name=DEFAULT_MLP_MODEL,
         verbose=False,
     ):
         """
@@ -433,19 +450,17 @@ class MLP_stax:
 
         # load additional information
         (
-            delta_t_sec,
+            train_dt_sec,
             batch_size,
             num_batches,
             num_epochs,
             step_size,
             opt_seed,
         ) = np.loadtxt(
-            savedir + save_base_name + "_info.txt",
-            usecols=(-1,),
-            skiprows=4,
+            savedir + save_base_name + "_info.txt", usecols=(-1,), skiprows=4
         )
-        self.delta_t_sec = float(delta_t_sec)
-        self.delta_t = format_time(self.delta_t_sec)
+        self.train_dt_sec = float(train_dt_sec)
+        self.train_dt = format_time(self.train_dt_sec)
         self.batch_size = int(batch_size)
         self.num_batches = int(num_batches)
         self.num_epochs = int(num_epochs)
@@ -561,8 +576,10 @@ class MLP_stax:
         self.batch_size = None
         self.num_batches = None
         self.num_epochs = None
-        self.delta_t = None
-        self.delta_t_sec = None
+        self.train_dt = None
+        self.train_dt_sec = None
         self.step_size = None
         self.opt_seed = None
         self.n_mlp_params = None
+        self.n_targets = None
+        self.hidden_layers = None

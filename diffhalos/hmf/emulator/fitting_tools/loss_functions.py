@@ -13,14 +13,14 @@ __all__ = ("mse", "mse_loss_hmf_params", "mse_loss_diff_hmf_curve")
 @jjit
 def mse(pred, target):
     """
-    Mean squared error loss function for optimization
+    Mean squared error loss function
 
     Parameters
     ----------
-    pred: ndarray of shape (n_data,)
+    pred: ndarray of shape (n_data, )
         predicted values by the model
 
-    target: ndarray of shape (n_data,)
+    target: ndarray of shape (n_data, )
         target data
 
     Returns
@@ -42,15 +42,11 @@ def mse_loss_hmf_params(preds, target_data):
 
     Parameters
     ----------
-    preds: ndarray of shape (n_cosmo, n_hmf_params,)
-        prediction by neural network model,
-        at a given state;
-        in this case the predicted HMF parameters
+    preds: ndarray of shape (n_cosmo, n_hmf_params)
+        predicted HMF parameters by the model
 
-    target_data: ndarray of shape (n_cosmo, n_hmf_params,)
-        target data for loss calculation
-        against current optimizer's state;
-        in this case the target HMF parameters
+    target_data: ndarray of shape (n_cosmo, n_hmf_params)
+        target HMF parameters
 
     Returns
     -------
@@ -77,17 +73,15 @@ def mse_loss_diff_hmf_curve(
 
     Parameters
     ----------
-    preds: ndarray of shape (n_cosmo, n_hmf_params,)
-        prediction by neural network model,
-        at a given state;
-        in this case the predicted HMF parameters
+    preds: ndarray of shape (n_cosmo, n_hmf_params)
+        predicted HMF parameters by the model
 
-    target_data: ndarray of shape (n_cosmo, n_redshift, n_halo,)
+    target_data: ndarray of shape (n_cosmo, n_redshift, n_halo)
         target data for loss calculation
         against current optimizer's state;
         in this case the target HMF parameters
 
-    logmp: ndarray of shape (n_cosmo, n_redshift, n_halo,)
+    logmp: ndarray of shape (n_cosmo, n_redshift, n_halo)
         base-10 log of halo mass per cosmology and redshift
 
     z: ndarray of shape (n_redshift, )
@@ -101,11 +95,7 @@ def mse_loss_diff_hmf_curve(
     """
     mse_val = 0.0
     for i, zi in enumerate(z):
-        loghmf_preds = _get_diff_hmf_vmap(
-            preds,
-            logmp[:, i, :],
-            zi,
-        )
+        loghmf_preds = _get_diff_hmf_vmap(preds, logmp[:, i, :], zi)
         mse_val += mse(loghmf_preds, target_data[:, i, :])
 
     return mse_val

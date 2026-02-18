@@ -6,10 +6,7 @@ from colossus.lss import mass_function
 from scipy.interpolate import UnivariateSpline
 
 
-__all__ = (
-    "colossus_diff_hmf",
-    "colossus_cuml_hmf",
-)
+__all__ = ("colossus_diff_hmf", "colossus_cuml_hmf")
 
 MDEF = "200m"
 HMF_MODEL = "tinker08"

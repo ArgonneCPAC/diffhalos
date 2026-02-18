@@ -14,9 +14,9 @@ from ....cosmology.cosmo_params import define_colossus_cosmology, sample_cosmo_p
 
 __all__ = (
     "get_file_naming_conventions",
-    "get_hmf_training_data",
-    "get_best_fit_hmf_params",
-    "load_cosmo_to_hmf_param_training_data",
+    "generate_hmf_training_data",
+    "get_best_fit_hmf_params_training_data",
+    "load_training_data",
     "load_hmf_fitter_loss_data",
 )
 
@@ -48,7 +48,7 @@ def get_file_naming_conventions():
     return DEFAULT_FILE_NAME_CONVENTIONS
 
 
-def get_hmf_training_data(
+def generate_hmf_training_data(
     logmhalo,
     z,
     cuml=False,
@@ -142,8 +142,8 @@ def get_hmf_training_data(
 
     Returns
     -------
-    saves files to the required destonation and/or
-    simply returns the results
+    saves files to the required destination and/or
+    returns the results
 
     data being retunred:
     loss_data: list
@@ -306,10 +306,10 @@ def _get_hmf_training_data(
 
     Parameters
     ----------
-    logMhalo: ndarray of shape (n_halo,)
+    logMhalo: ndarray of shape (n_halo, )
         base-10 log of halo masses, in Msun
 
-    z: ndarray of shape (n_z,)
+    z: ndarray of shape (n_z, )
         redshift values
 
     cuml: bool
@@ -348,16 +348,10 @@ def _get_hmf_training_data(
          base-10 log of halo mass,
          base-10 log of halo mass function]
     """
-    if cosmo_param_names is None or cosmo_params is None:
-        single_cosmo = True
-    else:
-        single_cosmo = False
+    cosmo_params = np.atleast_1d(cosmo_params)
 
     # number of sampled cosmologies
-    if not single_cosmo:
-        num_samples = cosmo_params.shape[0]
-    else:
-        num_samples = 1
+    num_samples = cosmo_params.shape[0]
 
     # get loss data
     loss_data = []
@@ -365,9 +359,8 @@ def _get_hmf_training_data(
 
         # define current Colossus cosmology
         cosmo_params_cur = deepcopy(base_cosmo_params)
-        if not single_cosmo:
-            for pi, _param in enumerate(cosmo_param_names):
-                cosmo_params_cur[_param] = cosmo_params[ci, pi]
+        for pi, _param in enumerate(cosmo_param_names):
+            cosmo_params_cur[_param] = cosmo_params[ci, pi]
         cosmo = define_colossus_cosmology(cosmo_params=cosmo_params_cur)
 
         # for current cosmology collect all redshifts
@@ -402,7 +395,7 @@ def _get_hmf_training_data(
     return loss_data
 
 
-def get_best_fit_hmf_params(
+def get_best_fit_hmf_params_training_data(
     loss_data,
     num_steps=1000,
     step_size=0.01,
@@ -542,10 +535,10 @@ def get_best_fit_hmf_params(
         for ci in range(num_samples):
             p_best, loss, loss_hist, params_hist, fit_terminates = res[ci]
 
-            ytp_params_all[ci, :] = np.asarray(p_best._asdict()["ytp_params"])
-            x0_params_all[ci, :] = np.asarray(p_best._asdict()["x0_params"])
-            lo_params_all[ci, :] = np.asarray(p_best._asdict()["lo_params"])
-            hi_params_all[ci, :] = np.asarray(p_best._asdict()["hi_params"])
+            ytp_params_all[ci, :] = np.asarray(p_best.ytp_params)
+            x0_params_all[ci, :] = np.asarray(p_best.x0_params)
+            lo_params_all[ci, :] = np.asarray(p_best.lo_params)
+            hi_params_all[ci, :] = np.asarray(p_best.hi_params)
             loss_hist_all[ci, :] = loss_hist
             fit_terminates_all[ci, :] = fit_terminates
 
@@ -580,7 +573,7 @@ def get_best_fit_hmf_params(
     return
 
 
-def load_cosmo_to_hmf_param_training_data(
+def load_training_data(
     savedir_input=None,
     savedir_target=None,
     save_base_name_input=None,
