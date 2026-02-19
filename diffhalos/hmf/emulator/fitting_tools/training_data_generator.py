@@ -3,6 +3,7 @@
 import numpy as np
 from copy import deepcopy
 import os
+import json
 
 from diffsky.mass_functions.hmf_model import DEFAULT_HMF_PARAMS as P_INIT
 
@@ -21,9 +22,11 @@ __all__ = (
 DEFAULT_FILE_NAME_CONVENTIONS = {
     "cosmo_param_names": "cosmo_param_names.txt",
     "cosmo_param_values": "cosmo_params.npy",
+    "cosmo_param_priors": "cosmo_param_priors.json",
     "redshift": "redshift.npy",
     "logmhalo": "logmhalo.npy",
-    "loghmf": "loghmf.npy",
+    "loghmf_diff": "loghmf_diff.npy",
+    "loghmf_cuml": "loghmf_cuml.npy",
     "ytp_params": "ytp_params.npy",
     "x0_params": "x0_params.npy",
     "lo_params": "lo_params.npy",
@@ -60,7 +63,7 @@ def generate_hmf_loss_train_data(
     seed=None,
     num_samples=None,
     mdef=MDEF,
-    model=HMF_MODEL,
+    hmf_model=HMF_MODEL,
     hmf_cut=HMF_CUT,
     savedir=None,
     save_base_name=None,
@@ -70,10 +73,12 @@ def generate_hmf_loss_train_data(
     """
     Generate data files for halo mass function fits
     for a range of cosmologies and redshifts
-    and save to file. These data can be used as input to
-    the neural net that is trained to predict halo mass function
-    parameters conditioned on the cosmological parameters or
-    on the halo mass functions themselves.
+    and save to file. These include the inforamation
+    on the sampled cosmological parameters and the
+    target halo mass functions. Once generated, these
+    data will be passed to the HMF fitter functions
+    that will return the best-fit HMF parameters to
+    be used as taining data for the MLP.
 
     Parameters
     ----------
@@ -122,7 +127,7 @@ def generate_hmf_loss_train_data(
     mdef: str
         mass definition
 
-    model: str
+    hmf_model: str
         model for halo mass function
 
     hmf_cut: float
@@ -197,7 +202,7 @@ def generate_hmf_loss_train_data(
         cosmo_param_names=cosmo_param_names,
         base_cosmo_params=base_cosmo_params,
         mdef=mdef,
-        model=model,
+        hmf_model=hmf_model,
         hmf_cut=hmf_cut,
     )
 
@@ -250,14 +255,28 @@ def generate_hmf_loss_train_data(
                 savedir + save_base_name + "_" + file_name_conventions["logmhalo"],
                 logmhalo_data,
             )
+            if cuml:
+                _hmf_file_name = file_name_conventions["loghmf_cuml"]
+            else:
+                _hmf_file_name = file_name_conventions["loghmf_diff"]
             np.save(
-                savedir + save_base_name + "_" + file_name_conventions["loghmf"],
+                savedir + save_base_name + "_" + _hmf_file_name,
                 loghmf_data,
             )
 
+        # save cosmological parameter ranges cosmo_param_priors
+        with open(
+            savedir
+            + save_base_name
+            + "_"
+            + file_name_conventions["cosmo_param_priors"],
+            "w",
+        ) as json_file:
+            json.dump(cosmo_priors, json_file, indent=4)
+
         # save additional information
         _info_n_cosmo_params = np.array(["n_cosmo_params:", cosmo_params.shape[1]])
-        _info_n_cosmo_samples = np.array(["n_cosmo_params:", cosmo_params.shape[0]])
+        _info_n_cosmo_samples = np.array(["n_cosmo_samples:", cosmo_params.shape[0]])
         _info_z_min = np.array(["z_min:", z[0]])
         _info_z_max = np.array(["z_max:", z[-1]])
         _info_n_z = np.array(["n_z:", num_redshift])
@@ -283,6 +302,8 @@ def generate_hmf_loss_train_data(
         )
 
     if return_outputs or savedir is None:
+        if num_samples == 1:
+            return hmf_loss_data[0]
         return hmf_loss_data
 
     return
@@ -296,7 +317,7 @@ def _get_hmf_training_data(
     cosmo_param_names=None,
     base_cosmo_params=DEFAULT_COSMOLOGY,
     mdef=MDEF,
-    model=HMF_MODEL,
+    hmf_model=HMF_MODEL,
     hmf_cut=HMF_CUT,
 ):
     """
@@ -334,7 +355,7 @@ def _get_hmf_training_data(
     mdef: str
         mass definition
 
-    model: str
+    hmf_model: str
         model for halo mass function
 
     hmf_cut: float
@@ -371,7 +392,7 @@ def _get_hmf_training_data(
                     zi,
                     cosmo,
                     mdef=mdef,
-                    model=model,
+                    model=hmf_model,
                     hmf_cut=hmf_cut,
                 )
             else:
@@ -380,7 +401,7 @@ def _get_hmf_training_data(
                     zi,
                     cosmo,
                     mdef=mdef,
-                    model=model,
+                    model=hmf_model,
                     hmf_cut=hmf_cut,
                 )
             loss_data_cosmo_cur.append([zi, logm_i, logmfunc_i])
@@ -570,10 +591,9 @@ def generate_best_fit_hmf_params_train_data(
 
 
 def load_training_data(
-    savedir_input=None,
-    savedir_target=None,
-    save_base_name_input=None,
-    save_base_name_target=None,
+    savedir=None,
+    save_base_name=None,
+    cuml=False,
     file_name_conventions=DEFAULT_FILE_NAME_CONVENTIONS,
 ):
     """
@@ -586,17 +606,15 @@ def load_training_data(
 
     Parameters
     ----------
-    savedir_input: str
-        path to directory where the input data is stored
+    savedir: str
+        path to directory where the data is stored
 
-    savedir_target: str
-        path to directory where the target data is stored
+    save_base_name: str
+        base name of the data files to load
 
-    save_base_name_input: str
-        base name of input data files to load
-
-    save_base_name_target: str
-        base name of target data files to load
+    cuml: bool
+        if True, the cumulative HMF will be used,
+        if False, the differential HMF will be used
 
     file_name_conventions: dictionary
         naming conventions for files
@@ -638,56 +656,34 @@ def load_training_data(
         values of base-10 log of the halo mass function
     """
     # load files
-    if savedir_input[-1] != "/":
-        savedir_input += "/"
-    if savedir_target[-1] != "/":
-        savedir_target += "/"
+    if savedir[-1] != "/":
+        savedir += "/"
 
     # ---load cosmological parameters
     cosmo_param_names = np.loadtxt(
-        savedir_input
-        + save_base_name_input
-        + "_"
-        + file_name_conventions["cosmo_param_names"],
+        savedir + save_base_name + "_" + file_name_conventions["cosmo_param_names"],
         dtype=str,
     )
 
     cosmo_param_values = np.load(
-        savedir_input
-        + save_base_name_input
-        + "_"
-        + file_name_conventions["cosmo_param_values"],
+        savedir + save_base_name + "_" + file_name_conventions["cosmo_param_values"],
     )
 
     # ---load redshift values
-    z = np.load(
-        savedir_input + save_base_name_input + "_" + file_name_conventions["redshift"]
-    )
+    z = np.load(savedir + save_base_name + "_" + file_name_conventions["redshift"])
 
     # --load halo mass function parameters
     ytp_params = np.load(
-        savedir_target
-        + save_base_name_target
-        + "_"
-        + file_name_conventions["ytp_params"],
+        savedir + save_base_name + "_" + file_name_conventions["ytp_params"],
     )
     x0_params = np.load(
-        savedir_target
-        + save_base_name_target
-        + "_"
-        + file_name_conventions["x0_params"],
+        savedir + save_base_name + "_" + file_name_conventions["x0_params"],
     )
     lo_params = np.load(
-        savedir_target
-        + save_base_name_target
-        + "_"
-        + file_name_conventions["lo_params"],
+        savedir + save_base_name + "_" + file_name_conventions["lo_params"],
     )
     hi_params = np.load(
-        savedir_target
-        + save_base_name_target
-        + "_"
-        + file_name_conventions["hi_params"],
+        savedir + save_base_name + "_" + file_name_conventions["hi_params"],
     )
 
     # combine all HMF parameters into a signle array
@@ -709,11 +705,13 @@ def load_training_data(
 
     # ---load halo mass and halo mass function
     logmhalo = np.load(
-        savedir_input + save_base_name_input + "_" + file_name_conventions["logmhalo"]
+        savedir + save_base_name + "_" + file_name_conventions["logmhalo"]
     )
-    loghmf = np.load(
-        savedir_input + save_base_name_input + "_" + file_name_conventions["loghmf"]
-    )
+    if cuml:
+        _hmf_file_name = file_name_conventions["loghmf_cuml"]
+    else:
+        _hmf_file_name = file_name_conventions["loghmf_diff"]
+    loghmf = np.load(savedir + save_base_name + "_" + _hmf_file_name)
 
     return (
         cosmo_param_names,
@@ -730,8 +728,9 @@ def load_training_data(
 
 
 def load_hmf_fitter_loss_data(
-    savedir_input=None,
-    save_base_name_input=None,
+    savedir=None,
+    save_base_name=None,
+    cuml=False,
     file_name_conventions=DEFAULT_FILE_NAME_CONVENTIONS,
 ):
     """
@@ -746,6 +745,10 @@ def load_hmf_fitter_loss_data(
     save_base_name_input: str
         base name of input data files to load
 
+    cuml: bool
+        if True, the cumulative HMF will be used,
+        if False, the differential HMF will be used
+
     file_name_conventions: dictionary
         naming conventions for files
 
@@ -758,28 +761,25 @@ def load_hmf_fitter_loss_data(
          base-10 log of halo mass function]
     """
     # load files
-    if savedir_input[-1] != "/":
-        savedir_input += "/"
+    if savedir[-1] != "/":
+        savedir += "/"
 
     # load redshift values and cosmologies
-    z = np.load(
-        savedir_input + save_base_name_input + "_" + file_name_conventions["redshift"]
-    )
+    z = np.load(savedir + save_base_name + "_" + file_name_conventions["redshift"])
     cosmo_param_values = np.load(
-        savedir_input
-        + save_base_name_input
-        + "_"
-        + file_name_conventions["cosmo_param_values"],
+        savedir + save_base_name + "_" + file_name_conventions["cosmo_param_values"],
     )
     num_samples = cosmo_param_values.shape[0]
 
     # load halo mass and halo mass function
     logmhalo = np.load(
-        savedir_input + save_base_name_input + "_" + file_name_conventions["logmhalo"]
+        savedir + save_base_name + "_" + file_name_conventions["logmhalo"]
     )
-    loghmf = np.load(
-        savedir_input + save_base_name_input + "_" + file_name_conventions["loghmf"]
-    )
+    if cuml:
+        _hmf_file_name = file_name_conventions["loghmf_cuml"]
+    else:
+        _hmf_file_name = file_name_conventions["loghmf_diff"]
+    loghmf = np.load(savedir + save_base_name + "_" + _hmf_file_name)
 
     loss_data = []
     for ic in range(num_samples):

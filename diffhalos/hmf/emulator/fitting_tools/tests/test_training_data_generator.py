@@ -42,8 +42,9 @@ def test_generate_diff_hmf_loss_train_data():
 
     # check that loading the loss data works without issues
     loss_data = tdg.load_hmf_fitter_loss_data(
-        savedir_input=SAVE_DIR,
-        save_base_name_input=SAVE_BASE_NAME_DIFF,
+        savedir=SAVE_DIR,
+        save_base_name=SAVE_BASE_NAME_DIFF,
+        cuml=False,
     )
 
     res = tdg.generate_best_fit_hmf_params_train_data(
@@ -102,8 +103,9 @@ def test_generate_cuml_hmf_loss_train_data():
 
     # check that loading the loss data works without issues
     loss_data = tdg.load_hmf_fitter_loss_data(
-        savedir_input=SAVE_DIR,
-        save_base_name_input=SAVE_BASE_NAME_CUML,
+        savedir=SAVE_DIR,
+        save_base_name=SAVE_BASE_NAME_CUML,
+        cuml=True,
     )
     assert len(loss_data) == num_samples
     for ci in range(len(loss_data)):
@@ -137,3 +139,64 @@ def test_generate_cuml_hmf_loss_train_data():
         assert np.all(np.isfinite(loss_hist))
         assert fit_terminates == 1
         assert loss < loss_hist[0]
+
+
+def test_generate_hmf_loss_train_data_unpacks_properly():
+    logmp = np.linspace(8.5, 15.5, 100)
+    z = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
+    num_z = len(z)
+
+    # for single cosmology
+    num_samples = 1
+    loss_data = tdg.generate_hmf_loss_train_data(
+        logmp,
+        z,
+        cuml=True,
+        cosmo_params=None,
+        cosmo_param_names=None,
+        base_cosmo_params=DEFAULT_COSMOLOGY,
+        cosmo_priors=DEFAULT_COSMO_PRIORS,
+        num_samples=num_samples,
+        savedir=None,
+        save_base_name=None,
+        return_outputs=True,
+    )
+
+    # one cosmology, many redshift
+    assert len(loss_data) == num_z
+    for _loss_z in loss_data:
+        try:
+            redshift, target_lgmp, target_hmf = _loss_z
+        except ValueError:
+            raise Exception(
+                "Loss data for each cosmology must be a list of len=3,\n but it has len = %d"
+                % len(loss_data),
+            )
+
+    # multiple cosmologies, many redshifts
+    num_samples = 5
+    loss_data = tdg.generate_hmf_loss_train_data(
+        logmp,
+        z,
+        cuml=True,
+        cosmo_params=None,
+        cosmo_param_names=None,
+        base_cosmo_params=DEFAULT_COSMOLOGY,
+        cosmo_priors=DEFAULT_COSMO_PRIORS,
+        num_samples=num_samples,
+        savedir=None,
+        save_base_name=None,
+        return_outputs=True,
+    )
+
+    assert len(loss_data) == num_samples
+    for _loss in loss_data:
+        assert len(_loss) == num_z
+        for _loss_z in _loss:
+            try:
+                redshift, target_lgmp, target_hmf = _loss_z
+            except ValueError:
+                raise Exception(
+                    "Loss data for each cosmology must be a list of len=3,\n but it has len = %d"
+                    % len(loss_data),
+                )

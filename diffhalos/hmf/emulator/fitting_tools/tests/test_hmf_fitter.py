@@ -4,17 +4,17 @@ import numpy as np
 
 
 from ..hmf_fitter import fit_hmf_single_cosmo, fit_hmf_multi_cosmo
-from ..training_data_generator import get_hmf_training_data
+from ..training_data_generator import generate_hmf_loss_train_data
 from .....cosmology.cosmo_params import sample_cosmo_params
 from .....cosmology.defaults import DEFAULT_COSMO_PRIORS, DEFAULT_COSMOLOGY
 
 
 def test_adam_cuml_hmf_single_cosmo_fitter():
-    logMhalo = np.linspace(8.5, 15.5, 100)
+    logmp = np.linspace(8.5, 15.5, 100)
     z = np.array([0.0, 1.5, 2.5, 3.5, 5.0])
 
-    loss_data = get_hmf_training_data(
-        logMhalo,
+    loss_data = generate_hmf_loss_train_data(
+        logmp,
         z,
         cuml=True,
         cosmo_params=None,
@@ -41,11 +41,11 @@ def test_adam_cuml_hmf_single_cosmo_fitter():
 
 
 def test_adam_diff_hmf_single_cosmo_fitter():
-    logMhalo = np.linspace(8.5, 15.5, 100)
+    logmp = np.linspace(8.5, 15.5, 100)
     z = np.array([0.0, 1.5, 2.5, 3.5, 5.0])
 
-    loss_data = get_hmf_training_data(
-        logMhalo,
+    loss_data = generate_hmf_loss_train_data(
+        logmp,
         z,
         cuml=False,
         cosmo_params=None,
@@ -72,7 +72,7 @@ def test_adam_diff_hmf_single_cosmo_fitter():
 
 
 def test_adam_diff_hmf_multi_cosmo_fitter():
-    logMhalo = np.linspace(8.5, 15.5, 100)
+    logmp = np.linspace(8.5, 15.5, 100)
     z = np.array([0.0, 1.5, 2.5, 3.5, 5.0])
 
     cosmo_params = sample_cosmo_params(
@@ -82,8 +82,8 @@ def test_adam_diff_hmf_multi_cosmo_fitter():
     )
     cosmo_param_names = list(DEFAULT_COSMO_PRIORS.keys())
 
-    loss_data = get_hmf_training_data(
-        logMhalo,
+    loss_data = generate_hmf_loss_train_data(
+        logmp,
         z,
         cosmo_params=cosmo_params,
         cosmo_param_names=cosmo_param_names,

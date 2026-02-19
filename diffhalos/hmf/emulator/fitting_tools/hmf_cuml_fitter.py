@@ -3,9 +3,7 @@
 from jax import jit as jjit
 from jax import value_and_grad
 
-from diffsky.mass_functions.fitting_utils.fitting_helpers import (
-    jax_adam_wrapper,
-)
+from diffsky.mass_functions.fitting_utils.fitting_helpers import jax_adam_wrapper
 
 from diffsky.mass_functions.hmf_model import DEFAULT_HMF_PARAMS as P_INIT
 from diffsky.mass_functions.hmf_model import HMF_Params

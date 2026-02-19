@@ -4,16 +4,16 @@ import numpy as np
 
 
 from ..hmf_diff_fitter import diff_hmf_fitter
-from ..training_data_generator import get_hmf_training_data
+from ..training_data_generator import generate_hmf_loss_train_data
 from .....cosmology.defaults import DEFAULT_COSMO_PRIORS, DEFAULT_COSMOLOGY
 
 
 def test_diff_hmf_fitter_runs():
-    logMhalo = np.linspace(8.5, 15.5, 100)
+    logmp = np.linspace(8.5, 15.5, 100)
     z = np.array([0.0, 1.5, 2.5, 3.5, 5.0])
 
-    loss_data = get_hmf_training_data(
-        logMhalo,
+    loss_data = generate_hmf_loss_train_data(
+        logmp,
         z,
         cuml=False,
         cosmo_params=None,

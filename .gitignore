@@ -1,8 +1,8 @@
 # Jupyter notebooks
 notebooks/
 
-# testing data
-*/testing_data/
+# testing data directories
+diffhalos/hmf/emulator/fitting_tools/tests/testing_data/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
