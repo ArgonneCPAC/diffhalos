@@ -7,17 +7,15 @@ import os
 from diffsky.mass_functions.hmf_model import DEFAULT_HMF_PARAMS as P_INIT
 
 from . import hmf_fitter
-from ...hmf_model_colossus import colossus_diff_hmf, colossus_cuml_hmf
+from ...hmf_model_colossus import predict_diff_hmf, predict_cuml_hmf
 from ....cosmology.defaults import DEFAULT_COSMOLOGY, DEFAULT_COSMO_PRIORS
 from ....cosmology.cosmo_params import define_colossus_cosmology, sample_cosmo_params
 
 
 __all__ = (
-    "get_file_naming_conventions",
-    "generate_hmf_training_data",
-    "get_best_fit_hmf_params_training_data",
+    "generate_hmf_loss_train_data",
+    "generate_best_fit_hmf_params_train_data",
     "load_training_data",
-    "load_hmf_fitter_loss_data",
 )
 
 DEFAULT_FILE_NAME_CONVENTIONS = {
@@ -40,16 +38,18 @@ HMF_MODEL = "tinker08"
 HMF_CUT = 1e-8
 
 
-def get_file_naming_conventions():
+def get_file_naming_conventions(verbose=True):
     """
     Convenience function to get the naming
     conventions for files to be saved and loaded
     """
+    if verbose:
+        print(DEFAULT_FILE_NAME_CONVENTIONS)
     return DEFAULT_FILE_NAME_CONVENTIONS
 
 
-def generate_hmf_training_data(
-    logmhalo,
+def generate_hmf_loss_train_data(
+    logmp,
     z,
     cuml=False,
     cosmo_params=None,
@@ -77,7 +77,7 @@ def generate_hmf_training_data(
 
     Parameters
     ----------
-    logmhalo: ndarray of shape (n_halo,)
+    logmp: ndarray of shape (n_halo,)
         base-10 log of halo masses, in Msun
 
     z: ndarray of shape (num_redshift,)
@@ -145,7 +145,7 @@ def generate_hmf_training_data(
     saves files to the required destination and/or
     returns the results
 
-    data being retunred:
+    data being generated:
     loss_data: list
         each element is a list of
         [redshift,
@@ -190,7 +190,7 @@ def generate_hmf_training_data(
         raise Exception(errmsg)
 
     hmf_loss_data = _get_hmf_training_data(
-        logmhalo,
+        logmp,
         z,
         cuml=cuml,
         cosmo_params=cosmo_params,
@@ -233,7 +233,7 @@ def generate_hmf_training_data(
 
         # save base-10 log of halo mass and halo mass function
         # per cosmology for all redshifts together
-        num_halo = len(logmhalo)
+        num_halo = len(logmp)
         num_redshift = len(z)
 
         logmhalo_data = np.zeros((num_samples, num_redshift, num_halo))
@@ -261,8 +261,8 @@ def generate_hmf_training_data(
         _info_z_min = np.array(["z_min:", z[0]])
         _info_z_max = np.array(["z_max:", z[-1]])
         _info_n_z = np.array(["n_z:", num_redshift])
-        _info_mh_min = np.array(["mhalo_min:", logmhalo[0]])
-        _info_mh_max = np.array(["mhalo_max:", logmhalo[-1]])
+        _info_mh_min = np.array(["mhalo_min:", logmp[0]])
+        _info_mh_max = np.array(["mhalo_max:", logmp[-1]])
         _info_n_halo = np.array(["n_halo:", num_halo])
         additional_info = np.column_stack(
             (
@@ -289,7 +289,7 @@ def generate_hmf_training_data(
 
 
 def _get_hmf_training_data(
-    logMhalo,
+    logmp,
     z,
     cuml=False,
     cosmo_params=None,
@@ -306,7 +306,7 @@ def _get_hmf_training_data(
 
     Parameters
     ----------
-    logMhalo: ndarray of shape (n_halo, )
+    logmp: ndarray of shape (n_halo, )
         base-10 log of halo masses, in Msun
 
     z: ndarray of shape (n_z, )
@@ -356,7 +356,6 @@ def _get_hmf_training_data(
     # get loss data
     loss_data = []
     for ci in range(num_samples):
-
         # define current Colossus cosmology
         cosmo_params_cur = deepcopy(base_cosmo_params)
         for pi, _param in enumerate(cosmo_param_names):
@@ -367,8 +366,8 @@ def _get_hmf_training_data(
         loss_data_cosmo_cur = []
         for zi in z:
             if cuml:
-                logmfunc_i, logm_i = colossus_cuml_hmf(
-                    logMhalo,
+                logmfunc_i, logm_i = predict_cuml_hmf(
+                    logmp,
                     zi,
                     cosmo,
                     mdef=mdef,
@@ -376,8 +375,8 @@ def _get_hmf_training_data(
                     hmf_cut=hmf_cut,
                 )
             else:
-                logmfunc_i, logm_i = colossus_diff_hmf(
-                    logMhalo,
+                logmfunc_i, logm_i = predict_diff_hmf(
+                    logmp,
                     zi,
                     cosmo,
                     mdef=mdef,
@@ -389,13 +388,10 @@ def _get_hmf_training_data(
         # collect loss for all cosmologies and all redshifts
         loss_data.append(loss_data_cosmo_cur)
 
-    if num_samples == 1:
-        loss_data = loss_data[0]
-
     return loss_data
 
 
-def get_best_fit_hmf_params_training_data(
+def generate_best_fit_hmf_params_train_data(
     loss_data,
     num_steps=1000,
     step_size=0.01,
@@ -787,8 +783,9 @@ def load_hmf_fitter_loss_data(
 
     loss_data = []
     for ic in range(num_samples):
+        _loss = []
         for iz, zi in enumerate(z):
-            _loss = [zi, logmhalo[iz, iz, :], loghmf[ic, iz, :]]
+            _loss.append([zi, logmhalo[ic, iz, :], loghmf[ic, iz, :]])
         loss_data.append(_loss)
 
     return loss_data

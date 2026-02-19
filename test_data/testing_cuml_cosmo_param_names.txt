@@ -1,0 +1,4 @@
+# cosmological parameter names
+Om0
+sigma8
+ns

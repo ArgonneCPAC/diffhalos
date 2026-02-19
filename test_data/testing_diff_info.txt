@@ -1,0 +1,8 @@
+n_cosmo_params: 3
+n_cosmo_params: 3
+z_min: 0.0
+z_max: 5.0
+n_z: 5
+mhalo_min: 8.5
+mhalo_max: 15.5
+n_halo: 100

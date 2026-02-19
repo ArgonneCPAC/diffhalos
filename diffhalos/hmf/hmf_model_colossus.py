@@ -6,16 +6,16 @@ from colossus.lss import mass_function
 from scipy.interpolate import UnivariateSpline
 
 
-__all__ = ("colossus_diff_hmf", "colossus_cuml_hmf")
+__all__ = ("predict_diff_hmf", "predict_cuml_hmf")
 
 MDEF = "200m"
 HMF_MODEL = "tinker08"
 HMF_CUT = 1e-8
 
 
-def colossus_diff_hmf(
-    logMhalo,
-    z,
+def predict_diff_hmf(
+    logmp,
+    redshift,
     cosmo,
     mdef=MDEF,
     model=HMF_MODEL,
@@ -27,10 +27,10 @@ def colossus_diff_hmf(
 
     Parameters
     ----------
-    logMhalo: ndarray of shape (n_halo,)
+    logmp: ndarray of shape (n_halo,)
         base-10 log of halo masses, in Msun
 
-    z: float
+    redshift: float
         redshift point
 
     cosmo: colossus cosmology
@@ -51,43 +51,33 @@ def colossus_diff_hmf(
         base-10 log of halo mass function model predictions after applying the
         HMF cut, in comoving 1/Mpc^3
 
-    logMhalo_out: ndarray of shape (n_halo_out,)
+    logmp_out: ndarray of shape (n_halo_out,)
         base-10 log of halo masses after applying the
         HMF cut, in Msun
     """
     # halo masses
-    Mhalo = 10**logMhalo
-    nhalo = len(logMhalo)
+    Mhalo = 10**logmp
+    nhalo = len(logmp)
 
     # halo mass function
-    mfunc = _call_colossus(
-        Mhalo * cosmo.h,
-        z,
-        cosmo,
-        mdef,
-        model,
-    )
+    mfunc = _call_colossus(Mhalo * cosmo.h, redshift, cosmo, mdef, model)
 
     # cut at low HMF limit
     _filter = np.where(mfunc > hmf_cut)[0]
     if len(_filter > 0):
-        logMhalo_after_cut = logMhalo[_filter]
+        logMhalo_after_cut = logmp[_filter]
         logm_min = logMhalo_after_cut[0]
         logm_max = logMhalo_after_cut[-1]
-        logMhalo_out = np.linspace(logm_min, logm_max, nhalo)
+        logmp_out = np.linspace(logm_min, logm_max, nhalo)
         mfunc_new = _call_colossus(
-            10**logMhalo_out * cosmo.h,
-            z,
-            cosmo,
-            mdef,
-            model,
+            10**logmp_out * cosmo.h, redshift, cosmo, mdef, model
         )
         logmfunc_out = np.log10(mfunc_new)
     else:
-        logMhalo_out = logMhalo
+        logmp_out = logmp
         logmfunc_out = np.log10(mfunc)
 
-    return logmfunc_out, logMhalo_out
+    return logmfunc_out, logmp_out
 
 
 def _call_colossus(
@@ -111,9 +101,9 @@ def _call_colossus(
     return mfunc
 
 
-def colossus_cuml_hmf(
-    logMhalo,
-    z,
+def predict_cuml_hmf(
+    logmp,
+    redshift,
     cosmo,
     mdef=MDEF,
     model=HMF_MODEL,
@@ -125,10 +115,10 @@ def colossus_cuml_hmf(
 
     Parameters
     ----------
-    logMhalo: ndarray of shape (n_halo,)
+    logmp: ndarray of shape (n_halo,)
         base-10 log of halo masses, in Msun
 
-    z: ndarray of shape (n_z,)
+    redshift: ndarray of shape (n_z,)
         redshift values
 
     cosmo: colossus cosmology
@@ -154,20 +144,23 @@ def colossus_cuml_hmf(
         HMF cut, in Msun
     """
     # halo mass function
-    logmfunc, logm = colossus_diff_hmf(
-        logMhalo, z, cosmo, mdef=mdef, model=model, hmf_cut=hmf_cut
+    logmp_cuml = np.zeros(len(logmp) + 1)
+    logmp_cuml[:-1] = logmp
+    logmp_cuml[-1] = logmp[-1] + 0.1
+    logmfunc, logm = predict_diff_hmf(
+        logmp_cuml, redshift, cosmo, mdef=mdef, model=model, hmf_cut=hmf_cut
     )
 
     # integrate to obtain the cumulative halo mass function
-    logm_cuml = logm[:-1]
-    loghmf_cuml_func = np.zeros(len(logm_cuml))
-    for i in range(len(logm_cuml)):
+    loghmf_cuml_func = np.zeros(len(logmp))
+    for i in range(len(loghmf_cuml_func)):
         loghmf_cuml_func[i] = np.log10(
             UnivariateSpline(
                 logm,
                 10**logmfunc,
                 s=0.0,
-            ).integral(logm_cuml[i], logm[-1])
+            ).integral(logm[i], logm[-1])
         )
+    logmp_cuml = logm[:-1]
 
-    return loghmf_cuml_func, logm_cuml
+    return loghmf_cuml_func, logmp_cuml

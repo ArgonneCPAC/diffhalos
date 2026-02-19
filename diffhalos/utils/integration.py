@@ -3,10 +3,7 @@
 from jax import jit as jjit
 from jax.lax import scan
 
-__all__ = (
-    "cumtrapz",
-    "trapz",
-)
+__all__ = ("cumtrapz", "trapz")
 
 
 @jjit
@@ -21,18 +18,21 @@ def _cumtrapz_scan_func(carryover, el):
 
 @jjit
 def cumtrapz(xarr, yarr):
-    """Cumulative trapezoidal integral
+    """
+    Cumulative trapezoidal integral
 
     Parameters
     ----------
-    xarr : ndarray, shape (n, )
+    xarr: ndarray, shape (n, )
+        x coordinaltes
 
-    yarr : ndarray, shape (n, )
+    yarr: ndarray, shape (n, )
+        integrand
 
     Returns
     -------
-    result : ndarray, shape (n, )
-
+    result: ndarray, shape (n, )
+        integration results
     """
     res_init = xarr[0], yarr[0], 0.0
     scan_data = xarr, yarr
@@ -42,18 +42,21 @@ def cumtrapz(xarr, yarr):
 
 @jjit
 def trapz(xarr, yarr):
-    """Trapezoidal integral
+    """
+    Trapezoidal integral
 
     Parameters
     ----------
-    xarr : ndarray, shape (n, )
+    xarr: ndarray, shape (n, )
+        x coordinaltes
 
-    yarr : ndarray, shape (n, )
+    yarr: ndarray, shape (n, )
+        integrand
 
     Returns
     -------
-    result : float
-
+    result: ndarray, shape (n, )
+        integration results
     """
     res_init = xarr[0], yarr[0], 0.0
     scan_data = xarr, yarr
