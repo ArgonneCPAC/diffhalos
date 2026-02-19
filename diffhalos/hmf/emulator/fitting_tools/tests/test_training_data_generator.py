@@ -7,7 +7,7 @@ from .. import training_data_generator as tdg
 from .....cosmology.cosmo_params import DEFAULT_COSMO_PRIORS, DEFAULT_COSMOLOGY
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SAVE_DIR = os.path.join(HERE, "test_data")
+SAVE_DIR = os.path.join(HERE, "testing_data")
 SAVE_BASE_NAME_DIFF = "testing_diff"
 SAVE_BASE_NAME_CUML = "testing_cuml"
 

@@ -2,7 +2,7 @@
 notebooks/
 
 # testing data
-*/test_data/
+*/testing_data/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
