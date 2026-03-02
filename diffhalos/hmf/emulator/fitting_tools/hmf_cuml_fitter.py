@@ -98,4 +98,4 @@ def _loss_func_multi_z(params, loss_data):
 
 
 """computes loss and gradient at multiple redshift points"""
-_loss_and_grad_func = value_and_grad(_loss_func_multi_z, argnums=0)
+_loss_and_grad_func = jjit(value_and_grad(_loss_func_multi_z, argnums=0))

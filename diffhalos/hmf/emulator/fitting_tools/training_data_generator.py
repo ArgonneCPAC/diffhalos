@@ -181,7 +181,6 @@ def generate_hmf_loss_train_data(
     if cosmo_params is not None and cosmo_param_names is not None:
         num_samples = cosmo_params.shape[0]
     elif num_samples is not None and cosmo_priors is not None:
-        cosmo_param_names = list(cosmo_priors.keys())
         cosmo_params = sample_cosmo_params(
             cosmo_priors=cosmo_priors,
             seed=seed,
@@ -189,10 +188,11 @@ def generate_hmf_loss_train_data(
             method=cosmo_params_sample_method,
         )
     else:
-        print("!ERROR! Either ``cosmo_params`` and ``cosmo_param_names``")
-        print("or ``num_samples`` and ``cosmo_priors``")
-        errmsg = "must be provided"
+        errmsg = "!ERROR! Either ``cosmo_params`` and ``cosmo_param_names`` \n or ``num_samples`` and ``cosmo_priors`` must be provided"
         raise Exception(errmsg)
+
+    if cosmo_param_names is None:
+        cosmo_param_names = list(cosmo_priors.keys())
 
     hmf_loss_data = _get_hmf_training_data(
         logmp,
@@ -230,6 +230,16 @@ def generate_hmf_loss_train_data(
             cosmo_params,
         )
 
+        # save cosmological parameter ranges
+        with open(
+            savedir
+            + save_base_name
+            + "_"
+            + file_name_conventions["cosmo_param_priors"],
+            "w",
+        ) as json_file:
+            json.dump(cosmo_priors, json_file, indent=4)
+
         # save redshifts
         np.save(
             savedir + save_base_name + "_" + file_name_conventions["redshift"],
@@ -238,9 +248,7 @@ def generate_hmf_loss_train_data(
 
         # save base-10 log of halo mass and halo mass function
         # per cosmology for all redshifts together
-        num_halo = len(logmp)
-        num_redshift = len(z)
-
+        num_halo, num_redshift = len(logmp), len(z)
         logmhalo_data = np.zeros((num_samples, num_redshift, num_halo))
         loghmf_data = np.zeros((num_samples, num_redshift, num_halo))
         for ci in range(num_samples):
@@ -263,16 +271,6 @@ def generate_hmf_loss_train_data(
                 savedir + save_base_name + "_" + _hmf_file_name,
                 loghmf_data,
             )
-
-        # save cosmological parameter ranges cosmo_param_priors
-        with open(
-            savedir
-            + save_base_name
-            + "_"
-            + file_name_conventions["cosmo_param_priors"],
-            "w",
-        ) as json_file:
-            json.dump(cosmo_priors, json_file, indent=4)
 
         # save additional information
         _info_n_cosmo_params = np.array(["n_cosmo_params:", cosmo_params.shape[1]])
@@ -427,7 +425,7 @@ def generate_best_fit_hmf_params_train_data(
     """
     Generate data files for halo mass function fits
     for a range of cosmologies and redshifts
-    and save to file. This function runs fits to
+    and save to file. This function runs the fitters to
     the input loss data and saves the results to file.
 
     Parameters

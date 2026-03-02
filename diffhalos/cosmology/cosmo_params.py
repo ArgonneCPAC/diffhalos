@@ -10,6 +10,9 @@ from .defaults import DEFAULT_COSMOLOGY, DEFAULT_COSMO_PRIORS
 __all__ = ("define_colossus_cosmology", "sample_cosmo_params")
 
 
+AV_SAMPLING_METHODS = ("LatinHypercube",)
+
+
 def define_colossus_cosmology(
     cosmo_name="cosmo",
     cosmo_params=DEFAULT_COSMOLOGY,
@@ -105,15 +108,16 @@ def sample_cosmo_params(
     cosmo_samples: ndarray of shape (num_samples, num_params)
         cosmological parameter samples
     """
-    if method == "LatinHypercube":
+    if method.lower() == "latinhypercube":
         cosmo_samples = _sample_cosmo_params_latin_hypercube(
             cosmo_priors=cosmo_priors,
             seed=seed,
             num_samples=num_samples,
         )
     else:
-        print("!ERROR! Method %s is not implemented" % method)
-        errmsg = "Choose from: ('LatinHypercube')"
+        errmsg = "!ERROR! Method {} is not implemented. \n Choose from: {}".format(
+            method, AV_SAMPLING_METHODS
+        )
         raise Exception(errmsg)
 
     return cosmo_samples

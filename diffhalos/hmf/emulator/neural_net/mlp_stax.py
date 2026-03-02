@@ -4,7 +4,6 @@ import numpy as np
 from time import time
 import pickle
 import os
-import glob
 import pathlib
 
 from jax import jit as jjit
@@ -14,17 +13,29 @@ from jax import value_and_grad
 from jax.example_libraries import stax
 from jax.example_libraries import optimizers as jax_opt
 
+from .pretrained_models import ENVIRON_VAR
 from ..utils import format_time
 
 __all__ = ("MLP_stax",)
 
 
 # load pretrained models
-PRETRAINED_PATH = pathlib.Path(__file__).parent / "pretrained_models"
-PRETRAINED_MODEL_NAMES = glob.glob(str(PRETRAINED_PATH / "*_opt_final.pkl"))
-PRETRAINED_MODEL_NAMES = [str(pathlib.Path(x).name) for x in PRETRAINED_PATH]
+try:
+    PRETRAINED_PATH = pathlib.Path(os.environ[ENVIRON_VAR])
+except KeyError:
+    msg = (
+        f"You must have the '{ENVIRON_VAR}' environment variable set to use the HMF emulator.\n"
+        "Run first 'export {ENVIRON_VAR}=path_to_diffhmfemu_data_folder'"
+    )
+    raise ValueError(msg)
 
-DEFAULT_MLP_MODEL = ""
+# PRETRAINED_PATH = pathlib.Path(__file__).parent / "pretrained_models"
+PRETRAINED_MODEL_NAMES = [
+    f.name for f in PRETRAINED_PATH.iterdir() if f.is_file() and f.name.endswith(".pkl")
+]
+
+# set the default model to use
+DEFAULT_MLP_MODEL = "mlp_model_v0"
 
 
 class MLP_stax:
@@ -341,7 +352,7 @@ class MLP_stax:
             os.makedirs(savedir)
 
         # save final state
-        file_path = savedir + save_base_name + "_opt_final" + ".pkl"
+        file_path = savedir + save_base_name + ".pkl"
         with open(file_path, "wb") as file:
             pickle.dump(self.opt_state_final, file)
 
@@ -405,6 +416,8 @@ class MLP_stax:
         savedir=PRETRAINED_PATH,
         save_base_name=DEFAULT_MLP_MODEL,
         verbose=False,
+        return_model=False,
+        return_extra=False,
     ):
         """
         Convenient function to load the model from disk
@@ -420,6 +433,13 @@ class MLP_stax:
         verbose: bool
             if True, feedback will be printed
 
+        return_model: bool
+            if True, the model will be returned during loaing
+
+        return_extra: bool
+            if True, will return extra data in addition to
+            the final state of the sampler
+
         Returns
         -------
         model_final: namedtuple
@@ -431,54 +451,69 @@ class MLP_stax:
         loss_hist: ndarray of shape (num_steps,)
             loss at each step of the optimization
         """
+        savedir = str(savedir)
         if savedir[-1] != "/":
             savedir += "/"
 
         # save final state
-        file_path = savedir + save_base_name + "_opt_final" + ".pkl"
+        file_path = savedir + save_base_name + ".pkl"
         with open(file_path, "rb") as file:
             self.opt_state_final = pickle.load(file)
-
-        # save initial state
-        file_path = savedir + save_base_name + "_opt_init" + ".pkl"
-        with open(file_path, "rb") as file:
-            self.opt_state_init = pickle.load(file)
-
-        # save loss history
-        file_path = savedir + save_base_name + "_loss_hist" + ".npy"
-        self.loss_hist = np.load(file_path)
-
-        # load additional information
-        (
-            train_dt_sec,
-            batch_size,
-            num_batches,
-            num_epochs,
-            step_size,
-            opt_seed,
-        ) = np.loadtxt(
-            savedir + save_base_name + "_info.txt", usecols=(-1,), skiprows=4
-        )
-        self.train_dt_sec = float(train_dt_sec)
-        self.train_dt = format_time(self.train_dt_sec)
-        self.batch_size = int(batch_size)
-        self.num_batches = int(num_batches)
-        self.num_epochs = int(num_epochs)
-        self.step_size = float(step_size)
-        self.opt_seed = int(opt_seed)
-
-        (
-            self.n_neuron_per_layer,
-            self.n_layer,
-            self.n_feature,
-            self.n_target,
-            self.n_mlp_params,
-        ) = self.get_mlp_architecture(self.opt_state_final)
 
         if verbose:
             print("Model and data loaded from %s" % savedir)
 
-        return self.opt_state_final, self.opt_state_init, self.loss_hist
+        if return_extra:
+            # load additional information
+            (
+                train_dt_sec,
+                batch_size,
+                num_batches,
+                num_epochs,
+                step_size,
+                opt_seed,
+            ) = np.loadtxt(
+                savedir + save_base_name + "_info.txt",
+                usecols=(-1,),
+                skiprows=4,
+            )
+            self.train_dt_sec = float(train_dt_sec)
+            self.train_dt = format_time(self.train_dt_sec)
+            self.batch_size = int(batch_size)
+            self.num_batches = int(num_batches)
+            self.num_epochs = int(num_epochs)
+            self.step_size = float(step_size)
+            self.opt_seed = int(opt_seed)
+
+            (
+                self.n_neuron_per_layer,
+                self.n_layer,
+                self.n_feature,
+                self.n_target,
+                self.n_mlp_params,
+            ) = self.get_mlp_architecture(self.opt_state_final)
+
+            # save initial state
+            file_path = savedir + save_base_name + "_opt_init" + ".pkl"
+            with open(file_path, "rb") as file:
+                self.opt_state_init = pickle.load(file)
+
+            # save loss history
+            file_path = savedir + save_base_name + "_loss_hist" + ".npy"
+            self.loss_hist = np.load(file_path)
+
+            return self.opt_state_final, self.opt_state_init, self.loss_hist
+        else:
+            self.opt_state_init = None
+            self.loss_hist = None
+
+        if return_model:
+            return self.opt_state_final
+
+        return
+
+    def get_available_models(self):
+        return PRETRAINED_MODEL_NAMES
 
     def get_mlp_architecture(
         self,
