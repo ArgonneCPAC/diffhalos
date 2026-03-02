@@ -29,7 +29,6 @@ except KeyError:
     )
     raise ValueError(msg)
 
-# PRETRAINED_PATH = pathlib.Path(__file__).parent / "pretrained_models"
 PRETRAINED_MODEL_NAMES = [
     f.name for f in PRETRAINED_PATH.iterdir() if f.is_file() and f.name.endswith(".pkl")
 ]
@@ -356,11 +355,6 @@ class MLP_stax:
         with open(file_path, "wb") as file:
             pickle.dump(self.opt_state_final, file)
 
-        # save initial state
-        file_path = savedir + save_base_name + "_opt_init" + ".pkl"
-        with open(file_path, "wb") as file:
-            pickle.dump(self.opt_state_init, file)
-
         # save loss history
         file_path = savedir + save_base_name + "_loss_hist" + ".npy"
         np.save(file_path, np.asarray(self.loss_history))
@@ -455,7 +449,7 @@ class MLP_stax:
         if savedir[-1] != "/":
             savedir += "/"
 
-        # save final state
+        # load final state
         file_path = savedir + save_base_name + ".pkl"
         with open(file_path, "rb") as file:
             self.opt_state_final = pickle.load(file)
@@ -493,18 +487,12 @@ class MLP_stax:
                 self.n_mlp_params,
             ) = self.get_mlp_architecture(self.opt_state_final)
 
-            # save initial state
-            file_path = savedir + save_base_name + "_opt_init" + ".pkl"
-            with open(file_path, "rb") as file:
-                self.opt_state_init = pickle.load(file)
-
-            # save loss history
+            # load loss history
             file_path = savedir + save_base_name + "_loss_hist" + ".npy"
             self.loss_hist = np.load(file_path)
 
             return self.opt_state_final, self.opt_state_init, self.loss_hist
         else:
-            self.opt_state_init = None
             self.loss_hist = None
 
         if return_model:

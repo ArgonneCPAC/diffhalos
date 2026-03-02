@@ -1,8 +1,10 @@
-# """ """
+""" """
 
-# from ..mlp_stax import MLP_stax
+from ..mlp_stax import MLP_stax
 
 
-# def test_mlp_stax_works_as_expected():
+def test_mlp_stax_loads_models():
 
-#     nn = MLP_stax()
+    mlp = MLP_stax()
+
+    # load default model

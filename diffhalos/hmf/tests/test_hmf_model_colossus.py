@@ -4,7 +4,7 @@ import numpy as np
 
 from colossus.cosmology import cosmology
 
-from ..hmf_model_colossus import colossus_diff_hmf, colossus_cuml_hmf
+from ..hmf_model_colossus import predict_diff_hmf, predict_cuml_hmf
 
 
 def test_colossus_hmf_call():
@@ -17,7 +17,7 @@ def test_colossus_hmf_call():
     hmf_cut = 1e-8
 
     for zi in z:
-        logmfunc, logm = colossus_diff_hmf(
+        logmfunc, logm = predict_diff_hmf(
             logMhalo,
             zi,
             cosmo,
@@ -42,7 +42,7 @@ def test_colossus_hmf_cuml():
     hmf_cut = 1e-8
 
     for zi in z:
-        logcumlmfunc, logm = colossus_cuml_hmf(
+        logcumlmfunc, logm = predict_cuml_hmf(
             logMhalo,
             zi,
             cosmo,
