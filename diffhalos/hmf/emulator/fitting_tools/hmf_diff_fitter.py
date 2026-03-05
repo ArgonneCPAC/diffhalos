@@ -10,8 +10,8 @@ from diffsky.mass_functions.fitting_utils.fitting_helpers import (
 from diffsky.mass_functions.hmf_model import DEFAULT_HMF_PARAMS as P_INIT
 from diffsky.mass_functions.hmf_model import HMF_Params
 
-from ...hmf_model import predict_diff_hmf
 from .loss_functions import mse
+from ...hmf_model import predict_diff_hmf
 
 __all__ = ("diff_hmf_fitter",)
 

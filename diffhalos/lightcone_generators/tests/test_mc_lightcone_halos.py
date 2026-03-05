@@ -4,9 +4,9 @@ import numpy as np
 from jax import numpy as jnp
 from jax import random as jran
 
-from ...calibrations.hmf_cal import hacc_core_hmf_params as hchmf
-from ...cosmology import DEFAULT_COSMOLOGY, flat_wcdm
-from ...hmf import hmf_model, mc_hosts
+from ...cosmology.cosmo import DEFAULT_COSMOLOGY_ARRAY, DEFAULT_COSMO_NAMES, flat_wcdm
+from ...cosmology.cosmo_param_utils import define_dsps_cosmology
+from ...hmf import hmf_model_mlp, mc_hosts
 from ...mah.diffmahnet.diffmahnet import log_mah_kern
 from ...mah.utils import apply_mah_rescaling
 from ...utils.stratified_grid import redshift_mass_grid
@@ -24,7 +24,7 @@ def test_mc_lightcone_host_halo_mass_function():
     z_min, z_max = 0.4, 0.5
     sky_area_degsq = 10.0
 
-    cosmo = DEFAULT_COSMOLOGY
+    cosmo = DEFAULT_COSMOLOGY_ARRAY
 
     n_tests = 5
     ran_keys = jran.split(jran.key(0), n_tests)
@@ -46,7 +46,7 @@ def test_mc_lightcone_host_halo_mass_function():
             * np.pi
             * flat_wcdm.comoving_distance_to_z(
                 z_min,
-                *cosmo,
+                *define_dsps_cosmology(cosmo),
             )
             ** 3
         )
@@ -55,11 +55,11 @@ def test_mc_lightcone_host_halo_mass_function():
             * np.pi
             * flat_wcdm.comoving_distance_to_z(
                 z_max,
-                *cosmo,
+                *define_dsps_cosmology(cosmo),
             )
             ** 3
         )
-        fsky = sky_area_degsq / hmf_model.FULL_SKY_AREA
+        fsky = sky_area_degsq / hmf_model_mlp.FULL_SKY_AREA
         vol_com_mpc = fsky * (vol_hi - vol_lo)
 
         lgmp_halopop_zmed = mc_hosts.mc_host_halos_singlez(
@@ -152,6 +152,17 @@ def test_mc_lightcone_host_halo_alt_mf_params():
     lgmp_min = 12.0
     sky_area_degsq = 1.0
 
+    alt_cosmo = np.zeros_like(DEFAULT_COSMOLOGY_ARRAY)
+    for i, _param in enumerate(DEFAULT_COSMO_NAMES):
+        if _param == "Om0":
+            alt_cosmo[i] = DEFAULT_COSMOLOGY_ARRAY[i] - 0.07
+        elif _param == "sigma8":
+            alt_cosmo[i] = DEFAULT_COSMOLOGY_ARRAY[i] + 0.05
+        elif _param == "H0":
+            alt_cosmo[i] = DEFAULT_COSMOLOGY_ARRAY[i] - 1.1
+        else:
+            alt_cosmo[i] = DEFAULT_COSMOLOGY_ARRAY[i]
+
     n_tests = 5
     z_max_arr = np.linspace(0.2, 2.5, n_tests)
     for z_max in z_max_arr:
@@ -159,7 +170,7 @@ def test_mc_lightcone_host_halo_alt_mf_params():
         z_min = z_max - 0.05
 
         args = (test_key, lgmp_min, z_min, z_max, sky_area_degsq)
-        cenpop = mclh.mc_lc_halos(*args, hmf_params=hchmf.HMF_PARAMS)
+        cenpop = mclh.mc_lc_halos(*args, cosmo_params=alt_cosmo)
 
         for _field in cenpop._fields:
             assert np.all(np.isfinite(cenpop._asdict()[_field]))
@@ -186,14 +197,14 @@ def test_mah_params_rescaling():
     sky_area_degsq = 200.0
     logmp_cutoff = mclh.DEFAULT_LOGMP_CUTOFF
     logmp_cutoff_himass = mclh.DEFAULT_LOGMP_HIMASS_CUTOFF
-    cosmo_params = DEFAULT_COSMOLOGY
+    cosmo_params = DEFAULT_COSMOLOGY_ARRAY
     centrals_model_key = mclh.DEFAULT_DIFFMAHNET_CEN_MODEL
 
     args = (halopop_key, lgmp_min, z_min, z_max, sky_area_degsq)
     z_obs, logmp_obs_mf = mclh.mc_lc_hmf(*args)
 
-    t_obs = flat_wcdm.age_at_z(z_obs, *cosmo_params)
-    t_0 = flat_wcdm.age_at_z0(*cosmo_params)
+    t_obs = flat_wcdm.age_at_z(z_obs, *define_dsps_cosmology(cosmo_params))
+    t_0 = flat_wcdm.age_at_z0(*define_dsps_cosmology(cosmo_params))
     logt0 = jnp.log10(t_0)
 
     # get the rescaled MAH parameters and MAH's for all halos

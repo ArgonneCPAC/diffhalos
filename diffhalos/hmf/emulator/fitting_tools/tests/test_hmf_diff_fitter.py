@@ -5,7 +5,7 @@ import numpy as np
 
 from ..hmf_diff_fitter import diff_hmf_fitter
 from ..training_data_generator import generate_hmf_loss_train_data
-from .....cosmology.defaults import DEFAULT_COSMO_PRIORS, DEFAULT_COSMOLOGY
+from .....cosmology.cosmo import DEFAULT_COSMO_PRIORS, DEFAULT_COSMOLOGY
 
 
 def test_diff_hmf_fitter_runs():

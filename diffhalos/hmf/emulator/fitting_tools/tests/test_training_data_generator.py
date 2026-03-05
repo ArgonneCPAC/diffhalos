@@ -4,7 +4,7 @@ import numpy as np
 import os
 
 from .. import training_data_generator as tdg
-from .....cosmology.cosmo_params import DEFAULT_COSMO_PRIORS, DEFAULT_COSMOLOGY
+from .....cosmology.cosmo_param_utils import DEFAULT_COSMO_PRIORS, DEFAULT_COSMOLOGY
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SAVE_DIR = os.path.join(HERE, "testing_data")
@@ -45,6 +45,7 @@ def test_generate_diff_hmf_loss_train_data():
         savedir=SAVE_DIR,
         save_base_name=SAVE_BASE_NAME_DIFF,
         cuml=False,
+        return_outputs=True,
     )
 
     res = tdg.generate_best_fit_hmf_params_train_data(
@@ -106,6 +107,7 @@ def test_generate_cuml_hmf_loss_train_data():
         savedir=SAVE_DIR,
         save_base_name=SAVE_BASE_NAME_CUML,
         cuml=True,
+        return_outputs=True,
     )
     assert len(loss_data) == num_samples
     for ci in range(len(loss_data)):

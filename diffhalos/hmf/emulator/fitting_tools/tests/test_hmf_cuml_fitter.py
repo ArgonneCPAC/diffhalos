@@ -2,10 +2,9 @@
 
 import numpy as np
 
-
 from ..hmf_cuml_fitter import cuml_hmf_fitter
 from ..training_data_generator import generate_hmf_loss_train_data
-from .....cosmology.defaults import DEFAULT_COSMO_PRIORS, DEFAULT_COSMOLOGY
+from .....cosmology.cosmo import DEFAULT_COSMO_PRIORS, DEFAULT_COSMOLOGY
 
 
 def test_cuml_hmf_fitter_single_cosmo():

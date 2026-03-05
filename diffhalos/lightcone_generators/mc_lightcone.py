@@ -7,15 +7,16 @@ from jax import config
 
 config.update("jax_enable_x64", True)
 
+import numpy as np
 from collections import namedtuple
 
-import numpy as np
-from diffmah.diffmah_kernels import _log_mah_kern
 from jax import numpy as jnp
 from jax import random as jran
 
+from diffmah.diffmah_kernels import _log_mah_kern
+
 from ..ccshmf import DEFAULT_CCSHMF_PARAMS
-from ..cosmology import DEFAULT_COSMOLOGY
+from ..cosmology.cosmo import DEFAULT_COSMOLOGY_ARRAY
 from ..hmf import mc_hosts
 from . import mc_lightcone_halos as mclch
 from . import mc_lightcone_subhalos as mclcsh
@@ -30,8 +31,7 @@ def mc_lc_mf(
     z_min,
     z_max,
     sky_area_degsq,
-    cosmo_params=DEFAULT_COSMOLOGY,
-    hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
+    cosmo_params=DEFAULT_COSMOLOGY_ARRAY,
     lgmp_max=mc_hosts.LGMH_MAX,
     n_hmf_grid=mclch.N_HMF_GRID,
     ccshmf_params=DEFAULT_CCSHMF_PARAMS,
@@ -60,12 +60,8 @@ def mc_lc_mf(
     sky_area_degsq: float
         sky area, in deg^2
 
-    cosmo_params: namedtuple
-        dsps.cosmology.flat_wcdm cosmology
-        cosmo_params = (Om0, w0, wa, h)
-
-    hmf_params: namedtuple
-        halo mass function parameters
+    cosmo_params: ndarray of shape (n_cosmo_params, )
+        cosmological parameters
 
     lgmp_max: float
         base-10 log of maximum halo mass, in Msun
@@ -96,7 +92,6 @@ def mc_lc_mf(
         z_max,
         sky_area_degsq,
         cosmo_params=cosmo_params,
-        hmf_params=hmf_params,
         lgmp_max=lgmp_max,
         n_hmf_grid=n_hmf_grid,
     )
@@ -119,8 +114,7 @@ def mc_lc(
     z_min,
     z_max,
     sky_area_degsq,
-    cosmo_params=DEFAULT_COSMOLOGY,
-    hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
+    cosmo_params=DEFAULT_COSMOLOGY_ARRAY,
     logmp_cutoff=mclch.DEFAULT_LOGMP_CUTOFF,
     logmp_cutoff_himass=mclch.DEFAULT_LOGMP_HIMASS_CUTOFF,
     lgmp_max=mc_hosts.LGMH_MAX,
@@ -158,12 +152,8 @@ def mc_lc(
     nhalos_tot: int
         total number of halos to generate in the lightcone
 
-    cosmo_params: namedtuple
-        dsps.cosmology.flat_wcdm cosmology
-        cosmo_params = (Om0, w0, wa, h)
-
-    hmf_params: namedtuple
-        halo mass function parameters
+    cosmo_params: ndarray of shape (n_cosmo_params, )
+        cosmological parameters
 
     logmp_cutoff: float
         base-10 log of minimum halo mass for which
@@ -239,7 +229,6 @@ def mc_lc(
         z_max,
         sky_area_degsq,
         cosmo_params=cosmo_params,
-        hmf_params=hmf_params,
         logmp_cutoff=logmp_cutoff,
         logmp_cutoff_himass=logmp_cutoff_himass,
         lgmp_max=lgmp_max,
@@ -300,8 +289,7 @@ def weighted_lc(
     lgmp_max,
     sky_area_degsq,
     *,
-    cosmo_params=DEFAULT_COSMOLOGY,
-    hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
+    cosmo_params=DEFAULT_COSMOLOGY_ARRAY,
     logmp_cutoff=mclch.DEFAULT_LOGMP_CUTOFF,
     logmp_cutoff_himass=mclch.DEFAULT_LOGMP_HIMASS_CUTOFF,
     n_mu_per_host=mclcsh.N_LGMU_PER_HOST,
@@ -333,11 +321,8 @@ def weighted_lc(
     sky_area_degsq: float
         sky area in deg^2
 
-    cosmo_params: namedtuple, optional kwarg
+    cosmo_params: ndarray of shape (n_cosmo_params, )
         cosmological parameters
-
-    hmf_params: namedtuple, optional kwarg
-        halo mass function parameters
 
     logmp_cutoff: float, optional kwarg
         base-10 log of minimum halo mass for which
@@ -439,7 +424,6 @@ def weighted_lc(
         lgmsub_min,
         sky_area_degsq,
         cosmo_params,
-        hmf_params,
         logmp_cutoff,
         logmp_cutoff_himass,
         n_mu_per_host,
@@ -459,7 +443,6 @@ def _weighted_lc_from_grid(
     lgmsub_min,
     sky_area_degsq,
     cosmo_params,
-    hmf_params,
     logmp_cutoff,
     logmp_cutoff_himass,
     n_mu_per_host,
@@ -479,7 +462,6 @@ def _weighted_lc_from_grid(
         logmp_obs,
         sky_area_degsq,
         cosmo_params=cosmo_params,
-        hmf_params=hmf_params,
         logmp_cutoff=logmp_cutoff,
         logmp_cutoff_himass=logmp_cutoff_himass,
         centrals_model_key=centrals_model_key,

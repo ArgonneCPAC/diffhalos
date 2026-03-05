@@ -5,8 +5,8 @@ import numpy as np
 
 from ..hmf_fitter import fit_hmf_single_cosmo, fit_hmf_multi_cosmo
 from ..training_data_generator import generate_hmf_loss_train_data
-from .....cosmology.cosmo_params import sample_cosmo_params
-from .....cosmology.defaults import DEFAULT_COSMO_PRIORS, DEFAULT_COSMOLOGY
+from .....cosmology.cosmo_param_utils import sample_cosmo_params
+from .....cosmology.cosmo import DEFAULT_COSMO_PRIORS, DEFAULT_COSMOLOGY
 
 
 def test_adam_cuml_hmf_single_cosmo_fitter():

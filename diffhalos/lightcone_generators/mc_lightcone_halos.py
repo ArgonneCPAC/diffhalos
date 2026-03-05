@@ -14,11 +14,11 @@ from jax import numpy as jnp
 from jax import random as jran
 from jax import vmap
 
-from ..cosmology import DEFAULT_COSMOLOGY, flat_wcdm
-from ..cosmology.cosmo_basics import get_tobs_from_zobs
+from ..cosmology.cosmo import DEFAULT_COSMOLOGY_ARRAY, get_tobs_from_zobs
 from ..cosmology.geometry_utils import compute_volume_from_sky_area
+from ..cosmology.cosmo_param_utils import define_dsps_cosmology
 from ..hmf import mc_hosts
-from ..hmf.hmf_model import halo_lightcone_weights
+from ..hmf.hmf_model_mlp import halo_lightcone_weights
 from ..mah.utils import apply_mah_rescaling
 
 N_HMF_GRID = 2_000
@@ -50,8 +50,7 @@ def mc_lc_hmf(
     z_min,
     z_max,
     sky_area_degsq,
-    cosmo_params=DEFAULT_COSMOLOGY,
-    hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
+    cosmo_params=DEFAULT_COSMOLOGY_ARRAY,
     lgmp_max=mc_hosts.LGMH_MAX,
     n_hmf_grid=N_HMF_GRID,
 ):
@@ -77,12 +76,8 @@ def mc_lc_hmf(
     sky_area_degsq: float
         sky area, in deg^2
 
-    cosmo_params: namedtuple
-        dsps.cosmology.flat_wcdm cosmology
-        cosmo_params = (Om0, w0, wa, h)
-
-    hmf_params: namedtuple
-        halo mass function parameters
+    cosmo_params: ndarray of shape (n_cosmo_params, )
+        cosmological parameters
 
     lgmp_max: float
         base-10 log of maximum halo mass, in Msun
@@ -110,18 +105,18 @@ def mc_lc_hmf(
     volume_com_mpc = compute_volume_from_sky_area(
         z_grid,
         sky_area_degsq,
-        cosmo_params,
+        define_dsps_cosmology(cosmo_params),
     )
 
     # at each grid point, compute <Nhalos> for the shell volume
     mean_nhalos = mc_hosts._compute_nhalos_tot(
-        hmf_params,
+        cosmo_params,
         lgmp_min,
         z_grid,
         volume_com_mpc,
     )
     mean_nhalos_lgmax = mc_hosts._compute_nhalos_tot(
-        hmf_params,
+        cosmo_params,
         lgmp_max,
         z_grid,
         volume_com_mpc,
@@ -143,7 +138,7 @@ def mc_lc_hmf(
     uran_m = jran.uniform(m_key, minval=0, maxval=1, shape=(nhalos_tot,))
 
     # draw a halo mass from the HMF at the particular redshift of each halo
-    logmp_cenpop = mc_logmp_vmap(uran_m, hmf_params, lgmp_min, z_cenpop, lgmp_max)
+    logmp_cenpop = mc_logmp_vmap(uran_m, cosmo_params, lgmp_min, z_cenpop, lgmp_max)
 
     return z_cenpop, logmp_cenpop
 
@@ -154,8 +149,7 @@ def mc_lc_halos(
     z_min,
     z_max,
     sky_area_degsq,
-    cosmo_params=DEFAULT_COSMOLOGY,
-    hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
+    cosmo_params=DEFAULT_COSMOLOGY_ARRAY,
     logmp_cutoff=DEFAULT_LOGMP_CUTOFF,
     logmp_cutoff_himass=DEFAULT_LOGMP_HIMASS_CUTOFF,
     lgmp_max=mc_hosts.LGMH_MAX,
@@ -186,12 +180,8 @@ def mc_lc_halos(
     nhalos_tot: int
         total number of halos to generate in the lightcone
 
-    cosmo_params: namedtuple
-        dsps.cosmology.flat_wcdm cosmology
-        cosmo_params = (Om0, w0, wa, h)
-
-    hmf_params: namedtuple
-        halo mass function parameters
+    cosmo_params: ndarray of shape (n_cosmo_params, )
+        cosmological parameters
 
     logmp_cutoff: float
         base-10 log of minimum halo mass for which
@@ -240,12 +230,13 @@ def mc_lc_halos(
         z_max,
         sky_area_degsq,
         cosmo_params=cosmo_params,
-        hmf_params=hmf_params,
         lgmp_max=lgmp_max,
         n_hmf_grid=n_hmf_grid,
     )
 
-    t_obs, t_0 = get_tobs_from_zobs(z_obs, cosmo_params=cosmo_params)
+    t_obs, t_0 = get_tobs_from_zobs(
+        z_obs, cosmo_params=define_dsps_cosmology(cosmo_params)
+    )
     logt0 = jnp.log10(t_0)
 
     # get rescaled mah parameters and mah's
@@ -279,8 +270,7 @@ def weighted_lc_halos(
     lgmp_max,
     sky_area_degsq,
     *,
-    cosmo_params=DEFAULT_COSMOLOGY,
-    hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
+    cosmo_params=DEFAULT_COSMOLOGY_ARRAY,
     logmp_cutoff=DEFAULT_LOGMP_CUTOFF,
     logmp_cutoff_himass=DEFAULT_LOGMP_HIMASS_CUTOFF,
     centrals_model_key=DEFAULT_DIFFMAHNET_CEN_MODEL,
@@ -306,11 +296,8 @@ def weighted_lc_halos(
     sky_area_degsq: float
         sky area in deg^2
 
-    cosmo_params: namedtuple, optional kwarg
+    cosmo_params: ndarray of shape (n_cosmo_params, )
         cosmological parameters
-
-    hmf_params: namedtuple, optional kwarg
-        halo mass function parameters
 
     logmp_cutoff: float, optional kwarg
         base-10 log of minimum halo mass for which
@@ -361,7 +348,6 @@ def weighted_lc_halos(
         logmp_obs,
         sky_area_degsq,
         cosmo_params,
-        hmf_params,
         logmp_cutoff,
         logmp_cutoff_himass,
         centrals_model_key,
@@ -375,8 +361,7 @@ def _weighted_lc_halos_from_grid(
     z_obs,
     logmp_obs,
     sky_area_degsq,
-    cosmo_params=DEFAULT_COSMOLOGY,
-    hmf_params=mc_hosts.DEFAULT_HMF_PARAMS,
+    cosmo_params=DEFAULT_COSMOLOGY_ARRAY,
     logmp_cutoff=DEFAULT_LOGMP_CUTOFF,
     logmp_cutoff_himass=DEFAULT_LOGMP_HIMASS_CUTOFF,
     centrals_model_key=DEFAULT_DIFFMAHNET_CEN_MODEL,
@@ -386,11 +371,12 @@ def _weighted_lc_halos_from_grid(
         logmp_obs,
         z_obs,
         sky_area_degsq,
-        hmf_params=hmf_params,
         cosmo_params=cosmo_params,
     )
 
-    t_obs, t_0 = get_tobs_from_zobs(z_obs, cosmo_params=cosmo_params)
+    t_obs, t_0 = get_tobs_from_zobs(
+        z_obs, cosmo_params=define_dsps_cosmology(cosmo_params)
+    )
     logt0 = jnp.log10(t_0)
 
     # get rescaled mah parameters and mah values at t_obs

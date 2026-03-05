@@ -6,8 +6,7 @@ from functools import partial
 from jax import jit as jjit
 from jax import numpy as jnp
 
-from ..cosmology import DEFAULT_COSMOLOGY
-from ..cosmology.cosmo_basics import get_tobs_from_zobs
+from ..cosmology.cosmo import get_tobs_from_zobs, DEFAULT_COSMOLOGY_DSPS
 
 __all__ = ("generate_mock_cenpop",)
 
@@ -18,7 +17,7 @@ def generate_mock_cenpop(
     z_max,
     logmp_min,
     logmp_max,
-    cosmo_params=DEFAULT_COSMOLOGY,
+    cosmo_params=DEFAULT_COSMOLOGY_DSPS,
     n_cens=200,
 ):
     """

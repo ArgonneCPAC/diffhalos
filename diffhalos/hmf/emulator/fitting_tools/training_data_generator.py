@@ -9,8 +9,11 @@ from diffsky.mass_functions.hmf_model import DEFAULT_HMF_PARAMS as P_INIT
 
 from . import hmf_fitter
 from ...hmf_model_colossus import predict_diff_hmf, predict_cuml_hmf
-from ....cosmology.defaults import DEFAULT_COSMOLOGY, DEFAULT_COSMO_PRIORS
-from ....cosmology.cosmo_params import define_colossus_cosmology, sample_cosmo_params
+from ....cosmology.cosmo import DEFAULT_COSMOLOGY, DEFAULT_COSMO_PRIORS
+from ....cosmology.cosmo_param_utils import (
+    define_colossus_cosmology,
+    sample_cosmo_params,
+)
 
 
 __all__ = (
@@ -730,6 +733,7 @@ def load_hmf_fitter_loss_data(
     save_base_name=None,
     cuml=False,
     file_name_conventions=DEFAULT_FILE_NAME_CONVENTIONS,
+    return_outputs=False,
 ):
     """
     Convenience function to load data for running
@@ -749,6 +753,9 @@ def load_hmf_fitter_loss_data(
 
     file_name_conventions: dictionary
         naming conventions for files
+
+    return_outputs: bool
+        if True, the outputs will be returned
 
     Returns
     -------
@@ -786,4 +793,7 @@ def load_hmf_fitter_loss_data(
             _loss.append([zi, logmhalo[ic, iz, :], loghmf[ic, iz, :]])
         loss_data.append(_loss)
 
-    return loss_data
+    if return_outputs:
+        return loss_data
+
+    return

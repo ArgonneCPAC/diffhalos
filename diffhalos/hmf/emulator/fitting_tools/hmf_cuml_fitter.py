@@ -8,8 +8,8 @@ from diffsky.mass_functions.fitting_utils.fitting_helpers import jax_adam_wrappe
 from diffsky.mass_functions.hmf_model import DEFAULT_HMF_PARAMS as P_INIT
 from diffsky.mass_functions.hmf_model import HMF_Params
 
-from ...hmf_model import predict_cuml_hmf
 from .loss_functions import mse
+from ...hmf_model import predict_cuml_hmf
 
 __all__ = ("cuml_hmf_fitter",)
 

@@ -5,41 +5,117 @@ from time import time
 import pickle
 import os
 import pathlib
+import warnings
+from functools import partial
 
 from jax import jit as jjit
 from jax import random as jran
 from jax import value_and_grad
-
 from jax.example_libraries import stax
 from jax.example_libraries import optimizers as jax_opt
 
 from .pretrained_models import ENVIRON_VAR
+from ..fitting_tools.loss_functions import mse
 from ..utils import format_time
+from ...hmf_param_utils import define_diffsky_hmf_params_namedtuple
 
-__all__ = ("MLP_stax",)
+__all__ = ("MLP_stax", "load_mlp_model", "predict_mlp_hmf_params")
 
 
 # load pretrained models
 try:
     PRETRAINED_PATH = pathlib.Path(os.environ[ENVIRON_VAR])
+    PRETRAINED_MODEL_NAMES = [
+        f.name.split(".")[0]
+        for f in PRETRAINED_PATH.iterdir()
+        if f.is_file() and f.name.endswith(".pkl")
+    ]
 except KeyError:
     msg = (
-        f"You must have the '{ENVIRON_VAR}' environment variable set to use the HMF emulator.\n"
-        "Run first 'export {ENVIRON_VAR}=path_to_diffhmfemu_data_folder'"
+        f"You have not set the '{ENVIRON_VAR}' environment variable to load HMF emulator models.\n"
+        f"To set it, first run 'export {ENVIRON_VAR}=path_to_data_folder'.\n"
+        "Otherwise, the full path to the models will have to be provided in `load_model(savedir=path_to_data_folder)`."
     )
-    raise ValueError(msg)
-
-PRETRAINED_MODEL_NAMES = [
-    f.name for f in PRETRAINED_PATH.iterdir() if f.is_file() and f.name.endswith(".pkl")
-]
+    warnings.warn(msg, UserWarning)
+    PRETRAINED_PATH = None
+    PRETRAINED_MODEL_NAMES = []
 
 # set the default model to use
 DEFAULT_MLP_MODEL = "mlp_model_v0"
 
 
+def load_mlp_model(savedir=PRETRAINED_PATH, name=DEFAULT_MLP_MODEL):
+    """
+    Load a `diffhmfemu` model
+
+    Parameters
+    ----------
+    savedir: str
+        path to directory where model is stored
+
+    name: str
+        base name for generated files
+
+    Returns
+    -------
+    mlp: MLP_stax object
+        instance of the MLP using the requested model
+    """
+    if name not in PRETRAINED_MODEL_NAMES:
+        raise KeyError(
+            f"Model {name} is not available\n"
+            f"Choose one of {PRETRAINED_MODEL_NAMES}."
+        )
+
+    mlp = MLP_stax.load_model(
+        savedir=savedir,
+        save_base_name=name,
+    )
+
+    return mlp
+
+
+@partial(jjit, static_argnames=["savedir", "name"])
+def predict_mlp_hmf_params(
+    cosmo_params,
+    savedir=PRETRAINED_PATH,
+    name=DEFAULT_MLP_MODEL,
+):
+    """
+    Predict diffsky HMF paramters, given
+    a set of cosmological parameters
+
+    Parameters
+    ----------
+    cosmo_params: ndarray of shape (n_cosmo_params, )
+        cosmological paramters
+
+    savedir: str
+        path to directory where model is stored
+
+    name: str
+        base name for generated files
+
+    Returns
+    -------
+    nn_hmf_params_ntup: namedtuple
+        mlp predicted HMF parameters at a given cosmology
+        as a namedtuple compatible with the diffsky HMF model
+    """
+    mlp = load_mlp_model(savedir=savedir, name=name)
+
+    nn_hmf_params = mlp.net_apply(
+        mlp.get_params(mlp.opt_state_final), cosmo_params
+    ).flatten()
+
+    nn_hmf_params_ntup = define_diffsky_hmf_params_namedtuple(nn_hmf_params)
+
+    return nn_hmf_params_ntup
+
+
 class MLP_stax:
 
-    def __init__(self, loss_function=None, loss_args=()):
+    def __init__(self, loss_function=mse, loss_args=()):
         self.loss_function = loss_function
         self.loss_args = loss_args
 
@@ -300,14 +376,16 @@ class MLP_stax:
         time_start = time()
         loss_history = []
         istep = 0
-        for iepoch in range(num_epochs):
-            for ibatch in range(num_batches):
+        for _ in range(num_epochs):
+            ibatch = 0
+            for _ in range(num_batches):
                 x_train = input_data[ibatch : ibatch + batch_size, :]
                 targets = target_data[ibatch : ibatch + batch_size, :]
 
                 loss, opt_state = _train_step(istep, opt_state, x_train, targets)
                 loss_history.append(float(loss))
                 istep += 1
+                ibatch += batch_size
 
         time_end = time()
         self.train_dt_sec = time_end - time_start
@@ -405,13 +483,13 @@ class MLP_stax:
         if verbose:
             print("Model and data saved in %s" % savedir)
 
+    @classmethod
     def load_model(
-        self,
+        cls,
         savedir=PRETRAINED_PATH,
         save_base_name=DEFAULT_MLP_MODEL,
         verbose=False,
-        return_model=False,
-        return_extra=False,
+        load_extra=False,
     ):
         """
         Convenient function to load the model from disk
@@ -427,12 +505,9 @@ class MLP_stax:
         verbose: bool
             if True, feedback will be printed
 
-        return_model: bool
-            if True, the model will be returned during loaing
-
-        return_extra: bool
-            if True, will return extra data in addition to
-            the final state of the sampler
+        load_extra: bool
+            if True will load extra information from training,
+            which is not needed for making a model prediction
 
         Returns
         -------
@@ -449,6 +524,8 @@ class MLP_stax:
         if savedir[-1] != "/":
             savedir += "/"
 
+        self = cls()
+
         # load final state
         file_path = savedir + save_base_name + ".pkl"
         with open(file_path, "rb") as file:
@@ -457,48 +534,53 @@ class MLP_stax:
         if verbose:
             print("Model and data loaded from %s" % savedir)
 
-        if return_extra:
-            # load additional information
-            (
-                train_dt_sec,
-                batch_size,
-                num_batches,
-                num_epochs,
-                step_size,
-                opt_seed,
-            ) = np.loadtxt(
-                savedir + save_base_name + "_info.txt",
-                usecols=(-1,),
-                skiprows=4,
-            )
-            self.train_dt_sec = float(train_dt_sec)
-            self.train_dt = format_time(self.train_dt_sec)
-            self.batch_size = int(batch_size)
-            self.num_batches = int(num_batches)
-            self.num_epochs = int(num_epochs)
-            self.step_size = float(step_size)
-            self.opt_seed = int(opt_seed)
+        # load additional information
+        (
+            train_dt_sec,
+            batch_size,
+            num_batches,
+            num_epochs,
+            step_size,
+            opt_seed,
+        ) = np.loadtxt(
+            savedir + save_base_name + "_info.txt",
+            usecols=(-1,),
+            skiprows=4,
+        )
+        self.train_dt_sec = float(train_dt_sec)
+        self.train_dt = format_time(self.train_dt_sec)
+        self.batch_size = int(batch_size)
+        self.num_batches = int(num_batches)
+        self.num_epochs = int(num_epochs)
+        self.step_size = float(step_size)
+        self.opt_seed = int(opt_seed)
 
-            (
-                self.n_neuron_per_layer,
-                self.n_layer,
-                self.n_feature,
-                self.n_target,
-                self.n_mlp_params,
-            ) = self.get_mlp_architecture(self.opt_state_final)
+        (
+            self.n_neuron_per_layer,
+            self.n_layer,
+            self.n_feature,
+            self.n_target,
+            self.n_mlp_params,
+        ) = self.get_mlp_architecture(self.opt_state_final)
 
+        if load_extra:
             # load loss history
             file_path = savedir + save_base_name + "_loss_hist" + ".npy"
             self.loss_hist = np.load(file_path)
 
-            return self.opt_state_final, self.opt_state_init, self.loss_hist
-        else:
-            self.loss_hist = None
+        (
+            self.opt_init,
+            self.opt_update,
+            self.get_params,
+        ) = jax_opt.adam(self.step_size)
 
-        if return_model:
-            return self.opt_state_final
+        self.hidden_layers = self.n_neuron_per_layer[1:-1]
 
-        return
+        self.net_init, self.net_apply = self.init_mlp(self.n_target, self.hidden_layers)
+
+        self.load_successful = True
+
+        return self
 
     def get_available_models(self):
         return PRETRAINED_MODEL_NAMES
@@ -606,3 +688,4 @@ class MLP_stax:
         self.n_mlp_params = None
         self.n_targets = None
         self.hidden_layers = None
+        self.load_successful = None

@@ -5,17 +5,18 @@ import numpy as np
 from jax import random as jran
 
 from diffsky.experimental import mc_lightcone_halos as mclh
-from diffsky.mass_functions import mc_hosts as diffsky_mc_hosts
 
-from .. import hmf_model
-from ...cosmology import DEFAULT_COSMOLOGY_DSPS
+from .. import hmf_model_mlp
+from ...cosmology.cosmo import DEFAULT_COSMOLOGY_ARRAY
+from ...cosmology.cosmo_param_utils import define_dsps_cosmology
+from ...cosmology.geometry_utils import compute_volume_from_sky_area
 
 
 def test_cuml_hmf_evaluations():
     lgmp_arr = np.linspace(-6, 0, 500)
     redshift = 0.2
-    res = hmf_model.predict_cuml_hmf(
-        hmf_model.DEFAULT_HMF_PARAMS,
+    res = hmf_model_mlp.predict_cuml_hmf(
+        DEFAULT_COSMOLOGY_ARRAY,
         lgmp_arr,
         redshift,
     )
@@ -26,8 +27,8 @@ def test_cuml_hmf_evaluations():
 def test_diff_hmf_evaluations():
     lgmp_arr = np.linspace(-6, 0, 500)
     redshift = 0.2
-    res = hmf_model.predict_diff_hmf(
-        hmf_model.DEFAULT_HMF_PARAMS,
+    res = hmf_model_mlp.predict_diff_hmf(
+        DEFAULT_COSMOLOGY_ARRAY,
         lgmp_arr,
         redshift,
     )
@@ -50,12 +51,11 @@ def test_halo_lightcone_weights():
         ran_key, lgmp_grid, z_grid, sky_area_degsq
     )
 
-    nhalos = hmf_model.halo_lightcone_weights(
+    nhalos = hmf_model_mlp.halo_lightcone_weights(
         cenpop["logmp_obs"],
         cenpop["z_obs"],
         sky_area_degsq,
-        hmf_params=diffsky_mc_hosts.DEFAULT_HMF_PARAMS,
-        cosmo_params=DEFAULT_COSMOLOGY_DSPS,
+        cosmo_params=DEFAULT_COSMOLOGY_ARRAY,
     )
 
     assert np.all(np.isfinite(nhalos))
@@ -71,25 +71,24 @@ def test_get_mean_nhalos_from_volume_and_from_sky_area():
 
     redshift = np.linspace(0.1, 3.0, 10)
 
-    volume_com_mpc = hmf_model.compute_volume_from_sky_area(
+    volume_com_mpc = compute_volume_from_sky_area(
         redshift,
         sky_area_degsq,
-        DEFAULT_COSMOLOGY_DSPS,
+        define_dsps_cosmology(DEFAULT_COSMOLOGY_ARRAY),
     )
 
-    nhalos_from_vol = hmf_model.get_mean_nhalos_from_volume(
+    nhalos_from_vol = hmf_model_mlp.get_mean_nhalos_from_volume(
         redshift,
         volume_com_mpc,
-        hmf_model.DEFAULT_HMF_PARAMS,
+        DEFAULT_COSMOLOGY_ARRAY,
         lgmp_min,
         lgmp_max,
     )
 
-    nhalos_from_area = hmf_model.get_mean_nhalos_from_sky_area(
+    nhalos_from_area = hmf_model_mlp.get_mean_nhalos_from_sky_area(
         redshift,
         sky_area_degsq,
-        DEFAULT_COSMOLOGY_DSPS,
-        hmf_model.DEFAULT_HMF_PARAMS,
+        DEFAULT_COSMOLOGY_ARRAY,
         lgmp_min,
         lgmp_max,
     )

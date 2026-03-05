@@ -1,13 +1,15 @@
 """Useful utilities for fitting"""
 
+from functools import partial
+
 from jax import numpy as jnp
 from jax import jit as jjit
 from jax import vmap
 
-from ...hmf_model_flat import wrapper_ndarray_diffsky_diff_hmf
+from ...hmf_model import predict_diff_hmf, predict_cuml_hmf
+from ...hmf_param_utils import define_diffsky_hmf_params_namedtuple
 
-
-__all__ = ("mse", "mse_loss_hmf_params", "mse_loss_diff_hmf_curve")
+__all__ = ("mse",)
 
 
 @jjit
@@ -35,75 +37,70 @@ def mse(pred, target):
 
 
 @jjit
-def mse_loss_hmf_params(preds, target_data):
+def mse_hmf_params(pred, target):
     """
-    Mean squared error loss function
-    on the halo mass function parameters directly
+    Loss function comparing directly the
+    mlp-predicted and target hmf parameters
 
     Parameters
     ----------
-    preds: ndarray of shape (n_cosmo, n_hmf_params)
-        predicted HMF parameters by the model
+    pred: ndarray of shape (n_cosmo, n_hmf_params)
+        predicted values by the model
 
-    target_data: ndarray of shape (n_cosmo, n_hmf_params)
-        target HMF parameters
+    target: ndarray of shape (n_cosmo, n_hmf_params)
+        target data
 
     Returns
     -------
     mse_val: float
-        mean squared error value between
-        nn's prediction and target data
+        mse value
     """
-
-    mse_val = mse(preds, target_data)
+    diff = (pred - target) ** 2
+    mse_val = jnp.sum(jnp.mean(diff, axis=1))
 
     return mse_val
 
 
-@jjit
-def mse_loss_diff_hmf_curve(
-    preds,
-    target_data,
-    logmp,
-    z,
-):
-    """
-    Mean squared error loss function
-    on the halo mass funcion curve
+# @partial(jjit, static_argnames=["n_cosmo"])
+# def mse_loss_diff_hmf_curve(preds, target, loss_data, n_cosmo):
+#     """
+#     Mean squared error loss function
+#     on the halo mass funcion curve
 
-    Parameters
-    ----------
-    preds: ndarray of shape (n_cosmo, n_hmf_params)
-        predicted HMF parameters by the model
+#     Parameters
+#     ----------
+#     preds: ndarray of shape (n_hmf_params, )
+#         hmf parameters predicted by the mlp
 
-    target_data: ndarray of shape (n_cosmo, n_redshift, n_halo)
-        target data for loss calculation
-        against current optimizer's state;
-        in this case the target HMF parameters
+#     target: ndarray of shape (n_redshift, n_halo)
+#         target hmf values
 
-    logmp: ndarray of shape (n_cosmo, n_redshift, n_halo)
-        base-10 log of halo mass per cosmology and redshift
+#     loss_data: list
+#         each element is a list of
+#         [redshift,
+#          base-10 log of halo mass,
+#          base-10 log of halo mass function]
 
-    z: ndarray of shape (n_redshift, )
-        redshift values considered
+#     n_cosmo: int
+#         number of sampled cosmologies
 
-    Returns
-    -------
-    mse: float
-        mean squared error value between
-        nn's prediction and target data
-    """
-    mse_val = 0.0
-    for i, zi in enumerate(z):
-        loghmf_preds = _get_diff_hmf_vmap(preds, logmp[:, i, :], zi)
-        mse_val += mse(loghmf_preds, target_data[:, i, :])
+#     Returns
+#     -------
+#     mse: float
+#         mean squared error value between hmf from
+#         mlp prediction and target data
+#     """
+#     mse_val = 0.0
+#     for i in range(n_cosmo):
+#         redshifts, logmp = loss_data[i]
+#         preds_loghmf = _predict_diff_hmf_multiz(
+#             define_diffsky_hmf_params_namedtuple(preds), logmp, redshifts
+#         )
 
-    return mse_val
+#         diff = (preds_loghmf, target[i]) ** 2
+#         mse_val += jnp.sum(jnp.mean(diff, axis=1))
+
+#     return mse_val
 
 
-_get_diff_hmf_vmap = jjit(
-    vmap(
-        wrapper_ndarray_diffsky_diff_hmf,
-        in_axes=(0, 0, None),
-    )
-)
+# _predict_diff_hmf_multiz = jjit(vmap(predict_diff_hmf, in_axes=(None, 0, 0)))

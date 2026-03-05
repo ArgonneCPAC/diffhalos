@@ -4,8 +4,8 @@ import numpy as np
 from jax import random as jran
 
 
-from ..hmf_model import (
-    DEFAULT_HMF_PARAMS,
+from ..hmf_model_mlp import (
+    DEFAULT_COSMOLOGY_ARRAY,
     predict_diff_hmf,
 )
 from ..mc_hosts import (
@@ -56,7 +56,7 @@ def test_diff_hmf_pophist_vs_theory_consistency():
     z_test = np.linspace(0.0, 1.0, 5)
 
     for z in z_test:
-        diff_hmf = predict_diff_hmf(DEFAULT_HMF_PARAMS, lgm_bins, z)
+        diff_hmf = predict_diff_hmf(DEFAULT_COSMOLOGY_ARRAY, lgm_bins, z)
 
         diff_hmf_target, lgm_binmids = mc_host_halos_hist_singlez(
             ran_key, lgmp_min, z, Vbox, bins=lgm_bins

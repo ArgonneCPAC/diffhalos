@@ -10,7 +10,7 @@ from ..diffmahnet_utils import (
     get_mean_and_std_of_mah,
 )
 from ..diffmahpop_utils import mc_mah_cenpop as mc_mah_cenpop_diffmahpop
-from ...mah.diffmahnet.diffmahnet import log_mah_kern
+from ..diffmahnet.diffmahnet import log_mah_kern
 
 
 def test_mc_mah_cenpop_behaves_as_expected():
