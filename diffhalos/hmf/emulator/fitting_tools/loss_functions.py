@@ -1,7 +1,5 @@
 """Useful utilities for fitting"""
 
-from functools import partial
-
 from jax import numpy as jnp
 from jax import jit as jjit
 from jax import vmap
@@ -9,7 +7,7 @@ from jax import vmap
 from ...hmf_model import predict_diff_hmf, predict_cuml_hmf
 from ...hmf_param_utils import define_diffsky_hmf_params_namedtuple
 
-__all__ = ("mse",)
+__all__ = ("mse", "mse_loss_diff_hmf_curve", "mse_loss_cuml_hmf_curve")
 
 
 @jjit
@@ -45,10 +43,10 @@ def mse_hmf_params(pred, target):
     Parameters
     ----------
     pred: ndarray of shape (n_cosmo, n_hmf_params)
-        predicted values by the model
+        predicted hmf parameters per cosmology sample
 
     target: ndarray of shape (n_cosmo, n_hmf_params)
-        target data
+        target hmf parameters per cosmology sample
 
     Returns
     -------
@@ -61,46 +59,80 @@ def mse_hmf_params(pred, target):
     return mse_val
 
 
-# @partial(jjit, static_argnames=["n_cosmo"])
-# def mse_loss_diff_hmf_curve(preds, target, loss_data, n_cosmo):
-#     """
-#     Mean squared error loss function
-#     on the halo mass funcion curve
+@jjit
+def mse_loss_diff_hmf_curve(preds, target, logmp, z):
+    """
+    Mean squared error loss function based
+    on the differential halo mass funcion curve
 
-#     Parameters
-#     ----------
-#     preds: ndarray of shape (n_hmf_params, )
-#         hmf parameters predicted by the mlp
+    Parameters
+    ----------
+    pred: ndarray of shape (n_cosmo, n_hmf_params)
+        predicted hmf parameters per cosmology sample
 
-#     target: ndarray of shape (n_redshift, n_halo)
-#         target hmf values
+    target: ndarray of shape (n_cosmo, n_redshift, n_halo)
+        target hmf curves per cosmology sample and redshift
 
-#     loss_data: list
-#         each element is a list of
-#         [redshift,
-#          base-10 log of halo mass,
-#          base-10 log of halo mass function]
+    logmp: ndarray of shape (n_cosmo, n_redshift, n_halo)
+        halo masses per cosmology sample and redshift, in Msun
 
-#     n_cosmo: int
-#         number of sampled cosmologies
+    z: ndarray of shape (n_redshift, )
+        redshift values for loss computation
 
-#     Returns
-#     -------
-#     mse: float
-#         mean squared error value between hmf from
-#         mlp prediction and target data
-#     """
-#     mse_val = 0.0
-#     for i in range(n_cosmo):
-#         redshifts, logmp = loss_data[i]
-#         preds_loghmf = _predict_diff_hmf_multiz(
-#             define_diffsky_hmf_params_namedtuple(preds), logmp, redshifts
-#         )
+    Returns
+    -------
+    mse: float
+        mean squared error value
+    """
 
-#         diff = (preds_loghmf, target[i]) ** 2
-#         mse_val += jnp.sum(jnp.mean(diff, axis=1))
+    mse_val = 0.0
+    for i in range(target.shape[0]):
+        preds_ntup = define_diffsky_hmf_params_namedtuple(preds[i])
+        loghmf_preds = _predict_diff_hmf_vmap(preds_ntup, logmp[i], z)
+        diff = (loghmf_preds - target[i]) ** 2
+        mse_val += jnp.sum(jnp.mean(diff, axis=1))
 
-#     return mse_val
+    return mse_val
 
 
-# _predict_diff_hmf_multiz = jjit(vmap(predict_diff_hmf, in_axes=(None, 0, 0)))
+_predict_diff_hmf_vmap = jjit(vmap(predict_diff_hmf, in_axes=(None, 0, 0)))
+
+
+@jjit
+def mse_loss_cuml_hmf_curve(preds, target_data):
+    """
+    Mean squared error loss function based
+    on the cumulative halo mass funcion curve
+
+    Parameters
+    ----------
+    preds: ndarray of shape (n_cosmo, n_hmf_params)
+        prediction for hmf parameters by neural network model
+
+    target_data: list of length (n_cosmo, )
+        each element is a list of
+        [redshift,
+         base-10 log of halo mass,
+         base-10 log of halo mass function]
+
+    Returns
+    -------
+    mse: float
+        mean squared error value
+    """
+    preds_ntup = define_diffsky_hmf_params_namedtuple(preds)
+
+    mse_val = 0.0
+    for _loss in target_data:
+        z, logmp, loghmf_target = _loss
+        loghmf_preds = _predict_cuml_hmf_vmap(
+            preds_ntup,
+            logmp,
+            z,
+        )
+        mse_val += mse(loghmf_preds, loghmf_target)
+
+    return mse_val
+
+
+_predict_cuml_hmf_vmap = jjit(vmap(predict_cuml_hmf, in_axes=(0, 0, None)))

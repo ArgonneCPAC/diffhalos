@@ -20,6 +20,7 @@ __all__ = (
     "generate_hmf_loss_train_data",
     "generate_best_fit_hmf_params_train_data",
     "load_training_data",
+    "load_hmf_loss_data",
 )
 
 DEFAULT_FILE_NAME_CONVENTIONS = {
@@ -262,18 +263,18 @@ def generate_hmf_loss_train_data(
                 logmhalo_data[ci, zi, :] = logmp_bins
                 loghmf_data[ci, zi, :] = loghmf_target
 
-            np.save(
-                savedir + save_base_name + "_" + file_name_conventions["logmhalo"],
-                logmhalo_data,
-            )
-            if cuml:
-                _hmf_file_name = file_name_conventions["loghmf_cuml"]
-            else:
-                _hmf_file_name = file_name_conventions["loghmf_diff"]
-            np.save(
-                savedir + save_base_name + "_" + _hmf_file_name,
-                loghmf_data,
-            )
+        np.save(
+            savedir + save_base_name + "_" + file_name_conventions["logmhalo"],
+            logmhalo_data,
+        )
+        if cuml:
+            _hmf_file_name = file_name_conventions["loghmf_cuml"]
+        else:
+            _hmf_file_name = file_name_conventions["loghmf_diff"]
+        np.save(
+            savedir + save_base_name + "_" + _hmf_file_name,
+            loghmf_data,
+        )
 
         # save additional information
         _info_n_cosmo_params = np.array(["n_cosmo_params:", cosmo_params.shape[1]])
@@ -728,12 +729,11 @@ def load_training_data(
     )
 
 
-def load_hmf_fitter_loss_data(
+def load_hmf_loss_data(
     savedir=None,
     save_base_name=None,
     cuml=False,
     file_name_conventions=DEFAULT_FILE_NAME_CONVENTIONS,
-    return_outputs=False,
 ):
     """
     Convenience function to load data for running
@@ -793,7 +793,4 @@ def load_hmf_fitter_loss_data(
             _loss.append([zi, logmhalo[ic, iz, :], loghmf[ic, iz, :]])
         loss_data.append(_loss)
 
-    if return_outputs:
-        return loss_data
-
-    return
+    return loss_data

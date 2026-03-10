@@ -22,8 +22,7 @@ def cuml_hmf_fitter(
     p_init=P_INIT,
 ):
     """
-    Runs a fitter to the cumulative
-    diffsky halo mass function
+    Runs a fitter to the cumulative diffsky halo mass function
 
     Parameters
     ----------
@@ -48,16 +47,16 @@ def cuml_hmf_fitter(
     Returns
     -------
     p_best: namedtuple
-        ``HMF_Params`` named tuple with the
+        `HMF_Params` named tuple with the
         best-fit diffsky HMF parameters
 
     loss: float
         loss at the last step
 
-    loss_hist: ndarray of shape (n_steps,)
+    loss_hist: ndarray of shape (n_steps, )
         loss at each step
 
-    params_hist: list of length ``n_steps``
+    params_hist: list of length `n_steps`
         HMF parameters at each step
 
     fit_terminates:

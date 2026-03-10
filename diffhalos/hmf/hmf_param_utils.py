@@ -1,9 +1,7 @@
 """HMF parameter utils"""
 
 import numpy as np
-
 from jax import jit as jjit
-import jax.numpy as jnp
 
 from ..calibrations.hmf_cal import DEFAULT_HMF_PARAMS
 from ..calibrations.hmf_cal.smdpl_hmf import (

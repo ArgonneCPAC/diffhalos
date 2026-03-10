@@ -15,7 +15,11 @@ from .cosmo import (
     DEFAULT_COSMO_PRIORS,
 )
 
-__all__ = ("sample_cosmo_params", "define_colossus_cosmology")
+__all__ = (
+    "sample_cosmo_params",
+    "sample_cosmo_params_full_cosmo",
+    "define_colossus_cosmology",
+)
 
 
 COSMO_PARAM_NAMES = DEFAULT_COSMOLOGY.keys()
@@ -25,6 +29,51 @@ AV_SAMPLING_METHODS = ("LatinHypercube",)
 
 
 def sample_cosmo_params(
+    cosmo_priors=DEFAULT_COSMO_PRIORS,
+    seed=None,
+    num_samples=1,
+    method="LatinHypercube",
+):
+    """
+    Sample cosmological parameters from prior volume
+    following the requested scheme
+
+    Parameters
+    ----------
+    cosmo_priors: dictionary
+        cosmological parameter values
+
+    seed: int
+        randomly generated key
+
+    num_samples: int
+        number of cosmology samples to generate
+
+    method: str
+        method for sampling;
+        options:
+        - 'LatinHypercube': Latin Hypercube
+
+    Returns
+    -------
+    cosmo_samples: ndarray of shape (num_samples, num_params)
+        cosmological parameter samples
+    """
+    if method == "LatinHypercube":
+        cosmo_samples = _sample_cosmo_params_latin_hypercube(
+            cosmo_priors=cosmo_priors,
+            seed=seed,
+            num_samples=num_samples,
+        )
+    else:
+        print("!ERROR! Method %s is not implemented" % method)
+        errmsg = "Choose from: ('LatinHypercube')"
+        raise Exception(errmsg)
+
+    return cosmo_samples
+
+
+def sample_cosmo_params_full_cosmo(
     underlying_cosmo=DEFAULT_COSMOLOGY,
     cosmo_priors=DEFAULT_COSMO_PRIORS,
     seed=None,

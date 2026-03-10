@@ -41,7 +41,7 @@ def test_generate_diff_hmf_loss_train_data():
             assert loss_data[ci][zi][0] == z[zi]
 
     # check that loading the loss data works without issues
-    loss_data = tdg.load_hmf_fitter_loss_data(
+    loss_data = tdg.load_hmf_loss_data(
         savedir=SAVE_DIR,
         save_base_name=SAVE_BASE_NAME_DIFF,
         cuml=False,
@@ -103,7 +103,7 @@ def test_generate_cuml_hmf_loss_train_data():
             assert loss_data[ci][zi][0] == z[zi]
 
     # check that loading the loss data works without issues
-    loss_data = tdg.load_hmf_fitter_loss_data(
+    loss_data = tdg.load_hmf_loss_data(
         savedir=SAVE_DIR,
         save_base_name=SAVE_BASE_NAME_CUML,
         cuml=True,

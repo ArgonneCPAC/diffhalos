@@ -15,7 +15,6 @@ from jax.example_libraries import stax
 from jax.example_libraries import optimizers as jax_opt
 
 from .pretrained_models import ENVIRON_VAR
-from ..fitting_tools.loss_functions import mse
 from ..utils import format_time
 from ...hmf_param_utils import define_diffsky_hmf_params_namedtuple
 
@@ -115,28 +114,28 @@ def predict_mlp_hmf_params(
 
 class MLP_stax:
 
-    def __init__(self, loss_function=mse, loss_args=()):
-        self.loss_function = loss_function
-        self.loss_args = loss_args
+    def __init__(self, n_targets=19, hidden_layers=[8, 8, 16, 16, 8]):
+        """
+        Parameters
+        ----------
+        n_targets: int
+            size of targets layer, by default 19
+            which is the number of diffsky hmf parameters
 
-    def init_mlp(
-        self,
-        n_targets,
-        hidden_layers,
-        activation=stax.Selu,
-    ):
+        hidden_layers: list(int)
+            number of neurons per hidden layer
+        """
+
+        self.n_targets = n_targets
+        self.hidden_layers = hidden_layers
+
+    def init_mlp(self, activation=stax.Selu):
         """
         Build the MLP using JAX's stax library.
         See https://docs.jax.dev/en/latest/jax.example_libraries.stax.html.
 
         Parameters
         ----------
-        n_targets: int
-            size of targets layer
-
-        hidden_layers: list(int) or tuple(int)
-            number of neurons per hidden layer
-
         activation: function
             activation function to use;
             default is the Selu activation function
@@ -156,17 +155,17 @@ class MLP_stax:
         """
         # hidden layers
         struct = ()
-        for n_neurons in hidden_layers:
+        for n_neurons in self.hidden_layers:
             struct += (stax.Dense(n_neurons), activation)
 
         # target layer
         self.net_init, self.net_apply = stax.serial(
             *struct,
-            stax.Dense(n_targets),
+            stax.Dense(self.n_targets),
         )
 
-        self.n_targets = n_targets
-        self.hidden_layers = hidden_layers
+        self.n_targets = self.n_targets
+        self.hidden_layers = self.hidden_layers
 
         return self.net_init, self.net_apply
 
@@ -243,11 +242,12 @@ class MLP_stax:
         self,
         input_data,
         target_data,
-        loss_function=None,
-        loss_args=None,
+        loss_function,
+        loss_args=(),
         batch_size=None,
         num_batches=None,
         num_epochs=None,
+        seed=0,
         timeit=False,
     ):
         """
@@ -267,7 +267,7 @@ class MLP_stax:
             loss function to optimize
 
         loss_args: tuple
-            arguments to pass to ``loss_function``
+            arguments to pass to `loss_function`
 
         batch_size: int
             size of a batch
@@ -277,6 +277,9 @@ class MLP_stax:
 
         num_epochs: int
             number of epochs for training
+
+        seed: int
+            random seed for batch-training
 
         timeit: bool
             if True, the training will be timed
@@ -289,15 +292,6 @@ class MLP_stax:
         self.batch_size = batch_size
         self.num_batches = num_batches
         self.num_epochs = num_epochs
-
-        if self.loss_function is None:
-            if loss_function is None:
-                raise Exception("Loss function must be provided")
-            else:
-                self.loss_function = loss_function
-
-        if loss_args is not None:
-            self.loss_args = loss_args
 
         @jjit
         def _loss_fun(net_params, input_data, target_data):
@@ -323,7 +317,7 @@ class MLP_stax:
                 value of loss
             """
             preds = self.net_apply(net_params, input_data)
-            loss = self.loss_function(preds, target_data, *self.loss_args)
+            loss = loss_function(preds, target_data, *loss_args)
 
             return loss
 
@@ -373,19 +367,26 @@ class MLP_stax:
         opt_state = self.opt_state_init
 
         # run in batches to train the model
+        num_cosmo = input_data.shape[0]
+        if batch_size > num_cosmo:
+            msg = (
+                f"Batch size {batch_size} is larger than size of data {num_cosmo}.\n"
+                f"Setting `batch_size={num_cosmo}` instead, to not duplicate data."
+            )
+            warnings.warn(msg, UserWarning)
+            batch_size = num_cosmo
+
         time_start = time()
         loss_history = []
-        istep = 0
-        for _ in range(num_epochs):
-            ibatch = 0
-            for _ in range(num_batches):
-                x_train = input_data[ibatch : ibatch + batch_size, :]
-                targets = target_data[ibatch : ibatch + batch_size, :]
+        ran_key = jran.PRNGKey(seed)
+        for i in range(num_epochs):
+            ran_key, sk_idx = jran.split(ran_key, 2)
+            idx = jran.randint(sk_idx, (batch_size,), 0, num_cosmo)
+            x_train = input_data[idx]
+            targets = target_data[idx]
 
-                loss, opt_state = _train_step(istep, opt_state, x_train, targets)
-                loss_history.append(float(loss))
-                istep += 1
-                ibatch += batch_size
+            loss, opt_state = _train_step(i, opt_state, x_train, targets)
+            loss_history.append(float(loss))
 
         time_end = time()
         self.train_dt_sec = time_end - time_start
@@ -423,10 +424,11 @@ class MLP_stax:
         -------
         saved files at the requested path
         """
-        if savedir[-1] != "/":
-            savedir += "/"
+        savedir = os.path.join(savedir, save_base_name)
         if not os.path.exists(savedir):
             os.makedirs(savedir)
+        if savedir[-1] != "/":
+            savedir += "/"
 
         # save final state
         file_path = savedir + save_base_name + ".pkl"
@@ -520,7 +522,9 @@ class MLP_stax:
         loss_hist: ndarray of shape (num_steps,)
             loss at each step of the optimization
         """
-        savedir = str(savedir)
+        savedir = os.path.join(savedir, save_base_name)
+        if not os.path.exists(savedir):
+            os.makedirs(savedir)
         if savedir[-1] != "/":
             savedir += "/"
 
@@ -576,7 +580,7 @@ class MLP_stax:
 
         self.hidden_layers = self.n_neuron_per_layer[1:-1]
 
-        self.net_init, self.net_apply = self.init_mlp(self.n_target, self.hidden_layers)
+        self.net_init, self.net_apply = self.init_mlp()
 
         self.load_successful = True
 
