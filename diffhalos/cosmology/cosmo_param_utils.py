@@ -18,6 +18,7 @@ from .cosmo import (
 __all__ = (
     "sample_cosmo_params",
     "sample_cosmo_params_full_cosmo",
+    "define_dsps_cosmology",
     "define_colossus_cosmology",
 )
 

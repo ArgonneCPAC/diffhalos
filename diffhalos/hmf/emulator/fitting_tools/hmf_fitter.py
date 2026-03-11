@@ -2,13 +2,10 @@
 
 from .hmf_diff_fitter import diff_hmf_fitter
 from .hmf_cuml_fitter import cuml_hmf_fitter
+from ...hmf_param_utils import DEFAULT_HMF_PARAMS as P_INIT
 
-from diffsky.mass_functions.hmf_model import DEFAULT_HMF_PARAMS as P_INIT
 
-__all__ = (
-    "fit_hmf_single_cosmo",
-    "fit_hmf_multi_cosmo",
-)
+__all__ = ("fit_hmf_single_cosmo", "fit_hmf_multi_cosmo")
 
 
 def fit_hmf_single_cosmo(

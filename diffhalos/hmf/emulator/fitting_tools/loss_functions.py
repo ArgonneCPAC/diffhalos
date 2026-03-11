@@ -5,7 +5,7 @@ from jax import jit as jjit
 from jax import vmap
 
 from ...hmf_model import predict_diff_hmf, predict_cuml_hmf
-from ...hmf_param_utils import define_diffsky_hmf_params_namedtuple
+from ...hmf_param_utils import define_diffsky_hmf_params_namedtuple_from_array
 
 __all__ = ("mse", "mse_loss_diff_hmf_curve", "mse_loss_cuml_hmf_curve")
 
@@ -85,14 +85,16 @@ def mse_loss_diff_hmf_curve(preds, target, logmp, z):
         mean squared error value
     """
 
+    n_cosmo_samples = target.shape[0]
+
     mse_val = 0.0
-    for i in range(target.shape[0]):
-        preds_ntup = define_diffsky_hmf_params_namedtuple(preds[i])
-        loghmf_preds = _predict_diff_hmf_vmap(preds_ntup, logmp[i], z)
-        diff = (loghmf_preds - target[i]) ** 2
+    for i in range(n_cosmo_samples):
+        preds_ntup = define_diffsky_hmf_params_namedtuple_from_array(preds[i, :])
+        loghmf_preds = _predict_diff_hmf_vmap(preds_ntup, logmp[i, ...], z)
+        diff = (loghmf_preds - target[i, ...]) ** 2
         mse_val += jnp.sum(jnp.mean(diff, axis=1))
 
-    return mse_val
+    return jnp.nan_to_num(mse_val, nan=999, posinf=999, neginf=-999)
 
 
 _predict_diff_hmf_vmap = jjit(vmap(predict_diff_hmf, in_axes=(None, 0, 0)))
@@ -120,7 +122,7 @@ def mse_loss_cuml_hmf_curve(preds, target_data):
     mse: float
         mean squared error value
     """
-    preds_ntup = define_diffsky_hmf_params_namedtuple(preds)
+    preds_ntup = define_diffsky_hmf_params_namedtuple_from_array(preds)
 
     mse_val = 0.0
     for _loss in target_data:

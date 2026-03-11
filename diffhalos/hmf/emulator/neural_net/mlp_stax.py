@@ -16,7 +16,10 @@ from jax.example_libraries import optimizers as jax_opt
 
 from .pretrained_models import ENVIRON_VAR
 from ..utils import format_time
-from ...hmf_param_utils import define_diffsky_hmf_params_namedtuple
+from ...hmf_param_utils import (
+    define_diffsky_hmf_params_namedtuple_from_array,
+    N_DIFFSKY_HMF_PARAMS,
+)
 
 __all__ = ("MLP_stax", "load_mlp_model", "predict_mlp_hmf_params")
 
@@ -29,6 +32,7 @@ try:
         for f in PRETRAINED_PATH.iterdir()
         if f.is_file() and f.name.endswith(".pkl")
     ]
+    PRETRAINED_PATH = str(PRETRAINED_PATH)
 except KeyError:
     msg = (
         f"You have not set the '{ENVIRON_VAR}' environment variable to load HMF emulator models.\n"
@@ -107,19 +111,19 @@ def predict_mlp_hmf_params(
         mlp.get_params(mlp.opt_state_final), cosmo_params
     ).flatten()
 
-    nn_hmf_params_ntup = define_diffsky_hmf_params_namedtuple(nn_hmf_params)
+    nn_hmf_params_ntup = define_diffsky_hmf_params_namedtuple_from_array(nn_hmf_params)
 
     return nn_hmf_params_ntup
 
 
 class MLP_stax:
 
-    def __init__(self, n_targets=19, hidden_layers=[8, 8, 16, 16, 8]):
+    def __init__(self, n_targets=N_DIFFSKY_HMF_PARAMS, hidden_layers=[8, 8, 16, 16, 8]):
         """
         Parameters
         ----------
         n_targets: int
-            size of targets layer, by default 19
+            size of targets layer, by default `N_DIFFSKY_HMF_PARAMS=19`
             which is the number of diffsky hmf parameters
 
         hidden_layers: list(int)
@@ -192,7 +196,7 @@ class MLP_stax:
 
         seed: int
             seed for rng generator,
-            if ``ran_key`` is not provided
+            if `ran_key` is not provided
 
         Returns
         -------
@@ -261,7 +265,7 @@ class MLP_stax:
 
         target_data: ndarray of shape (n_samples, n_target)
             target data to compare against;
-            if None, the first item in ``self.loss_args`` is used
+            if None, the first item in `self.loss_args` is used
 
         loss_function: callable
             loss function to optimize
@@ -289,9 +293,20 @@ class MLP_stax:
         loss_history: list
             loss value at each step of the training process
         """
-        self.batch_size = batch_size
-        self.num_batches = num_batches
+
+        num_cosmo = input_data.shape[0]
+        if batch_size > num_cosmo:
+            msg = (
+                f"Batch size {batch_size} is larger than size of data {num_cosmo}.\n"
+                f"Setting `batch_size={num_cosmo}` and `num_batches=1`, instead."
+            )
+            warnings.warn(msg, UserWarning)
+            batch_size = num_cosmo
+            num_batches = 1
+
         self.num_epochs = num_epochs
+        self.num_batches = num_batches
+        self.batch_size = batch_size
 
         @jjit
         def _loss_fun(net_params, input_data, target_data):
@@ -301,7 +316,7 @@ class MLP_stax:
 
             Parameters
             ----------
-            net_params: namedtuple or ndarray of shape (n_params, )
+            net_params: ndarray of shape (n_mlp_params, )
                 optimizer's current state
 
             input_data: ndarray of shape (n_features, )
@@ -309,7 +324,7 @@ class MLP_stax:
 
             target_data: ndarray of shape (n_target, )
                 target data for loss calculation
-                against current optimizer's state
+                against optimizer's current state
 
             Returns
             -------
@@ -336,13 +351,13 @@ class MLP_stax:
             step_i: int
                 current step in gradient decent
 
-            opt_state: namedtuple or ndarray of shape (n_params,)
+            opt_state: namedtuple or ndarray of shape (n_params, )
                 current optimizer state
 
-            input_data: ndarray of shape (n_features,)
+            input_data: ndarray of shape (n_features, )
                 input data for model calculation
 
-            target_data: ndarray of shape (n_target,)
+            target_data: ndarray of shape (n_target, )
                 target data for loss calculation
                 against current optimizer's state
 
@@ -351,7 +366,7 @@ class MLP_stax:
             loss: float
                 value of loss
 
-            opt_update_state: namedtuple or ndarray of shape (n_params,)
+            opt_update_state: ndarray of shape (n_mlp_params,)
                 updated parameters of new optimizer's state
             """
             net_params = self.get_params(opt_state)
@@ -367,23 +382,14 @@ class MLP_stax:
         opt_state = self.opt_state_init
 
         # run in batches to train the model
-        num_cosmo = input_data.shape[0]
-        if batch_size > num_cosmo:
-            msg = (
-                f"Batch size {batch_size} is larger than size of data {num_cosmo}.\n"
-                f"Setting `batch_size={num_cosmo}` instead, to not duplicate data."
-            )
-            warnings.warn(msg, UserWarning)
-            batch_size = num_cosmo
-
         time_start = time()
         loss_history = []
         ran_key = jran.PRNGKey(seed)
         for i in range(num_epochs):
-            ran_key, sk_idx = jran.split(ran_key, 2)
-            idx = jran.randint(sk_idx, (batch_size,), 0, num_cosmo)
-            x_train = input_data[idx]
-            targets = target_data[idx]
+            ran_key, batch_key = jran.split(ran_key, 2)
+            idx = jran.randint(batch_key, (batch_size,), 0, num_cosmo)
+            x_train = input_data[idx, ...]
+            targets = target_data[idx, ...]
 
             loss, opt_state = _train_step(i, opt_state, x_train, targets)
             loss_history.append(float(loss))
@@ -424,7 +430,6 @@ class MLP_stax:
         -------
         saved files at the requested path
         """
-        savedir = os.path.join(savedir, save_base_name)
         if not os.path.exists(savedir):
             os.makedirs(savedir)
         if savedir[-1] != "/":
@@ -522,7 +527,6 @@ class MLP_stax:
         loss_hist: ndarray of shape (num_steps,)
             loss at each step of the optimization
         """
-        savedir = os.path.join(savedir, save_base_name)
         if not os.path.exists(savedir):
             os.makedirs(savedir)
         if savedir[-1] != "/":
