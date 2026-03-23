@@ -127,7 +127,6 @@ def test_predict_mlp_hmf_params_computes():
 #     # sampler parameres
 #     step_size = 5e-4
 #     batch_size = input_data.shape[0]
-#     num_batches = 1
 #     num_epochs = 700_000
 
 #     # initialize the MLP
@@ -143,7 +142,6 @@ def test_predict_mlp_hmf_params_computes():
 #         target_data,
 #         num_epochs=num_epochs,
 #         batch_size=batch_size,
-#         num_batches=num_batches,
 #         timeit=False,
 #     )
 

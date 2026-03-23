@@ -4,7 +4,6 @@ from jax import numpy as jnp
 from jax import jit as jjit
 from jax import vmap
 
-from ...hmf_param_utils import get_bounded_params
 from ...hmf_model import predict_diff_hmf, predict_cuml_hmf
 from ...hmf_param_utils import define_diffsky_hmf_params_namedtuple_from_array
 
@@ -90,8 +89,7 @@ def mse_loss_diff_hmf_curve(preds, target, logmp, z):
 
     mse_val = 0.0
     for i in range(n_cosmo_samples):
-        preds_bounded = get_bounded_params(preds[i, :])
-        preds_ntup = define_diffsky_hmf_params_namedtuple_from_array(preds_bounded)
+        preds_ntup = define_diffsky_hmf_params_namedtuple_from_array(preds[i, :])
         loghmf_preds = _predict_diff_hmf_vmap(preds_ntup, logmp[i, ...], z)
         diff = (loghmf_preds - target[i, ...]) ** 2
         mse_val += jnp.sum(jnp.mean(diff, axis=1))

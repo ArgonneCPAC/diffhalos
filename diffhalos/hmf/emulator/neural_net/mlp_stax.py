@@ -249,7 +249,6 @@ class MLP_stax:
         loss_function,
         loss_args=(),
         batch_size=None,
-        num_batches=None,
         num_epochs=None,
         seed=0,
         timeit=False,
@@ -276,9 +275,6 @@ class MLP_stax:
         batch_size: int
             size of a batch
 
-        num_batches: int
-            number of batches
-
         num_epochs: int
             number of epochs for training
 
@@ -298,14 +294,12 @@ class MLP_stax:
         if batch_size > num_cosmo:
             msg = (
                 f"Batch size {batch_size} is larger than size of data {num_cosmo}.\n"
-                f"Setting `batch_size={num_cosmo}` and `num_batches=1`, instead."
+                f"Setting `batch_size={num_cosmo}` instead."
             )
             warnings.warn(msg, UserWarning)
             batch_size = num_cosmo
-            num_batches = 1
 
         self.num_epochs = num_epochs
-        self.num_batches = num_batches
         self.batch_size = batch_size
 
         @jjit
@@ -463,7 +457,6 @@ class MLP_stax:
         _info_mlp_layers = np.array(["neurons per layer:", _layers])
         _info_train_dt_sec = np.array(["train time (sec):", self.train_dt_sec])
         _info_batch_size = np.array(["batch size:", str(self.batch_size)])
-        _info_num_batches = np.array(["n_batches:", str(self.num_batches)])
         _info_num_epochs = np.array(["n_epochs:", str(self.num_epochs)])
         _info_step_size = np.array(["step size:", "%.3e" % self.step_size])
         _info_opt_seed = np.array(["optimizer seed:", str(self.opt_seed)])
@@ -475,7 +468,6 @@ class MLP_stax:
                 _info_mlp_layers,
                 _info_train_dt_sec,
                 _info_batch_size,
-                _info_num_batches,
                 _info_num_epochs,
                 _info_step_size,
                 _info_opt_seed,
@@ -543,7 +535,6 @@ class MLP_stax:
         (
             train_dt_sec,
             batch_size,
-            num_batches,
             num_epochs,
             step_size,
             opt_seed,
@@ -555,7 +546,6 @@ class MLP_stax:
         self.train_dt_sec = float(train_dt_sec)
         self.train_dt = format_time(self.train_dt_sec)
         self.batch_size = int(batch_size)
-        self.num_batches = int(num_batches)
         self.num_epochs = int(num_epochs)
         self.step_size = float(step_size)
         self.opt_seed = int(opt_seed)
@@ -684,7 +674,6 @@ class MLP_stax:
         self.n_feature = None
         self.n_target = None
         self.batch_size = None
-        self.num_batches = None
         self.num_epochs = None
         self.train_dt = None
         self.train_dt_sec = None
