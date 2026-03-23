@@ -14,11 +14,6 @@ from ..calibrations.hmf_cal.smdpl_hmf import (
     Hi_Params,
 )
 
-__all__ = (
-    "define_diffsky_hmf_params_namedtuple_from_array",
-    "define_diffsky_hmf_params_array_from_namedtuple",
-)
-
 
 YTP_PARAMS_ARRAY_DEFAULT = np.asarray(DEFAULT_HMF_PARAMS.ytp_params)
 X0_PARAMS_ARRAY_DEFAULT = np.asarray(DEFAULT_HMF_PARAMS.x0_params)
@@ -37,6 +32,12 @@ N_DIFFSKY_HMF_PARAMS = 19
 
 # x0, k, ymin, ymax
 SIGMOID_PARAMS = (0.0, 0.13, -15.0, 15.0)
+
+
+__all__ = (
+    "define_diffsky_hmf_params_namedtuple_from_array",
+    "define_diffsky_hmf_params_array_from_namedtuple",
+)
 
 
 @jjit

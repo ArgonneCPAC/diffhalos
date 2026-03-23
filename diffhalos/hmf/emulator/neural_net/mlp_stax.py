@@ -91,7 +91,7 @@ def predict_mlp_hmf_params(
     Parameters
     ----------
     cosmo_params: ndarray of shape (n_cosmo_params, )
-        cosmological paramters
+        cosmological paramters the mlp was trained on
 
     savedir: str
         path to directory where model is stored
