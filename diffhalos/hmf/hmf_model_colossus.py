@@ -60,7 +60,7 @@ def predict_diff_hmf(
     nhalo = len(logmp)
 
     # halo mass function
-    mfunc = _call_colossus(Mhalo * cosmo.h, redshift, cosmo, mdef, model)
+    mfunc = _call_colossus(Mhalo, redshift, cosmo, mdef, model)
 
     # cut at low HMF limit
     _filter = np.where(mfunc > hmf_cut)[0]
@@ -69,9 +69,7 @@ def predict_diff_hmf(
         logm_min = logMhalo_after_cut[0]
         logm_max = logMhalo_after_cut[-1]
         logmp_out = np.linspace(logm_min, logm_max, nhalo)
-        mfunc_new = _call_colossus(
-            10**logmp_out * cosmo.h, redshift, cosmo, mdef, model
-        )
+        mfunc_new = _call_colossus(10**logmp_out, redshift, cosmo, mdef, model)
         logmfunc_out = np.log10(mfunc_new)
     else:
         logmp_out = logmp

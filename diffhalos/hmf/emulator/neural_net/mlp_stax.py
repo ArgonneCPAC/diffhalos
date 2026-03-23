@@ -497,6 +497,7 @@ class MLP_stax:
         save_base_name=DEFAULT_MLP_MODEL,
         verbose=False,
         load_extra=False,
+        activation=stax.Selu,
     ):
         """
         Convenient function to load the model from disk
@@ -516,16 +517,12 @@ class MLP_stax:
             if True will load extra information from training,
             which is not needed for making a model prediction
 
+        activation: function
+            activation function to use
+
         Returns
         -------
-        model_final: namedtuple
-            state of model at the optimizer's final step
-
-        model_init: namedtuple
-            initial state of the model
-
-        loss_hist: ndarray of shape (num_steps,)
-            loss at each step of the optimization
+        mlp instance
         """
         if not os.path.exists(savedir):
             os.makedirs(savedir)
@@ -584,7 +581,7 @@ class MLP_stax:
 
         self.hidden_layers = self.n_neuron_per_layer[1:-1]
 
-        self.net_init, self.net_apply = self.init_mlp()
+        self.net_init, self.net_apply = self.init_mlp(activation=activation)
 
         self.load_successful = True
 

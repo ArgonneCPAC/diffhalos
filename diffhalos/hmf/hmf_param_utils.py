@@ -2,7 +2,9 @@
 
 import numpy as np
 from jax import jit as jjit
+from jax import numpy as jnp
 
+from ..utils.sigmoid_utils import _sigmoid
 from ..calibrations.hmf_cal import DEFAULT_HMF_PARAMS
 from ..calibrations.hmf_cal.smdpl_hmf import (
     HMF_Params,
@@ -32,6 +34,34 @@ HMF_PARAMS_ARRAY_DEFAULT = np.concatenate(
 )
 
 N_DIFFSKY_HMF_PARAMS = 19
+
+# x0, k, ymin, ymax
+SIGMOID_PARAMS = (0.0, 0.13, -15.0, 15.0)
+
+
+@jjit
+def get_bounded_params(u_params, sigmoid_params=SIGMOID_PARAMS):
+    """
+    Get the bounded version of the parameters
+
+    Parameters
+    ----------
+    u_params: ndarray of shape (n_params, )
+        unbounded parameters
+
+    sigmoid_params: tuple
+        sigmoid parameters for bounding
+
+    Returns
+    -------
+    params: ndarray of shape (n_params, )
+        bounded parameters
+    """
+    params = jnp.zeros(N_DIFFSKY_HMF_PARAMS)
+    for i in range(N_DIFFSKY_HMF_PARAMS):
+        params = params.at[i].set(_sigmoid(u_params[i], *sigmoid_params))
+
+    return params
 
 
 @jjit
