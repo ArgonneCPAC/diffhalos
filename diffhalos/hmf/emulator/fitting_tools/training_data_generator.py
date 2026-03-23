@@ -9,7 +9,7 @@ from diffsky.mass_functions.hmf_model import DEFAULT_HMF_PARAMS as P_INIT
 
 from . import hmf_fitter
 from ...hmf_model_colossus import predict_diff_hmf, predict_cuml_hmf
-from ....cosmology.cosmo import DEFAULT_COSMOLOGY, DEFAULT_COSMO_PRIORS
+from ....cosmology.cosmo import DEFAULT_COSMOLOGY_DICT, DEFAULT_COSMO_PRIORS
 from ....cosmology.cosmo_param_utils import (
     define_colossus_cosmology,
     sample_cosmo_params,
@@ -61,7 +61,7 @@ def generate_hmf_loss_train_data(
     cuml=False,
     cosmo_params=None,
     cosmo_param_names=None,
-    base_cosmo_params=DEFAULT_COSMOLOGY,
+    base_cosmo_params=DEFAULT_COSMOLOGY_DICT,
     cosmo_priors=DEFAULT_COSMO_PRIORS,
     cosmo_params_sample_method="LatinHypercube",
     seed=None,
@@ -317,7 +317,7 @@ def _get_hmf_training_data(
     cuml=False,
     cosmo_params=None,
     cosmo_param_names=None,
-    base_cosmo_params=DEFAULT_COSMOLOGY,
+    base_cosmo_params=DEFAULT_COSMOLOGY_DICT,
     mdef=MDEF,
     hmf_model=HMF_MODEL,
     hmf_cut=HMF_CUT,
@@ -383,7 +383,7 @@ def _get_hmf_training_data(
         cosmo_params_cur = deepcopy(base_cosmo_params)
         for pi, _param in enumerate(cosmo_param_names):
             cosmo_params_cur[_param] = cosmo_params[ci, pi]
-        cosmo = define_colossus_cosmology(cosmo_params=cosmo_params_cur)
+        cosmo = define_colossus_cosmology(cosmo_params_cur)
 
         # for current cosmology collect all redshifts
         loss_data_cosmo_cur = []

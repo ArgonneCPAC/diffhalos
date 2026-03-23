@@ -4,7 +4,7 @@ import numpy as np
 
 from ..hmf_cuml_fitter import cuml_hmf_fitter
 from ..training_data_generator import generate_hmf_loss_train_data
-from .....cosmology.cosmo import DEFAULT_COSMO_PRIORS, DEFAULT_COSMOLOGY
+from .....cosmology.cosmo import DEFAULT_COSMO_PRIORS, DEFAULT_COSMOLOGY_DICT
 
 
 def test_cuml_hmf_fitter_single_cosmo():
@@ -17,7 +17,7 @@ def test_cuml_hmf_fitter_single_cosmo():
         cuml=True,
         cosmo_params=None,
         cosmo_param_names=None,
-        base_cosmo_params=DEFAULT_COSMOLOGY,
+        base_cosmo_params=DEFAULT_COSMOLOGY_DICT,
         cosmo_priors=DEFAULT_COSMO_PRIORS,
         num_samples=1,
         savedir=None,

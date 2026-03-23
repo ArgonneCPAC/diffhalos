@@ -9,8 +9,8 @@ from jax import jit as jjit
 from colossus.cosmology import cosmology
 
 from .cosmo import (
-    DEFAULT_COSMOLOGY,
-    DEFAULT_COSMOLOGY_COLOSSUS,
+    DEFAULT_COSMOLOGY_NTUP,
+    DEFAULT_COSMOLOGY_DICT,
     DEFAULT_COSMOLOGY_DSPS,
     DEFAULT_COSMO_PRIORS,
 )
@@ -18,12 +18,13 @@ from .cosmo import (
 __all__ = (
     "sample_cosmo_params",
     "sample_cosmo_params_full_cosmo",
+    "define_full_cosmology",
     "define_dsps_cosmology",
     "define_colossus_cosmology",
 )
 
 
-COSMO_PARAM_NAMES = DEFAULT_COSMOLOGY.keys()
+COSMO_PARAM_NAMES = DEFAULT_COSMOLOGY_DICT.keys()
 COSMO_NTUP = namedtuple("CosmoNtup", COSMO_PARAM_NAMES)
 
 AV_SAMPLING_METHODS = ("LatinHypercube",)
@@ -75,7 +76,7 @@ def sample_cosmo_params(
 
 
 def sample_cosmo_params_full_cosmo(
-    underlying_cosmo=DEFAULT_COSMOLOGY,
+    underlying_cosmo=DEFAULT_COSMOLOGY_DICT,
     cosmo_priors=DEFAULT_COSMO_PRIORS,
     seed=None,
     num_samples=1,
@@ -188,37 +189,61 @@ def _sample_cosmo_params_latin_hypercube(
 
 
 @jjit
-def define_dsps_cosmology(cosmo_params_array):
+def define_full_cosmology(
+    cosmo_params_ntup,
+    underlying_cosmo=DEFAULT_COSMOLOGY_NTUP,
+):
     """
-    Helper function to define a DSPS cosmology
-    given an array of cosmological parameters
+    Helper function to define a cosmology namedtuple with all parameters
 
     Parameters
     ----------
-    cosmo_params_array: ndarray of shape (n_cosmo_params, )
-        array of cosmological parameters in the default form
+    cosmo_params_ntup: namedtuple
+        cosmological parameters to replace in underlying cosmology
+
+    underlying_cosmo: namedtuple
+        full underlying cosmology namedtuple
 
     Returns
     -------
     cosmo_dsps: namedtuple
         dsps.cosmology with parameters matching the input array
     """
-    cosmo_params_ntup = COSMO_NTUP(*cosmo_params_array)
+    cosmo_params = underlying_cosmo._asdict()
 
-    cosmo_dsps = DEFAULT_COSMOLOGY_DSPS
-    cosmo_dsps = cosmo_dsps._replace(
-        Om0=cosmo_params_ntup.Om0,
-        h=cosmo_params_ntup.H0 / 100,
-        w0=cosmo_params_ntup.w0,
-        wa=cosmo_params_ntup.wa,
-    )
+    for _param in cosmo_params_ntup._fields:
+        cosmo_params[_param] = getattr(cosmo_params_ntup, _param)
 
-    return cosmo_dsps
+    return underlying_cosmo._replace(**cosmo_params)
+
+
+@jjit
+def define_dsps_cosmology(cosmo_params_ntup):
+    """
+    Helper function to define a DSPS cosmology
+    given an namedtuple of cosmological parameters
+
+    Parameters
+    ----------
+    cosmo_params_ntup: namedtuple
+        full cosmology container
+
+    Returns
+    -------
+    cosmo_dsps: namedtuple
+        dsps.cosmology with parameters matching the input array
+    """
+    cosmo_dsps = DEFAULT_COSMOLOGY_DSPS._asdict()
+
+    for _param in cosmo_dsps.keys():
+        cosmo_dsps[_param] = getattr(cosmo_params_ntup, _param)
+
+    return DEFAULT_COSMOLOGY_DSPS._replace(**cosmo_dsps)
 
 
 def define_colossus_cosmology(
+    cosmo_params_dict,
     cosmo_name="ColossusCosmo",
-    cosmo_params=DEFAULT_COSMOLOGY,
     flat=None,
     Om0=None,
     sigma8=None,
@@ -229,17 +254,17 @@ def define_colossus_cosmology(
     wa=None,
 ):
     """
-    Define Colossus cosmology
+    Define Colossus cosmology given a dictionary of
+    cosmological parameters
 
     Parameters
     ----------
+    cosmo_params_dict: dictionary
+        dictionary with cosmological parameters
+        needed to define a Colossus cosmology
+
     cosmo_name: str
         cosmology name
-
-    cosmo_params: dictionary
-        dictionary with all cosmological parameters
-        needed to define a Colossus cosmology;
-        default values are from Planck 2018 cosmology
 
     flat: bool
         if True, flat cosmology is assumed
@@ -274,59 +299,43 @@ def define_colossus_cosmology(
 
     if flat is not None:
         cosmo_params_colossus["flat"] = flat
-    elif "flat" not in cosmo_params:
-        cosmo_params["flat"] = DEFAULT_COSMOLOGY_COLOSSUS["flat"]
     else:
-        cosmo_params_colossus["flat"] = cosmo_params["flat"]
+        cosmo_params_colossus["flat"] = cosmo_params_dict["flat"]
 
     if Om0 is not None:
         cosmo_params_colossus["Om0"] = Om0
-    elif "Om0" not in cosmo_params:
-        cosmo_params_colossus["Om0"] = DEFAULT_COSMOLOGY_COLOSSUS["Om0"]
     else:
-        cosmo_params_colossus["Om0"] = cosmo_params["Om0"]
+        cosmo_params_colossus["Om0"] = cosmo_params_dict["Om0"]
 
     if sigma8 is not None:
         cosmo_params_colossus["sigma8"] = sigma8
-    elif "sigma8" not in cosmo_params:
-        cosmo_params_colossus["sigma8"] = DEFAULT_COSMOLOGY_COLOSSUS["sigma8"]
     else:
-        cosmo_params_colossus["sigma8"] = cosmo_params["sigma8"]
+        cosmo_params_colossus["sigma8"] = cosmo_params_dict["sigma8"]
 
     if ns is not None:
         cosmo_params_colossus["ns"] = ns
-    elif "ns" not in cosmo_params:
-        cosmo_params_colossus["ns"] = DEFAULT_COSMOLOGY_COLOSSUS["ns"]
     else:
-        cosmo_params_colossus["ns"] = cosmo_params["ns"]
+        cosmo_params_colossus["ns"] = cosmo_params_dict["ns"]
 
     if Ob0 is not None:
         cosmo_params_colossus["Ob0"] = Ob0
-    elif "Ob0" not in cosmo_params:
-        cosmo_params_colossus["Ob0"] = DEFAULT_COSMOLOGY_COLOSSUS["Ob0"]
     else:
-        cosmo_params_colossus["Ob0"] = cosmo_params["Ob0"]
+        cosmo_params_colossus["Ob0"] = cosmo_params_dict["Ob0"]
 
     if H0 is not None:
         cosmo_params_colossus["H0"] = H0
-    elif "H0" not in cosmo_params:
-        cosmo_params_colossus["H0"] = DEFAULT_COSMOLOGY_COLOSSUS["H0"]
     else:
-        cosmo_params_colossus["H0"] = cosmo_params["H0"]
+        cosmo_params_colossus["H0"] = cosmo_params_dict["H0"]
 
     if w0 is not None:
         cosmo_params_colossus["w0"] = w0
-    elif "w0" not in cosmo_params:
-        cosmo_params_colossus["w0"] = DEFAULT_COSMOLOGY_COLOSSUS["w0"]
     else:
-        cosmo_params_colossus["w0"] = cosmo_params["w0"]
+        cosmo_params_colossus["w0"] = cosmo_params_dict["w0"]
 
     if wa is not None:
         cosmo_params_colossus["wa"] = wa
-    elif "wa" not in cosmo_params:
-        cosmo_params_colossus["wa"] = DEFAULT_COSMOLOGY_COLOSSUS["wa"]
     else:
-        cosmo_params_colossus["H0"] = cosmo_params["H0"]
+        cosmo_params_colossus["wa"] = cosmo_params_dict["wa"]
 
     cosmo = cosmology.setCosmology(cosmo_name, **cosmo_params_colossus)
 

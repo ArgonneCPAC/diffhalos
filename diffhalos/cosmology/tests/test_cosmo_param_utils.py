@@ -1,15 +1,18 @@
 """"""
 
 import numpy as np
+from collections import namedtuple
 
 from ..cosmo_param_utils import (
     sample_cosmo_params,
     sample_cosmo_params_full_cosmo,
     define_dsps_cosmology,
+    define_colossus_cosmology,
+    define_full_cosmology,
     DEFAULT_COSMO_PRIORS,
-    DEFAULT_COSMOLOGY,
+    DEFAULT_COSMOLOGY_DICT,
+    DEFAULT_COSMOLOGY_NTUP,
 )
-from ..cosmo import DEFAULT_COSMOLOGY_ARRAY
 
 
 def test_sample_cosmo_params_cosmo():
@@ -34,14 +37,14 @@ def test_sample_cosmo_params_cosmo():
 
 
 def test_sample_cosmo_params_full_cosmo():
-    cosmo_params = DEFAULT_COSMOLOGY.keys()
+    cosmo_params = DEFAULT_COSMOLOGY_DICT.keys()
     cosmo_sampled = DEFAULT_COSMO_PRIORS.keys()
 
     n_samples = 10
     n_params = len(cosmo_params)
 
     cosmo_param_samples = sample_cosmo_params_full_cosmo(
-        underlying_cosmo=DEFAULT_COSMOLOGY,
+        underlying_cosmo=DEFAULT_COSMOLOGY_DICT,
         cosmo_priors=DEFAULT_COSMO_PRIORS,
         seed=1291,
         num_samples=n_samples,
@@ -59,9 +62,45 @@ def test_sample_cosmo_params_full_cosmo():
 
 def test_define_dsps_cosmology():
 
-    dsps_cosmo = define_dsps_cosmology(DEFAULT_COSMOLOGY_ARRAY)
+    dsps_cosmo = define_dsps_cosmology(DEFAULT_COSMOLOGY_NTUP)
 
-    DEFAULT_COSMOLOGY["h"] = DEFAULT_COSMOLOGY["H0"] / 100
     assert isinstance(dsps_cosmo, tuple)
     for _param in dsps_cosmo._fields:
-        assert getattr(dsps_cosmo, _param) == DEFAULT_COSMOLOGY[_param]
+        assert getattr(dsps_cosmo, _param) == DEFAULT_COSMOLOGY_DICT[_param]
+
+
+def test_define_colossus_cosmology():
+
+    Om0 = 0.34
+    sigma8 = 0.5
+    H0 = 90.0
+
+    colossus_cosmo = define_colossus_cosmology(
+        DEFAULT_COSMOLOGY_DICT,
+        cosmo_name="ColossusCosmo",
+        Om0=Om0,
+        sigma8=sigma8,
+        H0=H0,
+    )
+
+    assert colossus_cosmo.Om0 == Om0
+    assert colossus_cosmo.sigma8 == sigma8
+    assert colossus_cosmo.H0 == H0
+
+
+def test_define_full_cosmology():
+
+    Om0 = 0.34
+    sigma8 = 0.5
+    H0 = 90.0
+
+    cosmo_params_ntup = namedtuple("cosmo", "Om0 sigma8 H0")(*(Om0, sigma8, H0))
+
+    full_cosmo = define_full_cosmology(
+        cosmo_params_ntup,
+        underlying_cosmo=DEFAULT_COSMOLOGY_NTUP,
+    )
+
+    assert full_cosmo.Om0 == Om0
+    assert full_cosmo.sigma8 == sigma8
+    assert full_cosmo.H0 == H0

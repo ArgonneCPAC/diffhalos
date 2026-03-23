@@ -22,7 +22,7 @@ from ..cosmology.geometry_utils import (
     spherical_shell_comoving_volume,
     compute_volume_from_sky_area,
 )
-from .emulator.neural_net.mlp_stax import predict_mlp_hmf_params, DEFAULT_MLP_MODEL
+from .emulator.neural_net.mlp_stax import predict_mlp_hmf_params
 from ..utils.sigmoid_utils import _sig_slope, _sigmoid
 from ..defaults import FULL_SKY_AREA
 
@@ -31,6 +31,8 @@ X0_XTP = 3.0
 HI_XTP = 3.0
 
 N_HMF_GRID = 500
+
+DEFAULT_MLP_MODEL = "mlp_model_v0"
 
 __all__ = (
     "predict_cuml_hmf",

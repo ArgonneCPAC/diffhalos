@@ -9,22 +9,24 @@ from dsps.cosmology import flat_wcdm
 from dsps.cosmology import DEFAULT_COSMOLOGY as DEFAULT_COSMOLOGY_DSPS
 
 # default diffhalos cosmology
-DEFAULT_COSMOLOGY = OrderedDict(
+DEFAULT_COSMOLOGY_DICT = OrderedDict(
     Om0=0.3111,
     sigma8=0.8102,
     ns=0.9665,
     Ob0=0.0490,
     H0=67.66,
+    h=0.6766,
     w0=-1.0,
     wa=0.0,
+    flat=True,
 )
 
-DEFAULT_COSMO_NAMES = list(DEFAULT_COSMOLOGY.keys())
+DEFAULT_COSMO_NAMES = list(DEFAULT_COSMOLOGY_DICT.keys())
 N_DEFAULT_COSMO_PARAMS = len(DEFAULT_COSMO_NAMES)
 
 DEFAULT_COSMOLOGY_ARRAY = np.zeros(N_DEFAULT_COSMO_PARAMS)
-for i, _param in enumerate(DEFAULT_COSMOLOGY):
-    DEFAULT_COSMOLOGY_ARRAY[i] = DEFAULT_COSMOLOGY[_param]
+for i, _param in enumerate(DEFAULT_COSMOLOGY_DICT):
+    DEFAULT_COSMOLOGY_ARRAY[i] = DEFAULT_COSMOLOGY_DICT[_param]
 
 DEFAULT_COSMOLOGY_NTUP = namedtuple("default_cosmo", DEFAULT_COSMO_NAMES)(
     *DEFAULT_COSMOLOGY_ARRAY
@@ -36,17 +38,6 @@ DEFAULT_COSMO_PRIORS = OrderedDict(
     Om0=(0.2, 0.5),
     sigma8=(0.6, 1.0),
     ns=(0.8, 1.1),
-)
-
-
-# default colossus cosmology (planck 2018)
-DEFAULT_COSMOLOGY_COLOSSUS = OrderedDict(
-    flat=True,
-    Om0=0.3111,
-    sigma8=0.8102,
-    ns=0.9665,
-    Ob0=0.0490,
-    H0=67.66,
 )
 
 __all__ = ("get_tobs_from_zobs",)

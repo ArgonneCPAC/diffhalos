@@ -4,7 +4,10 @@ import numpy as np
 import os
 
 from .. import training_data_generator as tdg
-from .....cosmology.cosmo_param_utils import DEFAULT_COSMO_PRIORS, DEFAULT_COSMOLOGY
+from .....cosmology.cosmo_param_utils import (
+    DEFAULT_COSMO_PRIORS,
+    DEFAULT_COSMOLOGY_DICT,
+)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SAVE_DIR = os.path.join(HERE, "testing_data")
@@ -23,7 +26,7 @@ def test_generate_diff_hmf_loss_train_data():
         logmp,
         z,
         cuml=False,
-        base_cosmo_params=DEFAULT_COSMOLOGY,
+        base_cosmo_params=DEFAULT_COSMOLOGY_DICT,
         cosmo_priors=DEFAULT_COSMO_PRIORS,
         num_samples=num_samples,
         hmf_cut=hmf_cut,
@@ -84,7 +87,7 @@ def test_generate_cuml_hmf_loss_train_data():
         logmp,
         z,
         cuml=True,
-        base_cosmo_params=DEFAULT_COSMOLOGY,
+        base_cosmo_params=DEFAULT_COSMOLOGY_DICT,
         cosmo_priors=DEFAULT_COSMO_PRIORS,
         num_samples=num_samples,
         hmf_cut=hmf_cut,
@@ -154,7 +157,7 @@ def test_generate_hmf_loss_train_data_unpacks_properly():
         cuml=True,
         cosmo_params=None,
         cosmo_param_names=None,
-        base_cosmo_params=DEFAULT_COSMOLOGY,
+        base_cosmo_params=DEFAULT_COSMOLOGY_DICT,
         cosmo_priors=DEFAULT_COSMO_PRIORS,
         num_samples=num_samples,
         savedir=None,
@@ -181,7 +184,7 @@ def test_generate_hmf_loss_train_data_unpacks_properly():
         cuml=True,
         cosmo_params=None,
         cosmo_param_names=None,
-        base_cosmo_params=DEFAULT_COSMOLOGY,
+        base_cosmo_params=DEFAULT_COSMOLOGY_DICT,
         cosmo_priors=DEFAULT_COSMO_PRIORS,
         num_samples=num_samples,
         savedir=None,
