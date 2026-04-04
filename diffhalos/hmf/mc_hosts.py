@@ -2,6 +2,7 @@
 """Generate MC realizations of the host dark matter halo mass function"""
 
 from jax import config
+from functools import partial
 
 config.update("jax_enable_x64", True)
 
@@ -11,15 +12,13 @@ from jax import jit as jjit
 from jax import numpy as jnp
 from jax import random as jran
 
-from .hmf_model_mlp import (
-    predict_cuml_hmf,
-    _compute_nhalos_tot,
-    DEFAULT_COSMOLOGY_ARRAY,
-)
+from .hmf_model_mlp import predict_cuml_hmf, _compute_nhalos_tot
 
 N_LGMU_TABLE = 200
 U_TABLE = jnp.linspace(0, 1, N_LGMU_TABLE)
 LGMH_MAX = 17.0
+
+DEFAULT_MLP_MODEL = "mlp_model_v0"
 
 __all__ = ("mc_host_halos_singlez",)
 
@@ -29,8 +28,9 @@ def mc_host_halos_singlez(
     lgmp_min,
     redshift,
     volume_com_mpc,
-    cosmo_params=DEFAULT_COSMOLOGY_ARRAY,
+    cosmo_params,
     lgmp_max=LGMH_MAX,
+    mlp_model=DEFAULT_MLP_MODEL,
 ):
     """
     Monte Carlo realization of the host halo mass function
@@ -51,11 +51,14 @@ def mc_host_halos_singlez(
     volume_com_mpc: float
         comoving volume of the generated population, in Mpc^3
 
-    cosmo_params: ndarray of shape (n_cosmo_params, )
+    cosmo_params: namedtuple
         cosmological parameters
 
     lgmp_max: float
         base-10 log of the maximum mass
+
+    mlp_model: str
+        mlp model to use
 
     Returns
     -------
@@ -73,12 +76,14 @@ def mc_host_halos_singlez(
         lgmp_min,
         redshift,
         volume_com_mpc,
+        mlp_model=mlp_model,
     )
     mean_nhalos_lgmax = _compute_nhalos_tot(
         cosmo_params,
         lgmp_max,
         redshift,
         volume_com_mpc,
+        mlp_model=mlp_model,
     )
     mean_nhalos = mean_nhalos - mean_nhalos_lgmax
 
@@ -92,42 +97,48 @@ def mc_host_halos_singlez(
             lgmp_min,
             redshift,
             lgmp_max=lgmp_max,
+            mlp_model=mlp_model,
         )
     )
 
     return lgmp_halopop
 
 
-@jjit
+@partial(jjit, static_argnames=["mlp_model"])
 def _get_hmf_cdf_interp_tables(
     cosmo_params,
     lgmp_min,
     redshift,
     lgmp_max=LGMH_MAX,
+    mlp_model=DEFAULT_MLP_MODEL,
 ):
     dlgmp = lgmp_max - lgmp_min
     lgmp_table = U_TABLE * dlgmp + lgmp_min
 
-    cdf_table = 10 ** predict_cuml_hmf(cosmo_params, lgmp_table, redshift)
+    cdf_table = 10 ** predict_cuml_hmf(
+        cosmo_params, lgmp_table, redshift, mlp_model=mlp_model
+    )
     cdf_table = cdf_table - cdf_table[0]
     cdf_table = cdf_table / cdf_table[-1]
 
     return lgmp_table, cdf_table
 
 
-@jjit
+@partial(jjit, static_argnames=["mlp_model"])
 def _mc_host_halos_singlez_kern(
     uran,
     cosmo_params,
     lgmp_min,
     redshift,
     lgmp_max=LGMH_MAX,
+    mlp_model=DEFAULT_MLP_MODEL,
 ):
     lgmp_table, cdf_table = _get_hmf_cdf_interp_tables(
         cosmo_params,
         lgmp_min,
         redshift,
         lgmp_max=lgmp_max,
+        mlp_model=mlp_model,
     )
     mc_lg_mp = jnp.interp(uran, cdf_table, lgmp_table)
 
@@ -139,8 +150,9 @@ def mc_host_halos_hist_singlez(
     lgmp_min,
     redshift,
     volume_com_mpc,
-    cosmo_params=DEFAULT_COSMOLOGY_ARRAY,
+    cosmo_params,
     lgmp_max=LGMH_MAX,
+    mlp_model=DEFAULT_MLP_MODEL,
     bins=20,
 ):
     """
@@ -163,11 +175,14 @@ def mc_host_halos_hist_singlez(
     volume_com_mpc: float
         comoving volume of the generated population, in Mpc^3
 
-    cosmo_params: ndarray of shape (n_cosmo_params, )
+    cosmo_params: namedtuple
         cosmological parameters
 
     lgmp_max: float
         base-10 log of the maximum mass
+
+    mlp_model: str
+        mlp model to use
 
     bins: int or ndarray of shape (n_bins, )
         number of histogram bins or specified bins to use for binning
@@ -185,8 +200,9 @@ def mc_host_halos_hist_singlez(
         lgmp_min,
         redshift,
         volume_com_mpc,
-        cosmo_params=cosmo_params,
+        cosmo_params,
         lgmp_max=lgmp_max,
+        mlp_model=mlp_model,
     )
 
     hist_data = np.histogram(mc_logmhalo, bins=bins, density=False)
@@ -200,6 +216,7 @@ def mc_host_halos_hist_singlez(
         lgmp_min,
         redshift,
         volume_com_mpc,
+        mlp_model=mlp_model,
     )
 
     # normalize counts
@@ -215,8 +232,9 @@ def mc_host_halos_hist_singlez_out_of_core(
     redshift,
     volume_com_mpc_per_subvol,
     n_subvol,
-    cosmo_params=DEFAULT_COSMOLOGY_ARRAY,
+    cosmo_params,
     lgmp_max=LGMH_MAX,
+    mlp_model=DEFAULT_MLP_MODEL,
     n_bins=20,
 ):
     """
@@ -245,11 +263,14 @@ def mc_host_halos_hist_singlez_out_of_core(
     n_subvol: int
         number of subvolumes to generate
 
-    cosmo_params: ndarray of shape (n_cosmo_params, )
+    cosmo_params: namedtuple
         cosmological parameters
 
     lgmp_max: float
         base-10 log of the maximum mass
+
+    mlp_model: str
+        mlp model to use
 
     n_bins: int
         number of histogram bins
@@ -273,8 +294,9 @@ def mc_host_halos_hist_singlez_out_of_core(
             lgmp_min,
             redshift,
             volume_com_mpc_per_subvol,
-            cosmo_params=cosmo_params,
+            cosmo_params,
             lgmp_max=lgmp_max,
+            mlp_model=mlp_model,
         )
 
         # put halo masses into bins
@@ -295,6 +317,7 @@ def mc_host_halos_hist_singlez_out_of_core(
         lgmp_min,
         redshift,
         volume_com_mpc_per_subvol * n_subvol,
+        mlp_model=mlp_model,
     )
     halo_counts /= np.diff(logm_bin_edges)
     halo_counts /= volume_com_mpc_per_subvol * n_subvol

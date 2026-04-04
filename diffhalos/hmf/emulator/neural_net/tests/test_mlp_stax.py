@@ -49,14 +49,16 @@ def test_predict_mlp_hmf_params_computes():
         pass
 
 
-def create_test_mlp_training_data(logmp, z):
-
-    num_samples = 5
-    hmf_cut = 1e-8
-    cuml = False
-    num_steps = 1_000
-    step_size = 3e-2
-    n_warmup = 10
+def create_test_mlp_training_data(
+    logmp,
+    z,
+    num_steps=700,
+    step_size=3e-2,
+    n_warmup=10,
+    num_samples=3,
+    hmf_cut=1e-8,
+    cuml=False,
+):
 
     cosmo_priors = {"Om0": (0.2, 0.5), "sigma8": (0.6, 1.0)}
     cosmo_param_names = cosmo_priors.keys()

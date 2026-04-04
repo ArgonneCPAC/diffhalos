@@ -2,10 +2,9 @@
 
 import numpy as np
 from jax import random as jran
-
+from collections import namedtuple
 
 from ..hmf_model_mlp import (
-    DEFAULT_COSMOLOGY_ARRAY,
     predict_diff_hmf,
 )
 from ..mc_hosts import (
@@ -23,11 +22,12 @@ def test_mc_host_halo_logmp_behaves_as_expected():
     Lbox = 1000.0
     volume_com_mpc = Lbox**3
 
+    # Om0, sigma8 for model v0
+    cosmo_param_vals = (0.3, 0.8)
+    cosmo_params = namedtuple("cosmo", "Om0 sigma8")(*cosmo_param_vals)
+
     lgmp_halopop = mc_host_halos_singlez(
-        ran_key,
-        lgmp_min,
-        redshift,
-        volume_com_mpc,
+        ran_key, lgmp_min, redshift, volume_com_mpc, cosmo_params
     )
     assert lgmp_halopop.size > 0
     assert np.all(lgmp_halopop > lgmp_min)
@@ -39,6 +39,7 @@ def test_mc_host_halo_logmp_behaves_as_expected():
         lgmp_min,
         redshift,
         volume_com_mpc,
+        cosmo_params,
         lgmp_max=lgmp_max,
     )
     assert np.all(lgmp_halopop > lgmp_min)
@@ -51,15 +52,19 @@ def test_diff_hmf_pophist_vs_theory_consistency():
     Lbox = 1000.0
     Vbox = Lbox**3
 
+    # Om0, sigma8 for model v0
+    cosmo_param_vals = (0.3, 0.8)
+    cosmo_params = namedtuple("cosmo", "Om0 sigma8")(*cosmo_param_vals)
+
     lgm_bins = np.linspace(lgmp_min + 0.5, 14.0, 50)
 
     z_test = np.linspace(0.0, 1.0, 5)
 
     for z in z_test:
-        diff_hmf = predict_diff_hmf(DEFAULT_COSMOLOGY_ARRAY, lgm_bins, z)
+        diff_hmf = predict_diff_hmf(cosmo_params, lgm_bins, z)
 
         diff_hmf_target, lgm_binmids = mc_host_halos_hist_singlez(
-            ran_key, lgmp_min, z, Vbox, bins=lgm_bins
+            ran_key, lgmp_min, z, Vbox, cosmo_params, bins=lgm_bins
         )
 
         # interpolate to compare same-sized arrays

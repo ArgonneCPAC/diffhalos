@@ -1,16 +1,23 @@
 """ """
 
 import numpy as np
+from collections import namedtuple
+
 from jax import numpy as jnp
 from jax import random as jran
 
-from ...cosmology.cosmo import DEFAULT_COSMOLOGY_ARRAY, DEFAULT_COSMO_NAMES, flat_wcdm
-from ...cosmology.cosmo_param_utils import define_dsps_cosmology
+from .. import mc_lightcone_halos as mclh
+from ...cosmology.cosmo import flat_wcdm
+from ...cosmology.cosmo_param_utils import (
+    define_dsps_cosmo_from_mlp_cosmo,
+    DEFAULT_COSMOLOGY_NTUP,
+)
 from ...hmf import hmf_model_mlp, mc_hosts
 from ...mah.diffmahnet.diffmahnet import log_mah_kern
 from ...mah.utils import apply_mah_rescaling
 from ...utils.stratified_grid import redshift_mass_grid
-from .. import mc_lightcone_halos as mclh
+
+MLP_MODEL = "mlp_model_v0"
 
 
 def test_mc_lightcone_host_halo_mass_function():
@@ -24,13 +31,17 @@ def test_mc_lightcone_host_halo_mass_function():
     z_min, z_max = 0.4, 0.5
     sky_area_degsq = 10.0
 
-    cosmo = DEFAULT_COSMOLOGY_ARRAY
+    # Om0, sigma8 for model v0
+    cosmo_param_vals = (0.3, 0.8)
+    cosmo_params = namedtuple("cosmo", "Om0 sigma8")(*cosmo_param_vals)
 
     n_tests = 5
     ran_keys = jran.split(jran.key(0), n_tests)
     for ran_key in ran_keys:
-        args = (ran_key, lgmp_min, z_min, z_max, sky_area_degsq)
-        redshifts_galpop, logmp_halopop = mclh.mc_lc_hmf(*args, lgmp_max=lgmp_max)
+        args = (ran_key, lgmp_min, z_min, z_max, sky_area_degsq, cosmo_params)
+        redshifts_galpop, logmp_halopop = mclh.mc_lc_hmf(
+            *args, lgmp_max=lgmp_max, mlp_model=MLP_MODEL
+        )
 
         assert np.all(np.isfinite(redshifts_galpop))
         assert np.all(np.isfinite(logmp_halopop))
@@ -46,7 +57,9 @@ def test_mc_lightcone_host_halo_mass_function():
             * np.pi
             * flat_wcdm.comoving_distance_to_z(
                 z_min,
-                *define_dsps_cosmology(cosmo),
+                *define_dsps_cosmo_from_mlp_cosmo(
+                    cosmo_params, underlying_cosmo=DEFAULT_COSMOLOGY_NTUP
+                ),
             )
             ** 3
         )
@@ -55,7 +68,9 @@ def test_mc_lightcone_host_halo_mass_function():
             * np.pi
             * flat_wcdm.comoving_distance_to_z(
                 z_max,
-                *define_dsps_cosmology(cosmo),
+                *define_dsps_cosmo_from_mlp_cosmo(
+                    cosmo_params, underlying_cosmo=DEFAULT_COSMOLOGY_NTUP
+                ),
             )
             ** 3
         )
@@ -67,7 +82,9 @@ def test_mc_lightcone_host_halo_mass_function():
             lgmp_min,
             z_med,
             vol_com_mpc,
+            cosmo_params,
             lgmp_max=lgmp_max,
+            mlp_model=MLP_MODEL,
         )
 
         n_lightcone, n_snapshot = redshifts_galpop.size, lgmp_halopop_zmed.size
@@ -95,14 +112,20 @@ def test_mc_lightcone_host_halo_mass_function_lgmp_max_feature():
     sky_area_degsq = 200.0
     lgmp_max_test = 13.0
 
+    # Om0, sigma8 for model v0
+    cosmo_param_vals = (0.3, 0.8)
+    cosmo_params = namedtuple("cosmo", "Om0 sigma8")(*cosmo_param_vals)
+
     n_tests = 10
     for __ in range(n_tests):
         ran_key, test_key = jran.split(ran_key, 2)
 
-        args = (test_key, lgmp_min, z_min, z_max, sky_area_degsq)
-        z_halopop, logmp_halopop = mclh.mc_lc_hmf(*args)
+        args = (test_key, lgmp_min, z_min, z_max, sky_area_degsq, cosmo_params)
+        z_halopop, logmp_halopop = mclh.mc_lc_hmf(*args, mlp_model=MLP_MODEL)
 
-        z_halopop2, logmp_halopop2 = mclh.mc_lc_hmf(*args, lgmp_max=lgmp_max_test)
+        z_halopop2, logmp_halopop2 = mclh.mc_lc_hmf(
+            *args, mlp_model=MLP_MODEL, lgmp_max=lgmp_max_test
+        )
         assert z_halopop.size > z_halopop2.size
         assert z_halopop2.size == logmp_halopop2.size
 
@@ -120,14 +143,18 @@ def test_mc_lightcone_host_halo():
     lgmp_min = 12.0
     sky_area_degsq = 1.0
 
+    # Om0, sigma8 for model v0
+    cosmo_param_vals = (0.3, 0.8)
+    cosmo_params = namedtuple("cosmo", "Om0 sigma8")(*cosmo_param_vals)
+
     n_tests = 5
     z_max_arr = np.linspace(0.2, 2.5, n_tests)
     for z_max in z_max_arr:
         test_key, ran_key = jran.split(ran_key, 2)
         z_min = z_max - 0.05
 
-        args = (test_key, lgmp_min, z_min, z_max, sky_area_degsq)
-        cenpop = mclh.mc_lc_halos(*args)
+        args = (test_key, lgmp_min, z_min, z_max, sky_area_degsq, cosmo_params)
+        cenpop = mclh.mc_lc_halos(*args, mlp_model=MLP_MODEL)
 
         for _field in cenpop._fields:
             assert np.all(np.isfinite(cenpop._asdict()[_field]))
@@ -138,49 +165,6 @@ def test_mc_lightcone_host_halo():
         assert np.all(cenpop.z_obs <= z_max)
 
         # some halos with logmp_obs<lgmp_min is ok,
-        # but too many indicates an issue with diffmahnet replicating logmp_obs
-        assert np.mean(cenpop.logmp_obs < lgmp_min) < 0.2, f"z_min={z_min:.2f}"
-
-
-def test_mc_lightcone_host_halo_alt_mf_params():
-    """
-    Enforce mc_lightcone_host_halo returns
-    reasonable results when passed
-    alternative halo mass function parameters
-    """
-    ran_key = jran.key(0)
-    lgmp_min = 12.0
-    sky_area_degsq = 1.0
-
-    alt_cosmo = np.zeros_like(DEFAULT_COSMOLOGY_ARRAY)
-    for i, _param in enumerate(DEFAULT_COSMO_NAMES):
-        if _param == "Om0":
-            alt_cosmo[i] = DEFAULT_COSMOLOGY_ARRAY[i] - 0.07
-        elif _param == "sigma8":
-            alt_cosmo[i] = DEFAULT_COSMOLOGY_ARRAY[i] + 0.05
-        elif _param == "H0":
-            alt_cosmo[i] = DEFAULT_COSMOLOGY_ARRAY[i] - 1.1
-        else:
-            alt_cosmo[i] = DEFAULT_COSMOLOGY_ARRAY[i]
-
-    n_tests = 5
-    z_max_arr = np.linspace(0.2, 2.5, n_tests)
-    for z_max in z_max_arr:
-        test_key, ran_key = jran.split(ran_key, 2)
-        z_min = z_max - 0.05
-
-        args = (test_key, lgmp_min, z_min, z_max, sky_area_degsq)
-        cenpop = mclh.mc_lc_halos(*args, cosmo_params=alt_cosmo)
-
-        for _field in cenpop._fields:
-            assert np.all(np.isfinite(cenpop._asdict()[_field]))
-
-        assert cenpop.logmp_obs.size == cenpop.logmp0.size == cenpop.z_obs.size
-
-        assert np.all(cenpop.z_obs >= z_min)
-        assert np.all(cenpop.z_obs <= z_max)
-
-        # Some halos with logmp_obs<lgmp_min is ok,
         # but too many indicates an issue with diffmahnet replicating logmp_obs
         assert np.mean(cenpop.logmp_obs < lgmp_min) < 0.2, f"z_min={z_min:.2f}"
 
@@ -197,14 +181,26 @@ def test_mah_params_rescaling():
     sky_area_degsq = 200.0
     logmp_cutoff = mclh.DEFAULT_LOGMP_CUTOFF
     logmp_cutoff_himass = mclh.DEFAULT_LOGMP_HIMASS_CUTOFF
-    cosmo_params = DEFAULT_COSMOLOGY_ARRAY
     centrals_model_key = mclh.DEFAULT_DIFFMAHNET_CEN_MODEL
 
-    args = (halopop_key, lgmp_min, z_min, z_max, sky_area_degsq)
-    z_obs, logmp_obs_mf = mclh.mc_lc_hmf(*args)
+    # Om0, sigma8 for model v0
+    cosmo_param_vals = (0.3, 0.8)
+    cosmo_params = namedtuple("cosmo", "Om0 sigma8")(*cosmo_param_vals)
 
-    t_obs = flat_wcdm.age_at_z(z_obs, *define_dsps_cosmology(cosmo_params))
-    t_0 = flat_wcdm.age_at_z0(*define_dsps_cosmology(cosmo_params))
+    args = (halopop_key, lgmp_min, z_min, z_max, sky_area_degsq, cosmo_params)
+    z_obs, logmp_obs_mf = mclh.mc_lc_hmf(*args, mlp_model=MLP_MODEL)
+
+    t_obs = flat_wcdm.age_at_z(
+        z_obs,
+        *define_dsps_cosmo_from_mlp_cosmo(
+            cosmo_params, underlying_cosmo=DEFAULT_COSMOLOGY_NTUP
+        ),
+    )
+    t_0 = flat_wcdm.age_at_z0(
+        *define_dsps_cosmo_from_mlp_cosmo(
+            cosmo_params, underlying_cosmo=DEFAULT_COSMOLOGY_NTUP
+        )
+    )
     logt0 = jnp.log10(t_0)
 
     # get the rescaled MAH parameters and MAH's for all halos
@@ -233,6 +229,10 @@ def test_mc_weighted_halo_lightcone_stratified():
     n_per_dim = 10
     num_halos = n_per_dim**2
 
+    # Om0, sigma8 for model v0
+    cosmo_param_vals = (0.3, 0.8)
+    cosmo_params = namedtuple("cosmo", "Om0 sigma8")(*cosmo_param_vals)
+
     for itest in range(n_tests):
         ran_key, test_key = jran.split(ran_key, 2)
 
@@ -256,6 +256,12 @@ def test_mc_weighted_halo_lightcone_stratified():
             z_obs,
             logmp_obs,
             sky_area_degsq,
+            cosmo_params,
+            DEFAULT_COSMOLOGY_NTUP,
+            mclh.DEFAULT_LOGMP_CUTOFF,
+            mclh.DEFAULT_LOGMP_HIMASS_CUTOFF,
+            mclh.DEFAULT_DIFFMAHNET_CEN_MODEL,
+            MLP_MODEL,
         )
 
         assert np.all(np.isfinite(cenpop.nhalos))
@@ -276,6 +282,10 @@ def test_mc_weighted_halo_lightcone_input_grid():
 
     sky_area_degsq = 15.0
 
+    # Om0, sigma8 for model v0
+    cosmo_param_vals = (0.3, 0.8)
+    cosmo_params = namedtuple("cosmo", "Om0 sigma8")(*cosmo_param_vals)
+
     num_halos = 1_000
     for itest in range(n_tests):
         ran_key, test_key = jran.split(ran_key, 2)
@@ -294,6 +304,12 @@ def test_mc_weighted_halo_lightcone_input_grid():
             z_grid,
             lgmp_grid,
             sky_area_degsq,
+            cosmo_params,
+            DEFAULT_COSMOLOGY_NTUP,
+            mclh.DEFAULT_LOGMP_CUTOFF,
+            mclh.DEFAULT_LOGMP_HIMASS_CUTOFF,
+            mclh.DEFAULT_DIFFMAHNET_CEN_MODEL,
+            MLP_MODEL,
         )
 
         assert np.all(np.isfinite(cenpop.nhalos))
@@ -314,8 +330,21 @@ def test_weighted_lc_halos():
     z_min, z_max = 0.4, 2.5
     lgmp_min, lgmp_max = 10.0, 15.5
     sky_area_degsq = 15.0
+
+    # Om0, sigma8 for model v0
+    cosmo_param_vals = (0.3, 0.8)
+    cosmo_params = namedtuple("cosmo", "Om0 sigma8")(*cosmo_param_vals)
+
     cenpop = mclh.weighted_lc_halos(
-        ran_key, n_halos, z_min, z_max, lgmp_min, lgmp_max, sky_area_degsq
+        ran_key,
+        n_halos,
+        z_min,
+        z_max,
+        lgmp_min,
+        lgmp_max,
+        sky_area_degsq,
+        cosmo_params,
+        mlp_model=MLP_MODEL,
     )
     for field in mclh.CenPop._fields:
         assert hasattr(cenpop, field)

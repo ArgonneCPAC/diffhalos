@@ -20,6 +20,7 @@ __all__ = (
     "sample_cosmo_params_full_cosmo",
     "define_full_cosmology",
     "define_dsps_cosmology",
+    "define_dsps_cosmo_from_mlp_cosmo",
     "define_colossus_cosmology",
 )
 
@@ -221,7 +222,7 @@ def define_full_cosmology(
 def define_dsps_cosmology(cosmo_params_ntup):
     """
     Helper function to define a DSPS cosmology
-    given an namedtuple of cosmological parameters
+    given a complete namedtuple of cosmological parameters
 
     Parameters
     ----------
@@ -237,6 +238,37 @@ def define_dsps_cosmology(cosmo_params_ntup):
 
     for _param in cosmo_dsps.keys():
         cosmo_dsps[_param] = getattr(cosmo_params_ntup, _param)
+
+    return DEFAULT_COSMOLOGY_DSPS._replace(**cosmo_dsps)
+
+
+@jjit
+def define_dsps_cosmo_from_mlp_cosmo(
+    cosmo_params_ntup, underlying_cosmo=DEFAULT_COSMOLOGY_NTUP
+):
+    """
+    Helper function to define a DSPS cosmology
+    given a namedtuple of cosmological parameters
+    used by the MLP model and the underlying full cosmology
+
+    Parameters
+    ----------
+    cosmo_params_ntup: namedtuple
+        full cosmology container
+
+    Returns
+    -------
+    cosmo_dsps: namedtuple
+        dsps.cosmology with parameters matching the input array
+    """
+    cosmo_params_ntup_tot = define_full_cosmology(
+        cosmo_params_ntup, underlying_cosmo=underlying_cosmo
+    )
+
+    cosmo_dsps = DEFAULT_COSMOLOGY_DSPS._asdict()
+
+    for _param in cosmo_dsps.keys():
+        cosmo_dsps[_param] = getattr(cosmo_params_ntup_tot, _param)
 
     return DEFAULT_COSMOLOGY_DSPS._replace(**cosmo_dsps)
 

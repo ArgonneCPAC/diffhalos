@@ -16,8 +16,10 @@ from jax import numpy as jnp
 from .hmf_kernels import lg_hmf_kern
 from ..calibrations.hmf_cal import HMF_Params
 from ..cosmology import flat_wcdm
-from ..cosmology.cosmo import DEFAULT_COSMOLOGY_ARRAY
-from ..cosmology.cosmo_param_utils import define_dsps_cosmology
+from ..cosmology.cosmo_param_utils import (
+    define_dsps_cosmo_from_mlp_cosmo,
+    DEFAULT_COSMOLOGY_NTUP,
+)
 from ..cosmology.geometry_utils import (
     spherical_shell_comoving_volume,
     compute_volume_from_sky_area,
@@ -55,7 +57,7 @@ def predict_cuml_hmf(
 
     Parameters
     ----------
-    cosmo_params: ndarray of shape (n_cosmo_params, )
+    cosmo_params: namedtuple
         cosmological parameters
 
     logmp: ndarray of shape (n_halos, )
@@ -63,6 +65,9 @@ def predict_cuml_hmf(
 
     redshift: float
         redshift value
+
+    mlp_model: str
+        MLP model to use
 
     Returns
     -------
@@ -73,6 +78,7 @@ def predict_cuml_hmf(
         Note that both number density and halo mass are defined in
         physical units (not h=1 units)
     """
+    cosmo_params = jnp.atleast_1d(cosmo_params)
     mlp_hmf_params = predict_mlp_hmf_params(cosmo_params, name=mlp_model)
     hmf_params = _get_singlez_cuml_hmf_params(mlp_hmf_params, redshift)
     return lg_hmf_kern(hmf_params, logmp)
@@ -135,30 +141,33 @@ def _hi_vs_redshift(params, redshift):
     return _sig_slope(redshift, HI_XTP, *p)
 
 
-@jjit
-def _diff_hmf_grad_kern(cosmo_params, logmp, redshift):
-    lgcuml_nd_pred = predict_cuml_hmf(cosmo_params, logmp, redshift)
+@partial(jjit, static_argnames=["mlp_model"])
+def _diff_hmf_grad_kern(cosmo_params, logmp, redshift, mlp_model):
+    lgcuml_nd_pred = predict_cuml_hmf(
+        cosmo_params, logmp, redshift, mlp_model=mlp_model
+    )
     cuml_nd_pred = 10**lgcuml_nd_pred
     return -cuml_nd_pred
 
 
-_A = (None, 0, None)
+_A = (None, 0, None, None)
 _predict_diff_hmf = jjit(
     vmap(
         grad(_diff_hmf_grad_kern, argnums=1),
         in_axes=_A,
-    )
+    ),
+    static_argnums=3,
 )
 
 
-@jjit
-def predict_diff_hmf(cosmo_params, logmp, redshift):
+@partial(jjit, static_argnames=["mlp_model"])
+def predict_diff_hmf(cosmo_params, logmp, redshift, mlp_model=DEFAULT_MLP_MODEL):
     """
     Predict the differential comoving number density of host halos
 
     Parameters
     ----------
-    cosmo_params: ndarray of shape (n_cosmo_params, )
+    cosmo_params: namedtuple
         cosmological parameters
 
     logmp: ndarray of shape (n_halos, )
@@ -166,6 +175,9 @@ def predict_diff_hmf(cosmo_params, logmp, redshift):
 
     redshift: float
         redshift value
+
+    mlp_model: str
+        MLP model to use
 
     Returns
     -------
@@ -176,33 +188,38 @@ def predict_diff_hmf(cosmo_params, logmp, redshift):
         Note that both number density and halo mass are defined in
         physical units (not h=1 units)
     """
-    hmf = jnp.log10(_predict_diff_hmf(cosmo_params, logmp, redshift))
+    hmf = jnp.log10(_predict_diff_hmf(cosmo_params, logmp, redshift, mlp_model))
     return hmf
 
 
-_dn_dlgm_kern = jjit(grad(_diff_hmf_grad_kern, argnums=1))
+_dn_dlgm_kern = jjit(grad(_diff_hmf_grad_kern, argnums=1), static_argnums=3)
 
 
-@jjit
-def _dn_dm_dz_kern(lgm, z, cosmo_params):
-    dn_dm_dv = _dn_dlgm_kern(cosmo_params, lgm, z)
+@partial(jjit, static_argnames=["mlp_model"])
+def _dn_dm_dz_kern(lgm, z, cosmo_params, underlying_cosmo, mlp_model):
+    dn_dm_dv = _dn_dlgm_kern(cosmo_params, lgm, z, mlp_model)
     dv_dz = flat_wcdm.differential_comoving_volume_at_z(
-        z, *define_dsps_cosmology(cosmo_params)
+        z,
+        *define_dsps_cosmo_from_mlp_cosmo(
+            cosmo_params, underlying_cosmo=underlying_cosmo
+        ),
     )
     dn_dm_dz = dn_dm_dv * dv_dz
     return dn_dm_dz
 
 
-_A = (0, 0, None)
-predict_dn_dlgm_dz = jjit(vmap(_dn_dm_dz_kern, in_axes=_A))
+_A = (0, 0, None, None, None)
+predict_dn_dlgm_dz = jjit(vmap(_dn_dm_dz_kern, in_axes=_A), static_argnums=4)
 
 
-@jjit
+@partial(jjit, static_argnames=["mlp_model"])
 def halo_lightcone_weights(
     lgmp,
     redshift,
     sky_area_degsq,
-    cosmo_params=DEFAULT_COSMOLOGY_ARRAY,
+    cosmo_params,
+    underlying_cosmo=DEFAULT_COSMOLOGY_NTUP,
+    mlp_model=DEFAULT_MLP_MODEL,
 ):
     """
     Computes lightcone halo weights on a grid
@@ -219,8 +236,14 @@ def halo_lightcone_weights(
     sky_area_degsq: float
         sky area covered by lightcone, in deg^2
 
-    cosmo_params: ndarray of shape (n_cosmo_params, )
+    cosmo_params: namedtuple
         cosmological parameters
+
+    underlying_cosmo: namedtuple
+        full underlying cosmology container
+
+    mlp_model: str
+        MLP model to use
 
     Returns
     -------
@@ -239,12 +262,18 @@ def halo_lightcone_weights(
     fsky = sky_area_degsq / FULL_SKY_AREA
     vol_shell_grid_mpc = fsky * spherical_shell_comoving_volume(
         z_grid,
-        define_dsps_cosmology(cosmo_params),
+        define_dsps_cosmo_from_mlp_cosmo(
+            cosmo_params, underlying_cosmo=underlying_cosmo
+        ),
     )
 
     # at each grid point, compute <Nhalos> for the shell volume
-    nd_lgmp_min = 10 ** predict_cuml_hmf(cosmo_params, lgmp_min, z_grid)
-    nd_lgmp_max = 10 ** predict_cuml_hmf(cosmo_params, lgmp_max, z_grid)
+    nd_lgmp_min = 10 ** predict_cuml_hmf(
+        cosmo_params, lgmp_min, z_grid, mlp_model=mlp_model
+    )
+    nd_lgmp_max = 10 ** predict_cuml_hmf(
+        cosmo_params, lgmp_max, z_grid, mlp_model=mlp_model
+    )
     nhalos_per_mpc3 = nd_lgmp_min - nd_lgmp_max
     nhalos_per_shell = vol_shell_grid_mpc * nhalos_per_mpc3
 
@@ -252,7 +281,9 @@ def halo_lightcone_weights(
     nhalos_tot = nhalos_per_shell.sum()
 
     # compute relative abundance of halos via weights ~ ∂n/∂z∂m
-    _weights = predict_dn_dlgm_dz(lgmp, redshift, cosmo_params)
+    _weights = predict_dn_dlgm_dz(
+        lgmp, redshift, cosmo_params, underlying_cosmo, mlp_model
+    )
     weights = _weights / _weights.sum()
 
     # compute relative number of halos per shell
@@ -261,13 +292,14 @@ def halo_lightcone_weights(
     return nhalos
 
 
-@jjit
+@partial(jjit, static_argnames=["mlp_model"])
 def get_mean_nhalos_from_volume(
     redshift,
     volume_com_mpc,
     cosmo_params,
     lgmp_min,
     lgmp_max,
+    mlp_model=DEFAULT_MLP_MODEL,
 ):
     """
     Compute the mean number of halos at a single redshift,
@@ -281,7 +313,7 @@ def get_mean_nhalos_from_volume(
     volume_com_mpc: float
         comoving volume of the generated population, in Mpc^3
 
-    cosmo_params: ndarray of shape (n_cosmo_params, )
+    cosmo_params: namedtuple
         cosmological parameters
 
     lgmp_min: float
@@ -289,6 +321,9 @@ def get_mean_nhalos_from_volume(
 
     lgmp_max: float
         base-10 log of maximum halo mass, in Msun
+
+    mlp_model: str
+        MLP model to use
 
     Returns
     -------
@@ -300,25 +335,29 @@ def get_mean_nhalos_from_volume(
         lgmp_min,
         redshift,
         volume_com_mpc,
+        mlp_model=mlp_model,
     )
     mean_nhalos_lgmax = _compute_nhalos_tot(
         cosmo_params,
         lgmp_max,
         redshift,
         volume_com_mpc,
+        mlp_model=mlp_model,
     )
     mean_nhalos = mean_nhalos_lgmin - mean_nhalos_lgmax
 
     return mean_nhalos
 
 
-@jjit
+@partial(jjit, static_argnames=["mlp_model"])
 def get_mean_nhalos_from_sky_area(
     redshift,
     sky_area_degsq,
     cosmo_params,
     lgmp_min,
     lgmp_max,
+    underlying_cosmo=DEFAULT_COSMOLOGY_NTUP,
+    mlp_model=DEFAULT_MLP_MODEL,
 ):
     """
     Compute the mean number of halos at a single redshift,
@@ -332,7 +371,7 @@ def get_mean_nhalos_from_sky_area(
     sky_area_degsq: float
         sky area, in deg^2
 
-    cosmo_params: ndarray of shape (n_cosmo_params, )
+    cosmo_params: namedtuple
         cosmological parameters
 
     lgmp_min: float
@@ -340,6 +379,12 @@ def get_mean_nhalos_from_sky_area(
 
     lgmp_max: float
         base-10 log of maximum halo mass, in Msun
+
+    underlying_cosmo: namedtuple
+        full underlying cosmology container
+
+    mlp_model: str
+        MLP model to use
 
     Returns
     -------
@@ -349,7 +394,9 @@ def get_mean_nhalos_from_sky_area(
     volume_com_mpc = compute_volume_from_sky_area(
         redshift,
         sky_area_degsq,
-        define_dsps_cosmology(cosmo_params),
+        define_dsps_cosmo_from_mlp_cosmo(
+            cosmo_params, underlying_cosmo=underlying_cosmo
+        ),
     )
 
     mean_nhalos = get_mean_nhalos_from_volume(
@@ -358,17 +405,19 @@ def get_mean_nhalos_from_sky_area(
         cosmo_params,
         lgmp_min,
         lgmp_max,
+        mlp_model=mlp_model,
     )
 
     return mean_nhalos
 
 
-@jjit
+@partial(jjit, static_argnames=["mlp_model"])
 def _compute_nhalos_tot(
     cosmo_params,
     lgmp_min,
     redshift,
     volume_com_mpc,
+    mlp_model=DEFAULT_MLP_MODEL,
 ):
     """
     Computes the total number of halos that are expected
@@ -377,7 +426,7 @@ def _compute_nhalos_tot(
 
     Parameters
     ----------
-    cosmo_params: ndarray of shape (n_cosmo_params, )
+    cosmo_params: namedtuple
         cosmological parameters
 
     lgmp_min: float
@@ -389,13 +438,18 @@ def _compute_nhalos_tot(
     volume_com_mpc: float
         comoving volume, in comoving Mpc^3
 
+    mlp_model: str
+        MLP model to use
+
     Returns
     -------
     nhalos_tot: float
         halo abundance at input redshift and within the input volume,
         considering the minimum mass cut
     """
-    nhalos_per_mpc3 = 10 ** predict_cuml_hmf(cosmo_params, lgmp_min, redshift)
+    nhalos_per_mpc3 = 10 ** predict_cuml_hmf(
+        cosmo_params, lgmp_min, redshift, mlp_model=mlp_model
+    )
     nhalos_tot = nhalos_per_mpc3 * volume_com_mpc
 
     return nhalos_tot

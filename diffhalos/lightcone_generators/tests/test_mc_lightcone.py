@@ -1,17 +1,23 @@
 """ """
 
 import numpy as np
-from diffmah.diffmah_kernels import _log_mah_kern
+from collections import namedtuple
+
 from jax import numpy as jnp
 from jax import random as jran
 
+from diffmah.diffmah_kernels import _log_mah_kern
+
+from .. import mc_lightcone as mclc
+from .. import mc_lightcone_halos as mclch
+from .. import mc_lightcone_subhalos as mclcsh
 from ...ccshmf.ccshmf_model import subhalo_lightcone_weights
 from ...ccshmf.utils import match_cenpop_to_subpop
 from ...mah.diffmahnet.diffmahnet import log_mah_kern
 from ...mah.diffmahnet_utils import mc_mah_cenpop
-from .. import mc_lightcone as mclc
-from .. import mc_lightcone_halos as mclch
-from .. import mc_lightcone_subhalos as mclcsh
+from ...cosmology.cosmo import DEFAULT_COSMOLOGY_NTUP
+
+MLP_MODEL = "mlp_model_v0"
 
 
 def test_mc_lc_mf_behaves_as_expected():
@@ -24,6 +30,10 @@ def test_mc_lc_mf_behaves_as_expected():
     z_max = 1.5
     sky_area_degsq = 10.0
 
+    # Om0, sigma8 for model v0
+    cosmo_param_vals = (0.3, 0.8)
+    cosmo_params = namedtuple("cosmo", "Om0 sigma8")(*cosmo_param_vals)
+
     z_halopop, logmp_cenpop, mc_lg_mu, subhalo_counts_per_halo = mclc.mc_lc_mf(
         ran_key,
         lgmp_min,
@@ -31,6 +41,8 @@ def test_mc_lc_mf_behaves_as_expected():
         z_min,
         z_max,
         sky_area_degsq,
+        cosmo_params,
+        mlp_model=MLP_MODEL,
     )
 
     assert np.all(np.isfinite(z_halopop))
@@ -62,6 +74,10 @@ def test_mc_lc_behaves_as_expected():
     z_max = 1.5
     sky_area_degsq = 10.0
 
+    # Om0, sigma8 for model v0
+    cosmo_param_vals = (0.3, 0.8)
+    cosmo_params = namedtuple("cosmo", "Om0 sigma8")(*cosmo_param_vals)
+
     halopop = mclc.mc_lc(
         ran_key,
         lgmp_min,
@@ -69,6 +85,8 @@ def test_mc_lc_behaves_as_expected():
         z_min,
         z_max,
         sky_area_degsq,
+        cosmo_params,
+        mlp_model=MLP_MODEL,
     )
 
     for _field in halopop._fields:
@@ -90,8 +108,22 @@ def test_weighted_lc_behaves_as_expected():
     z_min, z_max = 0.1, 3.1
     sky_area_degsq = 10.0
     lgmp_min, lgmp_max = 10.0, 15.0
-    args = (ran_key, n_host_halos, z_min, z_max, lgmp_min, lgmp_max, sky_area_degsq)
-    halopop = mclc.weighted_lc(*args)
+
+    # Om0, sigma8 for model v0
+    cosmo_param_vals = (0.3, 0.8)
+    cosmo_params = namedtuple("cosmo", "Om0 sigma8")(*cosmo_param_vals)
+
+    args = (
+        ran_key,
+        n_host_halos,
+        z_min,
+        z_max,
+        lgmp_min,
+        lgmp_max,
+        sky_area_degsq,
+        cosmo_params,
+    )
+    halopop = mclc.weighted_lc(*args, mlp_model=MLP_MODEL)
 
     n_subs = n_host_halos * halopop.nsub_per_host
     n_tot = n_host_halos + n_subs
@@ -128,8 +160,22 @@ def test_weighted_lc_logmp0_is_consistent_with_logmp_obs():
     z_min, z_max = 0.1, 3.1
     sky_area_degsq = 10.0
     lgmp_min, lgmp_max = 10.0, 15.0
-    args = (ran_key, n_host_halos, z_min, z_max, lgmp_min, lgmp_max, sky_area_degsq)
-    halopop = mclc.weighted_lc(*args)
+
+    # Om0, sigma8 for model v0
+    cosmo_param_vals = (0.3, 0.8)
+    cosmo_params = namedtuple("cosmo", "Om0 sigma8")(*cosmo_param_vals)
+
+    args = (
+        ran_key,
+        n_host_halos,
+        z_min,
+        z_max,
+        lgmp_min,
+        lgmp_max,
+        sky_area_degsq,
+        cosmo_params,
+    )
+    halopop = mclc.weighted_lc(*args, mlp_model=MLP_MODEL)
 
     # centrals: logmp_obs <= logmp0
     assert np.all(halopop.logmp0[:n_host_halos] >= halopop.logmp_obs[:n_host_halos])
@@ -155,8 +201,22 @@ def test_weighted_lc_tpeak_subs():
     z_min, z_max = 0.1, 3.1
     sky_area_degsq = 10.0
     lgmp_min, lgmp_max = 10.0, 15.0
-    args = (ran_key, n_host_halos, z_min, z_max, lgmp_min, lgmp_max, sky_area_degsq)
-    halopop = mclc.weighted_lc(*args)
+
+    # Om0, sigma8 for model v0
+    cosmo_param_vals = (0.3, 0.8)
+    cosmo_params = namedtuple("cosmo", "Om0 sigma8")(*cosmo_param_vals)
+
+    args = (
+        ran_key,
+        n_host_halos,
+        z_min,
+        z_max,
+        lgmp_min,
+        lgmp_max,
+        sky_area_degsq,
+        cosmo_params,
+    )
+    halopop = mclc.weighted_lc(*args, mlp_model=MLP_MODEL)
 
     # satellites: t_peak <= t_obs
     # ensure that the fraction of subs for which this is false is < 10%
@@ -193,11 +253,21 @@ def test_weighted_lc_tpeak_clip():
     lgmsub_min = 10.0
     sky_area_degsq = 10.0
 
+    # Om0, sigma8 for model v0
+    cosmo_param_vals = (0.3, 0.8)
+    cosmo_params = namedtuple("cosmo", "Om0 sigma8")(*cosmo_param_vals)
+
     cenpop = mclch._weighted_lc_halos_from_grid(
         cen_key,
         z_obs,
         logmp_obs,
         sky_area_degsq,
+        cosmo_params,
+        DEFAULT_COSMOLOGY_NTUP,
+        mclch.DEFAULT_LOGMP_CUTOFF,
+        mclch.DEFAULT_LOGMP_HIMASS_CUTOFF,
+        mclch.DEFAULT_DIFFMAHNET_CEN_MODEL,
+        MLP_MODEL,
     )
 
     # number of host halos

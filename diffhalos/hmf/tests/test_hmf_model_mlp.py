@@ -8,8 +8,13 @@ from jax import random as jran
 from diffsky.experimental import mc_lightcone_halos as mclh
 
 from .. import hmf_model_mlp
-from ...cosmology.cosmo_param_utils import define_dsps_cosmology
+from ...cosmology.cosmo_param_utils import (
+    define_dsps_cosmo_from_mlp_cosmo,
+    DEFAULT_COSMOLOGY_NTUP,
+)
 from ...cosmology.geometry_utils import compute_volume_from_sky_area
+
+MLP_MODEL = "mlp_model_v0"
 
 
 def test_cuml_hmf_evaluations():
@@ -23,6 +28,7 @@ def test_cuml_hmf_evaluations():
         cosmo_params,
         lgmp_arr,
         redshift,
+        mlp_model=MLP_MODEL,
     )
     assert res.shape == lgmp_arr.shape
     assert np.all(np.isfinite(res))
@@ -39,6 +45,7 @@ def test_diff_hmf_evaluations():
         cosmo_params,
         lgmp_arr,
         redshift,
+        mlp_model=MLP_MODEL,
     )
     assert res.shape == lgmp_arr.shape
     assert np.all(np.isfinite(res))
@@ -53,7 +60,8 @@ def test_halo_lightcone_weights():
     sky_area_degsq = 200.0
 
     # Om0, sigma8 for model v0
-    cosmo_params = np.array([0.3, 0.8])
+    cosmo_param_vals = (0.3, 0.8)
+    cosmo_params = namedtuple("cosmo", "Om0 sigma8")(*cosmo_param_vals)
 
     ran_key = jran.key(0)
 
@@ -65,7 +73,8 @@ def test_halo_lightcone_weights():
         cenpop["logmp_obs"],
         cenpop["z_obs"],
         sky_area_degsq,
-        cosmo_params=cosmo_params,
+        cosmo_params,
+        mlp_model=MLP_MODEL,
     )
 
     assert np.all(np.isfinite(nhalos))
@@ -86,7 +95,9 @@ def test_get_mean_nhalos_from_volume_and_from_sky_area():
     volume_com_mpc = compute_volume_from_sky_area(
         redshift,
         sky_area_degsq,
-        define_dsps_cosmology(cosmo_params),
+        define_dsps_cosmo_from_mlp_cosmo(
+            cosmo_params, underlying_cosmo=DEFAULT_COSMOLOGY_NTUP
+        ),
     )
 
     nhalos_from_vol = hmf_model_mlp.get_mean_nhalos_from_volume(
@@ -95,6 +106,7 @@ def test_get_mean_nhalos_from_volume_and_from_sky_area():
         cosmo_params,
         lgmp_min,
         lgmp_max,
+        mlp_model=MLP_MODEL,
     )
 
     nhalos_from_area = hmf_model_mlp.get_mean_nhalos_from_sky_area(
@@ -103,6 +115,7 @@ def test_get_mean_nhalos_from_volume_and_from_sky_area():
         cosmo_params,
         lgmp_min,
         lgmp_max,
+        mlp_model=MLP_MODEL,
     )
 
     assert np.all(np.isfinite(nhalos_from_vol))

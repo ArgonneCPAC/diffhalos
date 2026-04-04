@@ -15,11 +15,13 @@ from jax import random as jran
 
 from diffmah.diffmah_kernels import _log_mah_kern
 
-from ..ccshmf import DEFAULT_CCSHMF_PARAMS
-from ..cosmology.cosmo import DEFAULT_COSMOLOGY_ARRAY
-from ..hmf import mc_hosts
 from . import mc_lightcone_halos as mclch
 from . import mc_lightcone_subhalos as mclcsh
+from ..ccshmf import DEFAULT_CCSHMF_PARAMS
+from ..cosmology.cosmo import DEFAULT_COSMOLOGY_NTUP
+from ..hmf import mc_hosts
+
+DEFAULT_MLP_MODEL = "mlp_model_v0"
 
 __all__ = ("mc_lc_mf", "mc_lc", "weighted_lc")
 
@@ -31,10 +33,12 @@ def mc_lc_mf(
     z_min,
     z_max,
     sky_area_degsq,
-    cosmo_params=DEFAULT_COSMOLOGY_ARRAY,
+    cosmo_params,
+    underlying_cosmo=DEFAULT_COSMOLOGY_NTUP,
     lgmp_max=mc_hosts.LGMH_MAX,
     n_hmf_grid=mclch.N_HMF_GRID,
     ccshmf_params=DEFAULT_CCSHMF_PARAMS,
+    mlp_model=DEFAULT_MLP_MODEL,
 ):
     """
     Generate a Monte Carlo realization of a lightcone of
@@ -60,8 +64,11 @@ def mc_lc_mf(
     sky_area_degsq: float
         sky area, in deg^2
 
-    cosmo_params: ndarray of shape (n_cosmo_params, )
+    cosmo_params: namedtuple
         cosmological parameters
+
+    underlying_cosmo: namedtuple
+        full underlying cosmology container
 
     lgmp_max: float
         base-10 log of maximum halo mass, in Msun
@@ -71,6 +78,9 @@ def mc_lc_mf(
 
     ccshmf_params: namedtuple
         CCSHMF parameters
+
+    mlp_model: str
+        mlp model to use
 
     Returns
     -------
@@ -91,9 +101,11 @@ def mc_lc_mf(
         z_min,
         z_max,
         sky_area_degsq,
-        cosmo_params=cosmo_params,
+        cosmo_params,
+        underlying_cosmo=underlying_cosmo,
         lgmp_max=lgmp_max,
         n_hmf_grid=n_hmf_grid,
+        mlp_model=mlp_model,
     )
 
     # generate subhalo MC lightcone using the host halo realization
@@ -114,7 +126,8 @@ def mc_lc(
     z_min,
     z_max,
     sky_area_degsq,
-    cosmo_params=DEFAULT_COSMOLOGY_ARRAY,
+    cosmo_params,
+    underlying_cosmo=DEFAULT_COSMOLOGY_NTUP,
     logmp_cutoff=mclch.DEFAULT_LOGMP_CUTOFF,
     logmp_cutoff_himass=mclch.DEFAULT_LOGMP_HIMASS_CUTOFF,
     lgmp_max=mc_hosts.LGMH_MAX,
@@ -124,6 +137,7 @@ def mc_lc(
     logmsub_cutoff_himass=mclcsh.DEFAULT_LOGMSUB_HIMASS_CUTOFF,
     centrals_model_key=mclch.DEFAULT_DIFFMAHNET_CEN_MODEL,
     subhalo_model_key=mclcsh.DEFAULT_DIFFMAHNET_SAT_MODEL,
+    mlp_model=DEFAULT_MLP_MODEL,
 ):
     """
     Generate a halo+subhalo lightcone, including MAHs,
@@ -152,8 +166,11 @@ def mc_lc(
     nhalos_tot: int
         total number of halos to generate in the lightcone
 
-    cosmo_params: ndarray of shape (n_cosmo_params, )
+    cosmo_params: namedtuple
         cosmological parameters
+
+    underlying_cosmo: namedtuple
+        full underlying cosmology container
 
     logmp_cutoff: float
         base-10 log of minimum halo mass for which
@@ -187,6 +204,9 @@ def mc_lc(
 
     subhalo_model_key: str
         diffmahnet model to use for satellites
+
+    mlp_model: str
+        mlp model to use
 
     Returns
     -------
@@ -229,11 +249,13 @@ def mc_lc(
         z_max,
         sky_area_degsq,
         cosmo_params=cosmo_params,
+        underlying_cosmo=underlying_cosmo,
         logmp_cutoff=logmp_cutoff,
         logmp_cutoff_himass=logmp_cutoff_himass,
         lgmp_max=lgmp_max,
         n_hmf_grid=n_hmf_grid,
         centrals_model_key=centrals_model_key,
+        mlp_model=mlp_model,
     )
     # fields = ("z_obs", "t_obs", "logmp_obs", "mah_params", "logmp0", "logt0")
 
@@ -288,8 +310,9 @@ def weighted_lc(
     lgmp_min,
     lgmp_max,
     sky_area_degsq,
+    cosmo_params,
     *,
-    cosmo_params=DEFAULT_COSMOLOGY_ARRAY,
+    underlying_cosmo=DEFAULT_COSMOLOGY_NTUP,
     logmp_cutoff=mclch.DEFAULT_LOGMP_CUTOFF,
     logmp_cutoff_himass=mclch.DEFAULT_LOGMP_HIMASS_CUTOFF,
     n_mu_per_host=mclcsh.N_LGMU_PER_HOST,
@@ -299,6 +322,7 @@ def weighted_lc(
     centrals_model_key=mclch.DEFAULT_DIFFMAHNET_CEN_MODEL,
     subhalo_model_key=mclcsh.DEFAULT_DIFFMAHNET_SAT_MODEL,
     lgmsub_min=None,
+    mlp_model=DEFAULT_MLP_MODEL,
 ):
     """
     Generate a mass-function-weighted lightcone of halos+subhalos and their
@@ -321,8 +345,11 @@ def weighted_lc(
     sky_area_degsq: float
         sky area in deg^2
 
-    cosmo_params: ndarray of shape (n_cosmo_params, )
+    cosmo_params: namedtuple
         cosmological parameters
+
+    underlying_cosmo: namedtuple
+        full underlying cosmology container
 
     logmp_cutoff: float, optional kwarg
         base-10 log of minimum halo mass for which
@@ -359,6 +386,9 @@ def weighted_lc(
     lgmsub_min: float, optional kwarg
         base-10 log of the minimum subhalo mass, in Msun
         If none, will be set to lgmp_min-ε
+
+    mlp_model: str
+        mlp model to use
 
     Returns
     -------
@@ -424,6 +454,7 @@ def weighted_lc(
         lgmsub_min,
         sky_area_degsq,
         cosmo_params,
+        underlying_cosmo,
         logmp_cutoff,
         logmp_cutoff_himass,
         n_mu_per_host,
@@ -432,6 +463,7 @@ def weighted_lc(
         logmsub_cutoff_himass,
         centrals_model_key,
         subhalo_model_key,
+        mlp_model,
     )
     return halopop
 
@@ -443,6 +475,7 @@ def _weighted_lc_from_grid(
     lgmsub_min,
     sky_area_degsq,
     cosmo_params,
+    underlying_cosmo,
     logmp_cutoff,
     logmp_cutoff_himass,
     n_mu_per_host,
@@ -451,6 +484,7 @@ def _weighted_lc_from_grid(
     logmsub_cutoff_himass,
     centrals_model_key,
     subhalo_model_key,
+    mlp_model,
 ):
     # two random keys, one for the host and one for the subhalo population
     host_key, subhalo_key = jran.split(ran_key)
@@ -461,10 +495,12 @@ def _weighted_lc_from_grid(
         z_obs,
         logmp_obs,
         sky_area_degsq,
-        cosmo_params=cosmo_params,
-        logmp_cutoff=logmp_cutoff,
-        logmp_cutoff_himass=logmp_cutoff_himass,
-        centrals_model_key=centrals_model_key,
+        cosmo_params,
+        underlying_cosmo,
+        logmp_cutoff,
+        logmp_cutoff_himass,
+        centrals_model_key,
+        mlp_model,
     )
 
     # generate a weighted subhalo lightcone
