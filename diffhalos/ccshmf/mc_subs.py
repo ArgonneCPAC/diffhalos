@@ -24,12 +24,11 @@ from .ccshmf_model import (
     get_lgmu_cutoff,
     compute_mean_subhalo_counts,
 )
-from .utils import match_cenpop_to_subpop
 
 N_LGMU_TABLE = 100
 U_TABLE = np.linspace(1, 0, N_LGMU_TABLE)
 
-__all__ = ("generate_subhalopop",)
+__all__ = ("generate_subhalopop", "generate_subhalopop_kern")
 
 
 def generate_subhalopop(
@@ -50,8 +49,7 @@ def generate_subhalopop(
         base-10 log of host halo mass, in Msun
 
     lgmp_min: float
-        base-10 log of the smallest Mpeak value
-        of the synthetic subhalos, in Msun
+        base-10 log of the smallest Mpeak value of the synthetic subhalos, in Msun
 
     cshmf_params: namedtuple
         CCSHMF parameters named tuple
@@ -109,15 +107,13 @@ def generate_subhalopop_kern(
     Parameters
     ----------
     uran: ndarray of shape (n_subs, )
-        uniform random numbers for sampling from
-        the CDF of subhalo counts
+        uniform random numbers for sampling from the CDF of subhalo counts
 
     lgmhost: float
         base-10 log of host halo mass, in Msun
 
     lgmp_min: float
-        base-10 log of the smallest Mpeak value
-        of the synthetic subhalos, in Msun
+        base-10 log of the smallest Mpeak value of the synthetic subhalos, in Msun
 
     ccshmf_params: namedtuple
         CCSHMF parameters named tuple
@@ -164,8 +160,7 @@ def generate_subhalopop_hist(
         base-10 log of host halo mass, in Msun
 
     lgmp_min: float
-        base-10 log of the smallest Mpeak value
-        of the synthetic subhalos, in Msun
+        base-10 log of the smallest Mpeak value of the synthetic subhalos, in Msun
 
     ccshmf_params: namedtuple
         CCSHMF parameters named tuple
@@ -223,8 +218,7 @@ def generate_subhalopop_hist_out_of_core(
         base-10 log of host halo mass, in Msun
 
     lgmp_min: float
-        base-10 log of the smallest Mpeak value
-        of the synthetic subhalos, in Msun
+        base-10 log of the smallest Mpeak value of the synthetic subhalos, in Msun
 
     n_real: int
         number of realizations to generate
