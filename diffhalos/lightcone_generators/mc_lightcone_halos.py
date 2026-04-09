@@ -23,13 +23,11 @@ from ..cosmology.cosmo_param_utils import (
 from ..hmf import mc_hosts
 from ..hmf.hmf_model_mlp import halo_lightcone_weights
 from ..mah.utils import apply_mah_rescaling
+from ..defaults import DEFAULT_MLP_MODEL, DEFAULT_DIFFMAHNET_CEN_MODEL
 
 N_HMF_GRID = 2_000
 DEFAULT_LOGMP_CUTOFF = 10.0
 DEFAULT_LOGMP_HIMASS_CUTOFF = 14.5
-
-DEFAULT_DIFFMAHNET_CEN_MODEL = "cenflow_v2_0_64bit.eqx"
-DEFAULT_MLP_MODEL = "mlp_model_v0"
 
 _AXES = (0, None, None, 0, None, None)
 mc_logmp_vmap = jjit(

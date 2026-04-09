@@ -20,6 +20,7 @@ from ...hmf_param_utils import (
     define_diffsky_hmf_params_namedtuple_from_array,
     N_DIFFSKY_HMF_PARAMS,
 )
+from ....defaults import DEFAULT_MLP_MODEL
 
 __all__ = ("MLP_stax", "load_mlp_model", "predict_mlp_hmf_params")
 
@@ -42,9 +43,6 @@ except KeyError:
     warnings.warn(msg, UserWarning)
     PRETRAINED_PATH = None
     PRETRAINED_MODEL_NAMES = []
-
-# set the default model to use
-DEFAULT_MLP_MODEL = "mlp_model_v0"
 
 
 def load_mlp_model(savedir=PRETRAINED_PATH, name=DEFAULT_MLP_MODEL):

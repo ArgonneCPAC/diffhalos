@@ -16,3 +16,12 @@ FULL_SKY_AREA = (4 * jnp.pi) * (180 / jnp.pi) ** 2
 
 # age of the Universe at z=0
 TODAY = flat_wcdm.age_at_z0(*DEFAULT_COSMOLOGY_DSPS)
+
+# default MLP model
+DEFAULT_MLP_MODEL = "mlp_model_v0"
+
+# default diffmahnet central model
+DEFAULT_DIFFMAHNET_CEN_MODEL = "cenflow_v2_0_64bit.eqx"
+
+# default diffmahnet satellite model
+DEFAULT_DIFFMAHNET_SAT_MODEL = "satflow_v2_0_64bit.eqx"

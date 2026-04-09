@@ -20,8 +20,12 @@ from . import mc_lightcone_subhalos as mclcsh
 from ..ccshmf import DEFAULT_CCSHMF_PARAMS
 from ..cosmology.cosmo import DEFAULT_COSMOLOGY_NTUP
 from ..hmf import mc_hosts
+from ..defaults import (
+    DEFAULT_MLP_MODEL,
+    DEFAULT_DIFFMAHNET_CEN_MODEL,
+    DEFAULT_DIFFMAHNET_SAT_MODEL,
+)
 
-DEFAULT_MLP_MODEL = "mlp_model_v0"
 
 __all__ = ("mc_lc_mf", "mc_lc", "weighted_lc")
 
@@ -135,8 +139,8 @@ def mc_lc(
     ccshmf_params=DEFAULT_CCSHMF_PARAMS,
     logmsub_cutoff=mclcsh.DEFAULT_LOGMSUB_CUTOFF,
     logmsub_cutoff_himass=mclcsh.DEFAULT_LOGMSUB_HIMASS_CUTOFF,
-    centrals_model_key=mclch.DEFAULT_DIFFMAHNET_CEN_MODEL,
-    subhalo_model_key=mclcsh.DEFAULT_DIFFMAHNET_SAT_MODEL,
+    centrals_model_key=DEFAULT_DIFFMAHNET_CEN_MODEL,
+    subhalo_model_key=DEFAULT_DIFFMAHNET_SAT_MODEL,
     mlp_model=DEFAULT_MLP_MODEL,
 ):
     """
@@ -319,8 +323,8 @@ def weighted_lc(
     ccshmf_params=mclcsh.DEFAULT_CCSHMF_PARAMS,
     logmsub_cutoff=mclcsh.DEFAULT_LOGMSUB_CUTOFF,
     logmsub_cutoff_himass=mclcsh.DEFAULT_LOGMSUB_HIMASS_CUTOFF,
-    centrals_model_key=mclch.DEFAULT_DIFFMAHNET_CEN_MODEL,
-    subhalo_model_key=mclcsh.DEFAULT_DIFFMAHNET_SAT_MODEL,
+    centrals_model_key=DEFAULT_DIFFMAHNET_CEN_MODEL,
+    subhalo_model_key=DEFAULT_DIFFMAHNET_SAT_MODEL,
     lgmsub_min=None,
     mlp_model=DEFAULT_MLP_MODEL,
 ):

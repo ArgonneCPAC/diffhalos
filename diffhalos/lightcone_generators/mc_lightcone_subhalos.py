@@ -15,10 +15,10 @@ from jax import random as jran
 from ..ccshmf.ccshmf_model import DEFAULT_CCSHMF_PARAMS, subhalo_lightcone_weights
 from ..ccshmf.mc_subs import generate_subhalopop
 from ..mah.utils import apply_mah_rescaling
+from ..defaults import DEFAULT_DIFFMAHNET_SAT_MODEL
 
 __all__ = ("mc_lc_shmf", "mc_lc_subhalos", "weighted_lc_subhalos")
 
-DEFAULT_DIFFMAHNET_SAT_MODEL = "satflow_v2_0_64bit.eqx"
 N_LGMU_PER_HOST = 5
 
 

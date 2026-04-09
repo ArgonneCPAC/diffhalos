@@ -13,12 +13,11 @@ from jax import numpy as jnp
 from jax import random as jran
 
 from .hmf_model_mlp import predict_cuml_hmf, _compute_nhalos_tot
+from ..defaults import DEFAULT_MLP_MODEL
 
 N_LGMU_TABLE = 200
 U_TABLE = jnp.linspace(0, 1, N_LGMU_TABLE)
 LGMH_MAX = 17.0
-
-DEFAULT_MLP_MODEL = "mlp_model_v0"
 
 __all__ = ("mc_host_halos_singlez",)
 

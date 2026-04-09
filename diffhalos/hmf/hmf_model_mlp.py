@@ -26,15 +26,13 @@ from ..cosmology.geometry_utils import (
 )
 from .emulator.neural_net.mlp_stax import predict_mlp_hmf_params
 from ..utils.sigmoid_utils import _sig_slope, _sigmoid
-from ..defaults import FULL_SKY_AREA
+from ..defaults import FULL_SKY_AREA, DEFAULT_MLP_MODEL
 
 YTP_XTP = 3.0
 X0_XTP = 3.0
 HI_XTP = 3.0
 
 N_HMF_GRID = 500
-
-DEFAULT_MLP_MODEL = "mlp_model_v0"
 
 __all__ = (
     "predict_cuml_hmf",
