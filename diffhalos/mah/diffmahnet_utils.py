@@ -58,7 +58,7 @@ def mc_mah_cenpop(
     m_obs: ndarray of shape (n_cens, )
         grid of base-10 log of mass of the halos at observation, in Msun
 
-    t_obs: ndarray of shape (n_subs, )
+    t_obs: ndarray of shape (n_cens, )
         cosmic time at observation of each halo, in Gyr
 
     randkey: key
