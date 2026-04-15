@@ -205,6 +205,7 @@ def test_weighted_lc_tpeak_clip():
 
     # get mu values
     lgmu = subhalo_lightcone_weights(
+        ran_key,
         cenpop.logmp_obs,
         lgmsub_min,
         mclcsh.N_LGMU_PER_HOST,

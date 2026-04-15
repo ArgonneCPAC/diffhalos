@@ -8,13 +8,75 @@ from jax import random as jran
 
 from .math import map_intervals
 
-__all__ = ("stratified_xy_grid",)
+__all__ = (
+    "stratified_1d_grid",
+    "logmu_grid",
+    "stratified_xy_grid",
+    "redshift_mass_grid",
+)
+
+
+@partial(jjit, static_argnames=["n_grid"])
+def stratified_1d_grid(n_grid, ran_key):
+    """
+    Stratified grid with noise in 1D
+
+    Parameters
+    ----------
+    n_grid: int
+        number of points on the grid
+
+    ran_key: jax.random.key(seed)
+        random key
+
+    Returns
+    -------
+    grid_1d: ndarray of shape (n_per_dim, )
+        0 <= x <= 1 for every grid element
+    """
+    grid_1d = (jnp.arange(n_grid) + 0.5) / n_grid
+
+    uran = jran.uniform(ran_key, shape=grid_1d.shape)
+    noise = (uran - 0.5) / n_grid
+
+    return grid_1d + noise
+
+
+@partial(jjit, static_argnames=["n_grid"])
+def logmu_grid(n_grid, ran_key, lgmu_min, lgmu_max):
+    """
+    Stratified grid of log(mu) for subhalo lightcone
+
+    Parameters
+    ----------
+    n_grid: int
+        number of points on the grid
+
+    ran_key: jax.random.key(seed)
+        random key
+
+    lgmu_min: float
+        base-10 log of minimum mu
+
+    lgmu_max: float
+        base-10 log of maximum mu
+
+    Returns
+    -------
+    lgmu_grid: ndarray of shape (n_per_dim, )
+        base-10 log of mu
+
+    """
+    grid_1D = stratified_1d_grid(n_grid, ran_key)
+    lgmu_grid = map_intervals(grid_1D, 0, 1, lgmu_min, lgmu_max)
+
+    return lgmu_grid
 
 
 @partial(jjit, static_argnames=["n_per_dim"])
 def stratified_xy_grid(n_per_dim, ran_key):
     """
-    Stratified grid with noise
+    Stratified grid with noise in 2D
 
     Parameters
     ----------

@@ -251,6 +251,7 @@ def weighted_lc_subhalos(
 
     # get subhalo weights
     nsubhalo_weights, lgmu = subhalo_lightcone_weights(
+        ran_key,
         cenpop.logmp_obs,
         lgmsub_min,
         n_mu_per_host,
