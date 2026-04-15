@@ -10,7 +10,7 @@ from jax import vmap
 from jax import jit as jjit
 from jax import numpy as jnp
 
-from ..utils import _sig_slope
+from ..utils import _sig_slope, logmu_grid
 from .ccshmf_kernels import lg_cuml_cshmf_kern, lg_diff_cshmf_kern
 from ..calibrations.ccshmf_cal import (
     DEFAULT_CCSHMF_PARAMS,
@@ -227,6 +227,7 @@ def compute_mean_subhalo_counts(
 
 @partial(jjit, static_argnames=["n_logmu"])
 def subhalo_lightcone_weights_kern(
+    ran_key,
     lgmhost,
     lgmp_min,
     n_logmu,
@@ -238,6 +239,9 @@ def subhalo_lightcone_weights_kern(
 
     Parameters
     ----------
+    ran_key: jran.key
+        random key
+
     lgmhost: float
         base-10 log of the host halo mass, in Msun
 
@@ -259,7 +263,7 @@ def subhalo_lightcone_weights_kern(
     lgmu_cutoff = get_lgmu_cutoff(lgmhost, lgmp_min, 1)
 
     # calcumate array of mu values, given lgmp_min
-    lgmu = jnp.linspace(lgmu_cutoff, 0, n_logmu)
+    lgmu = logmu_grid(n_logmu, ran_key, lgmu_cutoff, 0)
 
     # compute <Nsubhalos> for a single host halo
     subhalo_counts_per_halo = 10 ** predict_cuml_cshmf(
@@ -284,6 +288,6 @@ by vmapping ``subhalo_lightcone_weights_kern``,
 with output being a ndarray of shape (n_host, n_mu)
 """
 subhalo_lightcone_weights = jjit(
-    vmap(subhalo_lightcone_weights_kern, in_axes=(0, None, None, None)),
+    vmap(subhalo_lightcone_weights_kern, in_axes=(None, 0, None, None, None)),
     static_argnames=["n_logmu"],
 )
