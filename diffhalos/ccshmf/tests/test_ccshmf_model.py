@@ -5,6 +5,8 @@ from glob import glob
 
 import numpy as np
 
+from jax import random as jran
+
 from ..ccshmf_model import (
     DEFAULT_CCSHMF_PARAMS,
     predict_cuml_cshmf,
@@ -143,7 +145,10 @@ def test_subhalo_lightcone_weights():
     lgmp_min = 12.0
     n_mu_per_host = 5
 
+    ran_key = jran.key(0)
+
     weights, lgmu = subhalo_lightcone_weights(
+        ran_key,
         lgmhost,
         lgmp_min,
         n_mu_per_host,

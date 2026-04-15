@@ -6,6 +6,35 @@ from jax import random as jran
 from .. import stratified_grid as sg
 
 
+def test_stratified_1d_grid():
+    ran_key = jran.key(0)
+    n_tests = 100
+    for n_grid in (5, 50, 500):
+        for __ in range(n_tests):
+            ran_key, test_key = jran.split(ran_key, 2)
+            grid_1d = sg.stratified_1d_grid(n_grid, test_key)
+            assert grid_1d.shape == (n_grid,)
+            assert np.all(grid_1d >= 0)
+            assert np.all(grid_1d <= 1)
+
+    grid_1d = sg.stratified_1d_grid(1_000, ran_key)
+    assert np.allclose(grid_1d.mean(), 0.5, atol=0.1)
+
+
+def test_logmu_grid():
+    ran_key = jran.key(0)
+    n_tests = 100
+
+    lgmu_min, lgmu_max = -5.0, 0.0
+
+    for n_grid in (5, 50, 500):
+        for __ in range(n_tests):
+            ran_key, test_key = jran.split(ran_key, 2)
+            lgmu_grid = sg.logmu_grid(n_grid, test_key, lgmu_min, lgmu_max)
+            assert lgmu_grid.size == n_grid
+            assert np.all((lgmu_grid >= lgmu_min) * (lgmu_grid <= lgmu_max))
+
+
 def test_stratified_xy_grid():
     ran_key = jran.key(0)
     n_tests = 100
