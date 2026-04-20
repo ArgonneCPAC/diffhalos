@@ -249,9 +249,12 @@ def weighted_lc_subhalos(
     # number of host halos
     n_host = cenpop.logmp_obs.size
 
+    # two keys: one for mah, one for lightcone weights
+    mah_key, w_key = jran.split(ran_key, 2)
+
     # get subhalo weights
     nsubhalo_weights, lgmu = subhalo_lightcone_weights(
-        ran_key,
+        w_key,
         cenpop.logmp_obs,
         lgmsub_min,
         n_mu_per_host,
@@ -267,7 +270,7 @@ def weighted_lc_subhalos(
     # get the rescaled mah parameters and mah values at t_obs
     logmsub_obs_clipped = jnp.clip(logmsub_obs, logmsub_cutoff, logmsub_cutoff_himass)
     mah_params_subs, logmsub_obs = apply_mah_rescaling(
-        ran_key,
+        mah_key,
         logmsub_obs,
         logmsub_obs_clipped,
         t_obs,

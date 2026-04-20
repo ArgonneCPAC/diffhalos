@@ -264,7 +264,6 @@ def subhalo_lightcone_weights_kern(
 
     # calculate array of mu values, given lgmp_min
     lgmu = logmu_grid(n_logmu, ran_key, lgmu_cutoff, 0)
-    # lgmu = jnp.linspace(lgmu_cutoff, 0, n_logmu)
 
     # compute <Nsubhalos> for a single host halo
     subhalo_counts_per_halo = 10 ** predict_cuml_cshmf(
