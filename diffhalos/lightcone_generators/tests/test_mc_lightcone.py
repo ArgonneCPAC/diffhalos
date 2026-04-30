@@ -253,3 +253,24 @@ def test_weighted_lc_tpeak_clip():
 
     # satellites: logmp_obs == logmp0
     assert np.allclose(logmp0_subs, logmsub_obs)
+
+
+def test_weighted_lc_nhalos_host():
+    ran_key = jran.key(0)
+
+    n_host_halos = 100
+    z_min, z_max = 0.1, 3.1
+    sky_area_degsq = 10.0
+    lgmp_min, lgmp_max = 10.0, 15.0
+    args = (ran_key, n_host_halos, z_min, z_max, lgmp_min, lgmp_max, sky_area_degsq)
+    halopop = mclc.weighted_lc(*args)
+
+    assert np.allclose(halopop.central[:n_host_halos], 1)
+    assert np.allclose(halopop.central[n_host_halos:], 0)
+
+    assert np.allclose(halopop.nhalos_host[:n_host_halos], 1)
+
+    assert np.allclose(
+        halopop.nhalos_host[n_host_halos:],
+        halopop.nhalos[halopop.halo_indx][n_host_halos:],
+    )
