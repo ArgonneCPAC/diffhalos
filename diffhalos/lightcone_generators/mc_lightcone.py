@@ -413,9 +413,12 @@ def weighted_lc(
                 the host halos should be weighted by nhalos,
                 but subhalos should be weighted by nhalos*nhalos_host.
 
+            central : ndarray of shape (n_halos_tot, )
+                Integer equals 1 for central halos and 0 for subhalos
+
             nhalos_host: ndarray of shape (n_halos_tot, )
                 Multiplicity factor of the host halo
-                Equals nhalos for central halos
+                Equals 1 for central halos
                 For subhalos, halopop.nhalos_host = halopop.nhalos[halopop.halo_indx]
 
             nsub_per_host: int
@@ -513,6 +516,7 @@ def _weighted_lc_from_grid(
     host_indx = jnp.arange(n_host).astype(int)
     subhalo_indx = jnp.repeat(host_indx, subpop.nsub_per_host)
     halo_indx = jnp.concatenate((host_indx, subhalo_indx)).astype(int)
+    central = jnp.concatenate((jnp.ones(n_host), jnp.zeros(n_sub))).astype(int)
 
     z_obs_subs = jnp.repeat(cenpop.z_obs, subpop.nsub_per_host)
     z_obs_all = jnp.concatenate((cenpop.z_obs, z_obs_subs))
@@ -523,7 +527,7 @@ def _weighted_lc_from_grid(
     cenpop = cenpop._replace(t_obs=t_obs_all)
 
     nhalos_host_subs = jnp.repeat(cenpop.nhalos, subpop.nsub_per_host)
-    nhalos_host_all = jnp.concatenate((cenpop.nhalos, nhalos_host_subs))
+    nhalos_host_all = jnp.concatenate((jnp.ones(n_host), nhalos_host_subs))
 
     logmp_obs_all = jnp.concatenate((cenpop.logmp_obs, subpop.logmp_obs))
     cenpop = cenpop._replace(logmp_obs=logmp_obs_all)
@@ -559,7 +563,14 @@ def _weighted_lc_from_grid(
     # the subhalo information and some fields are updated to new shapes
     halopop = namedtuple(
         "weighted_lc",
-        [*cenpop._fields, "nhalos_host", "nsub_per_host", "logmu_obs", "halo_indx"],
-    )(*cenpop, nhalos_host_all, subpop.nsub_per_host, logmu_obs_all, halo_indx)
+        [
+            *cenpop._fields,
+            "central",
+            "nhalos_host",
+            "nsub_per_host",
+            "logmu_obs",
+            "halo_indx",
+        ],
+    )(*cenpop, central, nhalos_host_all, subpop.nsub_per_host, logmu_obs_all, halo_indx)
 
     return halopop
