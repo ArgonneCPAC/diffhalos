@@ -272,5 +272,5 @@ def test_weighted_lc_nhalos_host():
 
     assert np.allclose(
         halopop.nhalos_host[n_host_halos:],
-        halopop.nhalos[halopop.halo_indx][n_host_halos:],
+        halopop.cen_weights[halopop.halo_indx][n_host_halos:],
     )

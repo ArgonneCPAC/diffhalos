@@ -526,7 +526,7 @@ def _weighted_lc_from_grid(
     t_obs_all = jnp.concatenate((cenpop.t_obs, t_obs_subs))
     cenpop = cenpop._replace(t_obs=t_obs_all)
 
-    nhalos_host_subs = jnp.repeat(cenpop.nhalos, subpop.nsub_per_host)
+    nhalos_host_subs = jnp.repeat(cenpop.cen_weights, subpop.nsub_per_host)
     nhalos_host_all = jnp.concatenate((jnp.ones(n_host), nhalos_host_subs))
 
     logmp_obs_all = jnp.concatenate((cenpop.logmp_obs, subpop.logmp_obs))
@@ -553,7 +553,9 @@ def _weighted_lc_from_grid(
     cenpop = cenpop._replace(mah_params=mah_params_ntup)
 
     # combine halo and subhalo weights
-    cenpop = cenpop._replace(nhalos=np.concatenate((cenpop.nhalos, subpop.nsubhalos)))
+    cenpop = cenpop._replace(
+        cen_weights=np.concatenate((cenpop.cen_weights, subpop.sat_weights))
+    )
 
     logmu_obs_host = jnp.zeros(n_host)
     logmu_obs_all = jnp.concatenate((logmu_obs_host, subpop.logmu_obs))
