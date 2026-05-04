@@ -39,7 +39,7 @@ _CENPOP_FIELDS = (
     "mah_params",
     "logmp0",
     "logt0",
-    "cen_weights",
+    "cen_weight",
 )
 CenPop = namedtuple("CenPop", _CENPOP_FIELDS)
 

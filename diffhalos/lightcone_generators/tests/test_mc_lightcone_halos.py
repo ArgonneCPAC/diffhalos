@@ -247,7 +247,7 @@ def test_mc_weighted_halo_lightcone_stratified():
             sky_area_degsq,
         )
 
-        assert np.all(np.isfinite(cenpop.cen_weights))
+        assert np.all(np.isfinite(cenpop.cen_weight))
         assert cenpop.logmp_obs.size == num_halos
 
         assert np.all(cenpop.z_obs >= z_min)
@@ -285,7 +285,7 @@ def test_mc_weighted_halo_lightcone_input_grid():
             sky_area_degsq,
         )
 
-        assert np.all(np.isfinite(cenpop.cen_weights))
+        assert np.all(np.isfinite(cenpop.cen_weight))
         assert cenpop.logmp_obs.size == num_halos
 
         assert np.all(cenpop.z_obs >= z_min)
@@ -309,7 +309,7 @@ def test_weighted_lc_halos():
     for field in mclh.CenPop._fields:
         assert hasattr(cenpop, field)
 
-    assert np.all(np.isfinite(cenpop.cen_weights))
+    assert np.all(np.isfinite(cenpop.cen_weight))
     assert cenpop.logmp_obs.size == n_halos
 
     assert np.all(cenpop.z_obs >= z_min)

@@ -203,7 +203,7 @@ def test_mc_weighted_lc_subhalos_behaves_as_expected():
     for _field in subpop._fields:
         assert np.all(np.isfinite(subpop._asdict()[_field]))
 
-    assert subpop.sat_weights.shape == (n_cens * n_sub_per_host,)
+    assert subpop.sat_weight.shape == (n_cens * n_sub_per_host,)
     assert subpop.logmu_obs.shape == (n_cens * n_sub_per_host,)
 
     nsub_tot = int(subpop.nsub_per_host * n_cens)
@@ -242,7 +242,7 @@ def test_mc_weighted_lc_subhalos_with_different_nsubs_per_host():
     for _field in subpop._fields:
         assert np.all(np.isfinite(subpop._asdict()[_field]))
 
-    assert subpop.sat_weights.shape == (n_cens * n_sub_per_host,)
+    assert subpop.sat_weight.shape == (n_cens * n_sub_per_host,)
     assert subpop.logmu_obs.shape == (n_cens * n_sub_per_host,)
 
     nsub_tot = int(subpop.nsub_per_host * n_cens)
@@ -282,4 +282,4 @@ def test_mc_weighted_lc_subhalos_agrees_with_mc_subhalopop():
             0
         ]
 
-        assert np.allclose(mc_lg_mu_pop.size, halopop.sat_weights.sum(), rtol=0.1)
+        assert np.allclose(mc_lg_mu_pop.size, halopop.sat_weight.sum(), rtol=0.1)

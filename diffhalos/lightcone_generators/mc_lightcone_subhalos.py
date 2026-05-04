@@ -253,14 +253,14 @@ def weighted_lc_subhalos(
     mah_key, w_key = jran.split(ran_key, 2)
 
     # get subhalo weights
-    sat_weights, lgmu = subhalo_lightcone_weights(
+    sat_weight, lgmu = subhalo_lightcone_weights(
         w_key,
         cenpop.logmp_obs,
         lgmsub_min,
         n_mu_per_host,
         ccshmf_params,
     )
-    sat_weights = sat_weights.reshape(n_host * n_mu_per_host)
+    sat_weight = sat_weight.reshape(n_host * n_mu_per_host)
     lgmu = lgmu.reshape(n_host * n_mu_per_host)
 
     # get the subhalo mass and time of observation for MAH computations
@@ -282,8 +282,8 @@ def weighted_lc_subhalos(
     logmu_obs = logmsub_obs - jnp.repeat(cenpop.logmp_obs, n_mu_per_host)
 
     # add subhalo weights to the dictionary
-    fields = ("sat_weights", "mah_params", "logmu_obs", "logmp_obs", "nsub_per_host")
-    data = (sat_weights, mah_params_subs, logmu_obs, logmsub_obs, n_mu_per_host)
+    fields = ("sat_weight", "mah_params", "logmu_obs", "logmp_obs", "nsub_per_host")
+    data = (sat_weight, mah_params_subs, logmu_obs, logmsub_obs, n_mu_per_host)
     subpop = namedtuple("subpop", fields)(*data)
 
     return subpop
