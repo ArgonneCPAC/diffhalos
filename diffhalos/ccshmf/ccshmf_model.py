@@ -274,10 +274,10 @@ def subhalo_lightcone_weights_kern(
 
     # compute relative abundance of subhalos
     _weights = 10 ** predict_diff_cshmf(ccshmf_params, lgmhost, lgmu)
-    weights = _weights / _weights.sum()
+    weights_unit_normalized = _weights / _weights.sum()
 
     # compute relative number of subhalos
-    nsubhalos_in_host = subhalo_counts_per_halo * weights
+    nsubhalos_in_host = subhalo_counts_per_halo * weights_unit_normalized
 
     return nsubhalos_in_host, lgmu
 

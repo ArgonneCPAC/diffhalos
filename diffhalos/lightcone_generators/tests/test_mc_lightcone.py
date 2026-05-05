@@ -255,7 +255,7 @@ def test_weighted_lc_tpeak_clip():
     assert np.allclose(logmp0_subs, logmsub_obs)
 
 
-def test_weighted_lc_nhalos_host():
+def test_weighted_lc_central():
     ran_key = jran.key(0)
 
     n_host_halos = 100
@@ -268,9 +268,65 @@ def test_weighted_lc_nhalos_host():
     assert np.allclose(halopop.central[:n_host_halos], 1)
     assert np.allclose(halopop.central[n_host_halos:], 0)
 
-    assert np.allclose(halopop.nhalos_host[:n_host_halos], 1)
 
-    assert np.allclose(
-        halopop.nhalos_host[n_host_halos:],
-        halopop.nhalos[halopop.halo_indx][n_host_halos:],
+def test_weighted_lc_sat_weight_is_unity_for_centrals():
+    """Enforce sat_weight=1 for centrals"""
+    ran_key = jran.key(0)
+
+    n_host_halos = 100
+    z_min, z_max = 0.1, 3.1
+    sky_area_degsq = 10.0
+    lgmp_min, lgmp_max = 10.0, 15.0
+    args = (ran_key, n_host_halos, z_min, z_max, lgmp_min, lgmp_max, sky_area_degsq)
+    halopop = mclc.weighted_lc(*args)
+
+    assert np.allclose(halopop.sat_weight[:n_host_halos], 1)
+
+
+def test_weighted_lc_cen_weight():
+    """Enforce sat_weight=1 for centrals"""
+    ran_key = jran.key(0)
+
+    n_host_halos = 100
+    z_min, z_max = 0.1, 3.1
+    sky_area_degsq = 10.0
+    lgmp_min, lgmp_max = 10.0, 15.0
+    args = (ran_key, n_host_halos, z_min, z_max, lgmp_min, lgmp_max, sky_area_degsq)
+    halopop = mclc.weighted_lc(*args)
+
+    correct_cen_weight_sats = np.repeat(
+        halopop.cen_weight[:n_host_halos], halopop.nsub_per_host
     )
+    assert np.allclose(halopop.cen_weight[n_host_halos:], correct_cen_weight_sats)
+
+
+def test_weighted_lc_logmu_obs():
+    """Enforce logmu = logmp_obs - logmp_host for all (sub)halos"""
+    ran_key = jran.key(0)
+
+    n_host_halos = 100
+    z_min, z_max = 0.1, 3.1
+    sky_area_degsq = 10.0
+    lgmp_min, lgmp_max = 10.0, 15.0
+    args = (ran_key, n_host_halos, z_min, z_max, lgmp_min, lgmp_max, sky_area_degsq)
+    halopop = mclc.weighted_lc(*args)
+
+    correct_logmp_host_sats = halopop.logmp_obs[halopop.halo_indx]
+    correct_logmu_sats = halopop.logmp_obs - correct_logmp_host_sats
+    assert np.allclose(halopop.logmu_obs, correct_logmu_sats)
+    assert np.allclose(halopop.logmu_obs[:n_host_halos], 0.0)
+
+
+def test_weighted_lc_gal_weight():
+    ran_key = jran.key(0)
+
+    n_host_halos = 100
+    z_min, z_max = 0.1, 3.1
+    sky_area_degsq = 10.0
+    lgmp_min, lgmp_max = 10.0, 15.0
+    args = (ran_key, n_host_halos, z_min, z_max, lgmp_min, lgmp_max, sky_area_degsq)
+    halopop = mclc.weighted_lc(*args)
+
+    gal_weight = halopop.cen_weight * halopop.sat_weight
+    assert np.allclose(gal_weight[:n_host_halos], halopop.cen_weight[:n_host_halos])
+    assert not np.any(gal_weight[n_host_halos:] == halopop.cen_weight[n_host_halos:])
