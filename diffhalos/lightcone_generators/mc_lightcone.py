@@ -155,9 +155,6 @@ def mc_lc(
     sky_area_degsq: float
         sky area, in deg^2
 
-    nhalos_tot: int
-        total number of halos to generate in the lightcone
-
     cosmo_params: namedtuple
         dsps.cosmology.flat_wcdm cosmology
         cosmo_params = (Om0, w0, wa, h)
@@ -401,25 +398,19 @@ def weighted_lc(
             logt0: float
                 Base-10 log of z=0 age of the Universe for the input cosmology
 
-            nhalos: ndarray of shape (n_halos_tot, )
-                weight of the (sub)halo
-                the nhalos value has a different interpretation for hosts and subs
-                For host halos, this is the multiplicity factor by which
-                each halo should be upweighted in order for the generated lightcone
-                to have the correct host halo mass function across redshift
-                For subhalos, this is the multiplicity factor associated with the
-                conditional subhalo mass function, N_sub(logmp | Mhost)
-                Thus when computing the (unconditional) (sub)halo mass function,
-                the host halos should be weighted by nhalos,
-                but subhalos should be weighted by nhalos*nhalos_host.
+            cen_weight: ndarray of shape (n_halos_tot, )
+
+                For centrals, cen_weight is determined by the halo mass function (HMF)
+                For satellites, cen_weight is HMF weight of the associated central
+                For satellites, cen_weight = halopop.cen_weight[halopop.halo_indx]
 
             central : ndarray of shape (n_halos_tot, )
                 Integer equals 1 for central halos and 0 for subhalos
 
-            nhalos_host: ndarray of shape (n_halos_tot, )
-                Multiplicity factor of the host halo
+            sat_weight: ndarray of shape (n_halos_tot, )
+                Multiplicity factor of the subhalo richness
                 Equals 1 for central halos
-                For subhalos, halopop.nhalos_host = halopop.nhalos[halopop.halo_indx]
+                For subhalos, halopop.sat_weight = <Nsat(Msub) | Mhost>
 
             nsub_per_host: int
                 number of subhalos per host halo
@@ -518,16 +509,15 @@ def _weighted_lc_from_grid(
     halo_indx = jnp.concatenate((host_indx, subhalo_indx)).astype(int)
     central = jnp.concatenate((jnp.ones(n_host), jnp.zeros(n_sub))).astype(int)
 
-    z_obs_subs = jnp.repeat(cenpop.z_obs, subpop.nsub_per_host)
-    z_obs_all = jnp.concatenate((cenpop.z_obs, z_obs_subs))
+    z_obs_all = jnp.concatenate(
+        (cenpop.z_obs, jnp.repeat(cenpop.z_obs, subpop.nsub_per_host))
+    )
     cenpop = cenpop._replace(z_obs=z_obs_all)
 
-    t_obs_subs = jnp.repeat(cenpop.t_obs, subpop.nsub_per_host)
-    t_obs_all = jnp.concatenate((cenpop.t_obs, t_obs_subs))
+    t_obs_all = jnp.concatenate(
+        (cenpop.t_obs, jnp.repeat(cenpop.t_obs, subpop.nsub_per_host))
+    )
     cenpop = cenpop._replace(t_obs=t_obs_all)
-
-    nhalos_host_subs = jnp.repeat(cenpop.cen_weight, subpop.nsub_per_host)
-    nhalos_host_all = jnp.concatenate((jnp.ones(n_host), nhalos_host_subs))
 
     logmp_obs_all = jnp.concatenate((cenpop.logmp_obs, subpop.logmp_obs))
     cenpop = cenpop._replace(logmp_obs=logmp_obs_all)
@@ -536,6 +526,12 @@ def _weighted_lc_from_grid(
     logmp0_subs = _log_mah_kern(subpop.mah_params, 10**cenpop.logt0, cenpop.logt0)
     logmp0_all = jnp.concatenate((cenpop.logmp0, logmp0_subs))
     cenpop = cenpop._replace(logmp0=logmp0_all)
+
+    cenpop = cenpop._replace(
+        cen_weight=np.concatenate(
+            (cenpop.cen_weight, jnp.repeat(cenpop.cen_weight, subpop.nsub_per_host))
+        )
+    )
 
     # combine halo and subhalo mah_params
     mah_params_names = cenpop.mah_params._fields
@@ -552,27 +548,20 @@ def _weighted_lc_from_grid(
     )
     cenpop = cenpop._replace(mah_params=mah_params_ntup)
 
-    # combine halo and subhalo weights
-    cenpop = cenpop._replace(
-        cen_weight=np.concatenate((cenpop.cen_weight, subpop.sat_weight))
-    )
+    logmu_obs_all = jnp.concatenate((jnp.zeros(n_host), subpop.logmu_obs))
 
-    logmu_obs_host = jnp.zeros(n_host)
-    logmu_obs_all = jnp.concatenate((logmu_obs_host, subpop.logmu_obs))
+    sat_weight_all = jnp.concatenate((jnp.ones(n_host), subpop.sat_weight))
 
     # create the output namedtuple containing host and subhalo information;
     # this will contain all host halo information, updated to include
     # the subhalo information and some fields are updated to new shapes
-    halopop = namedtuple(
-        "weighted_lc",
-        [
-            *cenpop._fields,
-            "central",
-            "nhalos_host",
-            "nsub_per_host",
-            "logmu_obs",
-            "halo_indx",
-        ],
-    )(*cenpop, central, nhalos_host_all, subpop.nsub_per_host, logmu_obs_all, halo_indx)
+    halopop = WeightedLightcone(
+        *cenpop, central, sat_weight_all, subpop.nsub_per_host, logmu_obs_all, halo_indx
+    )
 
     return halopop
+
+
+SAT_FIELDS = ["central", "sat_weight", "nsub_per_host", "logmu_obs", "halo_indx"]
+_FIELDS = list(mclch.CenPop._fields) + SAT_FIELDS
+WeightedLightcone = namedtuple("WeightedLightcone", _FIELDS)

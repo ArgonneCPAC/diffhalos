@@ -227,10 +227,10 @@ def weighted_lc_subhalos(
     -------
     subpop: namedtuple
         subhalo population with fields:
-            nsubhalos: ndarray of shape (n_nub, )
-                Multiplicity factor by which each subhalo should be upweighted
-                in order for the generated lightcone to have the correct
-                number of subhalos conditional subhalo mass function
+            sat_weight: ndarray of shape (n_nub, )
+                Multiplicity factor <Nsub | Mhost> by which each subhalo
+                should be weighted in order for the generated lightcone to have
+                the correct number of subhalos within each host
 
             mah_params_subs: namedtuple of ndarray's with shape (n_subs, n_mah_params)
                 diffmah parameters for each subhalo in the lightcone
