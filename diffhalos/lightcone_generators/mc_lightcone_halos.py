@@ -14,7 +14,7 @@ from jax import numpy as jnp
 from jax import random as jran
 from jax import vmap
 
-from ..cosmology import DEFAULT_COSMOLOGY, flat_wcdm
+from ..cosmology import DEFAULT_COSMOLOGY
 from ..cosmology.cosmo_basics import get_tobs_from_zobs
 from ..cosmology.geometry_utils import compute_volume_from_sky_area
 from ..hmf import mc_hosts
@@ -39,7 +39,7 @@ _CENPOP_FIELDS = (
     "mah_params",
     "logmp0",
     "logt0",
-    "nhalos",
+    "cen_weight",
 )
 CenPop = namedtuple("CenPop", _CENPOP_FIELDS)
 
@@ -345,7 +345,7 @@ def weighted_lc_halos(
             logt0: float
                 Base-10 log of z=0 age of the Universe for the input cosmology
 
-            nhalos: ndarray of shape (n_halos, )
+            cen_weight: ndarray of shape (n_halos, )
                 Multiplicity factor by which each halo should be upweighted
                 in order for the generated lightcone to have the correct
                 host halo mass function across redshift
@@ -384,7 +384,7 @@ def _weighted_lc_halos_from_grid(
     centrals_model_key=DEFAULT_DIFFMAHNET_CEN_MODEL,
 ):
     # get halo weights
-    nhalo_weights = halo_lightcone_weights(
+    cen_weight = halo_lightcone_weights(
         logmp_obs,
         z_obs,
         sky_area_degsq,
@@ -410,7 +410,7 @@ def _weighted_lc_halos_from_grid(
     logmp0 = _log_mah_kern(mah_params, 10**logt0, logt0)
 
     # create output namedtuple
-    values = (z_obs, t_obs, logmp_obs, mah_params, logmp0, logt0, nhalo_weights)
+    values = (z_obs, t_obs, logmp_obs, mah_params, logmp0, logt0, cen_weight)
     cenpop = CenPop(*values)
 
     return cenpop

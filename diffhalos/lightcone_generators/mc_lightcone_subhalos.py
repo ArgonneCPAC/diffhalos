@@ -227,10 +227,10 @@ def weighted_lc_subhalos(
     -------
     subpop: namedtuple
         subhalo population with fields:
-            nsubhalos: ndarray of shape (n_nub, )
-                Multiplicity factor by which each subhalo should be upweighted
-                in order for the generated lightcone to have the correct
-                number of subhalos conditional subhalo mass function
+            sat_weight: ndarray of shape (n_nub, )
+                Multiplicity factor <Nsub | Mhost> by which each subhalo
+                should be weighted in order for the generated lightcone to have
+                the correct number of subhalos within each host
 
             mah_params_subs: namedtuple of ndarray's with shape (n_subs, n_mah_params)
                 diffmah parameters for each subhalo in the lightcone
@@ -253,14 +253,14 @@ def weighted_lc_subhalos(
     mah_key, w_key = jran.split(ran_key, 2)
 
     # get subhalo weights
-    nsubhalo_weights, lgmu = subhalo_lightcone_weights(
+    sat_weight, lgmu = subhalo_lightcone_weights(
         w_key,
         cenpop.logmp_obs,
         lgmsub_min,
         n_mu_per_host,
         ccshmf_params,
     )
-    nsubhalo_weights = nsubhalo_weights.reshape(n_host * n_mu_per_host)
+    sat_weight = sat_weight.reshape(n_host * n_mu_per_host)
     lgmu = lgmu.reshape(n_host * n_mu_per_host)
 
     # get the subhalo mass and time of observation for MAH computations
@@ -282,8 +282,8 @@ def weighted_lc_subhalos(
     logmu_obs = logmsub_obs - jnp.repeat(cenpop.logmp_obs, n_mu_per_host)
 
     # add subhalo weights to the dictionary
-    fields = ("nsubhalos", "mah_params", "logmu_obs", "logmp_obs", "nsub_per_host")
-    data = (nsubhalo_weights, mah_params_subs, logmu_obs, logmsub_obs, n_mu_per_host)
+    fields = ("sat_weight", "mah_params", "logmu_obs", "logmp_obs", "nsub_per_host")
+    data = (sat_weight, mah_params_subs, logmu_obs, logmsub_obs, n_mu_per_host)
     subpop = namedtuple("subpop", fields)(*data)
 
     return subpop
