@@ -18,6 +18,15 @@ from ..mah.utils import apply_mah_rescaling
 
 __all__ = ("mc_lc_shmf", "mc_lc_subhalos", "weighted_lc_subhalos")
 
+_SUBPOP_FIELDS = (
+    "sat_weight",
+    "mah_params",
+    "logmu_obs",
+    "logmp_obs",
+    "nsub_per_host",
+)
+SubPop = namedtuple("SubPop", _SUBPOP_FIELDS)
+
 DEFAULT_DIFFMAHNET_SAT_MODEL = "satflow_v2_0_64bit.eqx"
 N_LGMU_PER_HOST = 5
 
@@ -121,14 +130,21 @@ def mc_lc_subhalos(
     -------
     subpop: namedtuple
         subhalo population with fields:
-            nsub_per_host: ndarray of shape (n_host, )
-                number of generated subhalos per host halo
+            sat_weight: ndarray of ones of shape (n_nub, )
+                weights are one for all objects
 
             mah_params_subs: namedtuple of ndarray's with shape (n_subs, n_mah_params)
                 diffmah parameters for each subhalo in the lightcone
 
+            logmp_obs: ndarray of shape (n_subs, )
+                base-10 log of Mpeak/Msun of each subhalo
+
             logmu_obs: ndarray of shape (n_subs, )
                 base-10 log of mu=Msub/Mhost for each subhalo in the lightcone
+
+            nsub_per_host: int
+                number of representative subhalos per host halo
+                equal to the input n_mu_per_host
     """
 
     # two random keys, one for the MC subhalo population and one for diffmahnet
@@ -160,12 +176,16 @@ def mc_lc_subhalos(
     )
 
     # compute the rescaled mu values
-    mc_lg_mu = logmsub_obs - jnp.repeat(cenpop.logmp_obs, n_mu_per_host)
+    logmu_obs = logmsub_obs - jnp.repeat(cenpop.logmp_obs, n_mu_per_host)
 
-    # add the subhalo data to the halo population namedtuple
-    fields = ("nsub_per_host", "mah_params", "logmu_obs")
-    data = (n_mu_per_host, mah_params_subs, mc_lg_mu)
-    subpop = namedtuple("subpop", fields)(*data)
+    # create array of weights: one for every object
+    n_subs = len(logmu_obs)
+    sat_weight = jnp.ones(n_subs)
+    # TODO: check shape of sat_weight
+    # sat_weight = jnp.repeat(sat_weight, n_mu_per_host) ?
+
+    values = (sat_weight, mah_params_subs, logmu_obs, logmsub_obs, n_mu_per_host)
+    subpop = SubPop(*values)
 
     return subpop
 
@@ -281,9 +301,7 @@ def weighted_lc_subhalos(
     # compute the rescaled mu values at t_obs
     logmu_obs = logmsub_obs - jnp.repeat(cenpop.logmp_obs, n_mu_per_host)
 
-    # add subhalo weights to the dictionary
-    fields = ("sat_weight", "mah_params", "logmu_obs", "logmp_obs", "nsub_per_host")
-    data = (sat_weight, mah_params_subs, logmu_obs, logmsub_obs, n_mu_per_host)
-    subpop = namedtuple("subpop", fields)(*data)
+    values = (sat_weight, mah_params_subs, logmu_obs, logmsub_obs, n_mu_per_host)
+    subpop = SubPop(*values)
 
     return subpop
