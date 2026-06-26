@@ -74,8 +74,8 @@ def test_mc_lc_behaves_as_expected():
     for _field in halopop._fields:
         assert np.all(np.isfinite(halopop._asdict()[_field]))
 
-    n_host = halopop.logmp_obs.size
-    n_subs = halopop.logmu_obs.size
+    n_host = np.sum(halopop.central == 1)
+    n_subs = np.sum(halopop.central == 0)
     for _param in halopop.mah_params._fields:
         assert halopop.mah_params._asdict()[_param].size == n_host + n_subs
 
