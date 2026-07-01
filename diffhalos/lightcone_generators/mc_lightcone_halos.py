@@ -229,6 +229,9 @@ def mc_lc_halos(
 
             logt0: float
                 base-10 log of cosmic time at today, in Gyr
+
+            cen_weight: ndarray of ones of shape (n_halos, )
+                one for every object
     """
 
     # generate mc realization of the halo mass function
@@ -262,10 +265,13 @@ def mc_lc_halos(
     # compute MAH values today
     logmp0 = _log_mah_kern(mah_params, 10**logt0, logt0)
 
+    # compute weights = 1 for all objects
+    n_halos = len(z_obs)
+    cen_weight = jnp.ones(n_halos)
+
     # create output namedtuple
-    fields = CenPop._fields[:-1]
-    values = (z_obs, t_obs, logmp_obs, mah_params, logmp0, logt0)
-    cenpop = namedtuple("cenpop", fields)(*values)
+    values = (z_obs, t_obs, logmp_obs, mah_params, logmp0, logt0, cen_weight)
+    cenpop = CenPop(*values)
 
     return cenpop
 
