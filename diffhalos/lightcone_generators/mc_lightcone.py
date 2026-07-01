@@ -10,7 +10,6 @@ config.update("jax_enable_x64", True)
 from collections import namedtuple
 
 import numpy as np
-from diffmah.diffmah_kernels import _log_mah_kern
 from jax import numpy as jnp
 from jax import random as jran
 
@@ -77,11 +76,7 @@ def _combine_cenpop_subpop(cenpop, subpop):
     logmp_obs_all = jnp.concatenate((cenpop.logmp_obs, subpop.logmp_obs))
 
     # Combine logmp0 from cens and subs
-    # Compute mah values at z=0 for subs
-    logmp0_subs = _log_mah_kern(subpop.mah_params, 10**cenpop.logt0, cenpop.logt0)
-    logmp0_all = jnp.concatenate((cenpop.logmp0, logmp0_subs))
-    # TODO: logmp0_all = jnp.concatenate((cenpop.logmp0, subpop.logmp0_subs))
-    # This implies adding the logmp0 field to SubPop and running the mah kernel in the subs function instead of doing it here.
+    logmp0_all = jnp.concatenate((cenpop.logmp0, subpop.logmp0))
 
     # Reshape cen_weight to assign values for all halos
     cen_weight_all = np.concatenate(

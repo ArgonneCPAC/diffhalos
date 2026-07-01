@@ -15,6 +15,7 @@ from jax import random as jran
 from ..ccshmf.ccshmf_model import DEFAULT_CCSHMF_PARAMS, subhalo_lightcone_weights
 from ..ccshmf.mc_subs import generate_subhalopop
 from ..mah.utils import apply_mah_rescaling
+from diffmah.diffmah_kernels import _log_mah_kern
 
 __all__ = ("mc_lc_shmf", "mc_lc_subhalos", "weighted_lc_subhalos")
 
@@ -24,6 +25,7 @@ _SUBPOP_FIELDS = (
     "logmu_obs",
     "logmp_obs",
     "nsub_per_host",
+    "logmp0",
 )
 SubPop = namedtuple("SubPop", _SUBPOP_FIELDS)
 
@@ -178,13 +180,21 @@ def mc_lc_subhalos(
     # compute the rescaled mu values
     logmu_obs = logmsub_obs - jnp.repeat(cenpop.logmp_obs, n_mu_per_host)
 
+    # Compute mah values at z=0 for subs
+    logmp0_subs = _log_mah_kern(mah_params_subs, 10**cenpop.logt0, cenpop.logt0)
+
     # create array of weights: one for every object
     n_subs = len(logmu_obs)
     sat_weight = jnp.ones(n_subs)
-    # TODO: check shape of sat_weight
-    # sat_weight = jnp.repeat(sat_weight, n_mu_per_host) ?
 
-    values = (sat_weight, mah_params_subs, logmu_obs, logmsub_obs, n_mu_per_host)
+    values = (
+        sat_weight,
+        mah_params_subs,
+        logmu_obs,
+        logmsub_obs,
+        n_mu_per_host,
+        logmp0_subs,
+    )
     subpop = SubPop(*values)
 
     return subpop
@@ -301,7 +311,17 @@ def weighted_lc_subhalos(
     # compute the rescaled mu values at t_obs
     logmu_obs = logmsub_obs - jnp.repeat(cenpop.logmp_obs, n_mu_per_host)
 
-    values = (sat_weight, mah_params_subs, logmu_obs, logmsub_obs, n_mu_per_host)
+    # Compute mah values at z=0 for subs
+    logmp0_subs = _log_mah_kern(mah_params_subs, 10**cenpop.logt0, cenpop.logt0)
+
+    values = (
+        sat_weight,
+        mah_params_subs,
+        logmu_obs,
+        logmsub_obs,
+        n_mu_per_host,
+        logmp0_subs,
+    )
     subpop = SubPop(*values)
 
     return subpop
