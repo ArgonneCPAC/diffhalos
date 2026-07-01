@@ -81,6 +81,12 @@ def test_mc_lc_behaves_as_expected():
 
     assert halopop.halo_indx.size == n_host + n_subs
 
+    # Check halo_weight
+    halo_weight = halopop.halo_weight
+    assert np.allclose(halo_weight, halopop.cen_weight * halopop.sat_weight)
+    # Should be one for all objects in the unweighted (mc) lc
+    assert np.allclose(halo_weight, 1.0)
+
 
 def test_weighted_lc_behaves_as_expected():
     """Check each returned column is finite and has the expected shape"""
@@ -114,6 +120,10 @@ def test_weighted_lc_behaves_as_expected():
     assert np.isfinite(halopop.logt0)
     assert halopop.nsub_per_host.shape == ()
     assert np.isfinite(halopop.nsub_per_host)
+
+    # Check halo_weight
+    halo_weight = halopop.halo_weight
+    assert np.allclose(halo_weight, halopop.cen_weight * halopop.sat_weight)
 
 
 def test_weighted_lc_logmp0_is_consistent_with_logmp_obs():
@@ -317,7 +327,7 @@ def test_weighted_lc_logmu_obs():
     assert np.allclose(halopop.logmu_obs[:n_host_halos], 0.0)
 
 
-def test_weighted_lc_gal_weight():
+def test_weighted_lc_halo_weight():
     ran_key = jran.key(0)
 
     n_host_halos = 100
@@ -327,6 +337,7 @@ def test_weighted_lc_gal_weight():
     args = (ran_key, n_host_halos, z_min, z_max, lgmp_min, lgmp_max, sky_area_degsq)
     halopop = mclc.weighted_lc(*args)
 
-    gal_weight = halopop.cen_weight * halopop.sat_weight
-    assert np.allclose(gal_weight[:n_host_halos], halopop.cen_weight[:n_host_halos])
-    assert not np.any(gal_weight[n_host_halos:] == halopop.cen_weight[n_host_halos:])
+    halo_weight = halopop.halo_weight
+
+    assert np.allclose(halo_weight[:n_host_halos], halopop.cen_weight[:n_host_halos])
+    assert not np.any(halo_weight[n_host_halos:] == halopop.cen_weight[n_host_halos:])

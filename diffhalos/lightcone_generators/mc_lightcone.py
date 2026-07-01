@@ -22,7 +22,6 @@ from . import mc_lightcone_subhalos as mclcsh
 
 __all__ = ("mc_lc_mf", "mc_lc", "weighted_lc")
 
-# TODO: I think we could also define halo_weight == gal_weight = cen_weight * sat_weight here, instead of leaving the user to multiply afterwards.
 _HALOPOP_FIELDS = (
     "z_obs",  # defined for centrals, repeated to be assigned to all objects
     "t_obs",  # defined for centrals, repeated to be assigned to all objects
@@ -34,8 +33,9 @@ _HALOPOP_FIELDS = (
     "central",  # host halo idenfier
     "sat_weight",  # defined for subs, repeated to be assigned to all objects
     "nsub_per_host",
-    "logmu_obs",  # defined for subs, repeated to be assigned to all objects ?
+    "logmu_obs",  # defined for subs, repeated to be assigned to all objects
     "halo_indx",
+    "halo_weight",  # same as gal_weight = cen_weight * sat_weight
 )
 
 HaloPop = namedtuple("HaloPop", _HALOPOP_FIELDS)
@@ -94,19 +94,22 @@ def _combine_cenpop_subpop(cenpop, subpop):
     for i, _param in enumerate(mah_params_names):
         mah_params_tot[i, :] = np.concatenate(
             (
-                cenpop.mah_params._asdict()[_param],
-                subpop.mah_params._asdict()[_param],
+                getattr(cenpop.mah_params, _param),
+                getattr(subpop.mah_params, _param),
             )
         )
     mah_params_all = namedtuple("mah_params", cenpop.mah_params._fields)(
         *mah_params_tot
     )
 
-    # Reshape logmu_obs to assign values for all halos
+    # Reshape logmu_obs to assign values to all halos
     logmu_obs_all = jnp.concatenate((jnp.zeros(n_host), subpop.logmu_obs))
 
     # Reshape sat_weight to assign values for all halos
     sat_weight_all = jnp.concatenate((jnp.ones(n_host), subpop.sat_weight))
+
+    # Define halo weight
+    halo_weight_all = cen_weight_all * sat_weight_all
 
     # -- Create the output namedtuple containing host and subhalo information --
     values = (
@@ -122,6 +125,7 @@ def _combine_cenpop_subpop(cenpop, subpop):
         subpop.nsub_per_host,
         logmu_obs_all,
         halo_indx,
+        halo_weight_all,
     )
     halopop = HaloPop(*values)
 
