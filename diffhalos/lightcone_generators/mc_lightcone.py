@@ -10,7 +10,6 @@ config.update("jax_enable_x64", True)
 from collections import namedtuple
 
 import numpy as np
-from diffmah.diffmah_kernels import _log_mah_kern
 from jax import numpy as jnp
 from jax import random as jran
 
@@ -21,6 +20,111 @@ from . import mc_lightcone_halos as mclch
 from . import mc_lightcone_subhalos as mclcsh
 
 __all__ = ("mc_lc_mf", "mc_lc", "weighted_lc")
+
+_HALOPOP_FIELDS = (
+    "z_obs",  # defined for centrals, repeated to be assigned to all objects
+    "t_obs",  # defined for centrals, repeated to be assigned to all objects
+    "logmp_obs",  # join the values of cens and subs
+    "mah_params",  # join the values of cens and subs
+    "logmp0",  # join the values of cens and subs
+    "logt0",  # defined for centrals, repeated to be assigned to all objects
+    "cen_weight",  # defined for centrals, repeated to be assigned to all objects
+    "central",  # host halo idenfier
+    "sat_weight",  # defined for subs, repeated to be assigned to all objects
+    "nsub_per_host",
+    "logmu_obs",  # defined for subs, repeated to be assigned to all objects
+    "halo_indx",
+    "halo_weight",  # same as gal_weight = cen_weight * sat_weight
+)
+
+HaloPop = namedtuple("HaloPop", _HALOPOP_FIELDS)
+
+
+def _combine_cenpop_subpop(cenpop, subpop):
+    """
+    Auxiliary function to reshape and combine cens and subs quantities, and build an unified halopop namedtuple.
+
+    Returns halopop
+    This is almost the same as simply joining CenPop and SubPop, but some variables defined for each namedtuple separately are combined here into a single one, e.g., MAH params, logmp_obs. So they do not appear twice, as they would if we were simply joining CenPop and SubPop.
+
+    Paste here full description of halopop
+    """
+
+    # Create the halo index array
+    n_host = cenpop.logmp_obs.size
+    n_sub = subpop.logmp_obs.size
+    host_indx = jnp.arange(n_host).astype(int)
+    subhalo_indx = jnp.repeat(host_indx, subpop.nsub_per_host)
+    halo_indx = jnp.concatenate((host_indx, subhalo_indx)).astype(int)
+
+    # Create the central identifier array
+    is_central = jnp.concatenate((jnp.ones(n_host), jnp.zeros(n_sub))).astype(int)
+
+    # -- Combine properties --
+
+    # Reshape z_obs to assign values for all halos
+    z_obs_all = jnp.concatenate(
+        (cenpop.z_obs, jnp.repeat(cenpop.z_obs, subpop.nsub_per_host))
+    )
+
+    # Reshape t_obs to assign values for all halos
+    t_obs_all = jnp.concatenate(
+        (cenpop.t_obs, jnp.repeat(cenpop.t_obs, subpop.nsub_per_host))
+    )
+
+    # Combine logmp_obs from cens and subs
+    logmp_obs_all = jnp.concatenate((cenpop.logmp_obs, subpop.logmp_obs))
+
+    # Combine logmp0 from cens and subs
+    logmp0_all = jnp.concatenate((cenpop.logmp0, subpop.logmp0))
+
+    # Reshape cen_weight to assign values for all halos
+    cen_weight_all = np.concatenate(
+        (cenpop.cen_weight, jnp.repeat(cenpop.cen_weight, subpop.nsub_per_host))
+    )
+
+    # Combine halo and subhalo mah_params
+    mah_params_names = cenpop.mah_params._fields
+    mah_params_tot = np.zeros((len(mah_params_names), n_host + n_sub))
+    for i, _param in enumerate(mah_params_names):
+        mah_params_tot[i, :] = np.concatenate(
+            (
+                getattr(cenpop.mah_params, _param),
+                getattr(subpop.mah_params, _param),
+            )
+        )
+    mah_params_all = namedtuple("mah_params", cenpop.mah_params._fields)(
+        *mah_params_tot
+    )
+
+    # Reshape logmu_obs to assign values to all halos
+    logmu_obs_all = jnp.concatenate((jnp.zeros(n_host), subpop.logmu_obs))
+
+    # Reshape sat_weight to assign values for all halos
+    sat_weight_all = jnp.concatenate((jnp.ones(n_host), subpop.sat_weight))
+
+    # Define halo weight
+    halo_weight_all = cen_weight_all * sat_weight_all
+
+    # -- Create the output namedtuple containing host and subhalo information --
+    values = (
+        z_obs_all,
+        t_obs_all,
+        logmp_obs_all,
+        mah_params_all,
+        logmp0_all,
+        cenpop.logt0,
+        cen_weight_all,
+        is_central,
+        sat_weight_all,
+        subpop.nsub_per_host,
+        logmu_obs_all,
+        halo_indx,
+        halo_weight_all,
+    )
+    halopop = HaloPop(*values)
+
+    return halopop
 
 
 def mc_lc_mf(
@@ -198,39 +302,14 @@ def mc_lc(
     Returns
     -------
     halopop: namedtuple
-        halo population with fields:
-            z_obs: ndarray of shape (n_host, )
-                lightcone redshift
 
-            logmp_obs: ndarray of shape (n_host, )
-                halo mass at the lightcone redshift, in Msun
-
-            mah_params: namedtuple of ndarray's with shape (n_host+n_sub, n_mah_params)
-                diffmah parameters for each host halo in the lightcone
-
-            logmp0: narray of shape (n_host, )
-                base-10 log of halo mass at z=0, in Msun
-
-            logt0: float
-                base-10 log of cosmic time at today, in Gyr
-
-            nsub_per_host: ndarray of shape (n_host, )
-                number of subhalos generated per host halo
-
-            logmu_obs: ndarray of shape (n_sub, )
-                base-10 log of mu=Msub/Mhost for each generated subhalo
-
-            halo_indx: ndarray of shape (n_host+n_sub, )
-                halo index; for host halos, the index is arange(n_host),
-                while for the subhalos, indeces correspond to the host
-                halo that hosts each generated subhalo
     """
     # two random keys, one for the host and one for the subhalo population
-    host_key, subhalo_key = jran.split(ran_key)
+    cen_key, sub_key = jran.split(ran_key)
 
-    # generate a host halo lightcone
+    # -- Compute cenpop: compute HMF and MAH params. for centrals. --
     cenpop = mclch.mc_lc_halos(
-        host_key,
+        cen_key,
         lgmp_min,
         z_min,
         z_max,
@@ -243,11 +322,10 @@ def mc_lc(
         n_hmf_grid=n_hmf_grid,
         centrals_model_key=centrals_model_key,
     )
-    # fields = ("z_obs", "t_obs", "logmp_obs", "mah_params", "logmp0", "logt0")
 
-    # generate a subhalo lightcone
+    # -- Compute subpop: compute SHMF and MAH params. for subs. --
     subpop = mclcsh.mc_lc_subhalos(
-        subhalo_key,
+        sub_key,
         cenpop,
         lgmsub_min,
         ccshmf_params=ccshmf_params,
@@ -256,34 +334,7 @@ def mc_lc(
         subhalo_model_key=subhalo_model_key,
     )
 
-    # create the index array: [...host_indx..., ...subhalo_indx...]
-    n_host = cenpop.logmp_obs.size
-    host_indx = jnp.arange(n_host).astype(int)
-    n_sub = int(subpop.nsub_per_host.sum())
-    subhalo_indx = jnp.repeat(host_indx, subpop.nsub_per_host)
-    halo_indx = jnp.concatenate((host_indx, subhalo_indx)).astype(int)
-
-    # combine halo and subhalo mah_params
-    mah_params_names = cenpop.mah_params._fields
-    mah_params_tot = np.zeros((len(mah_params_names), n_host + n_sub))
-    for i, _param in enumerate(mah_params_names):
-        mah_params_tot[i, :] = np.concatenate(
-            (
-                cenpop.mah_params._asdict()[_param],
-                subpop.mah_params._asdict()[_param],
-            )
-        )
-    mah_params_ntup = namedtuple("mah_params", cenpop.mah_params._fields)(
-        *mah_params_tot
-    )
-    cenpop = cenpop._replace(mah_params=mah_params_ntup)
-
-    # create the output namedtuple containing host and subhalo information;
-    # this will contain all host halo information, updated to include
-    # the subhalo information and some fields are updated to new shapes
-    halopop = namedtuple(
-        "mc_lc", [*cenpop._fields, "nsub_per_host", "logmu_obs", "halo_indx"]
-    )(*cenpop, subpop.nsub_per_host, subpop.logmu_obs, halo_indx)
+    halopop = _combine_cenpop_subpop(cenpop, subpop)
 
     return halopop
 
@@ -501,67 +552,6 @@ def _weighted_lc_from_grid(
         subhalo_model_key=subhalo_model_key,
     )
 
-    # create the index array
-    n_host = cenpop.logmp_obs.size
-    n_sub = subpop.logmp_obs.size
-    host_indx = jnp.arange(n_host).astype(int)
-    subhalo_indx = jnp.repeat(host_indx, subpop.nsub_per_host)
-    halo_indx = jnp.concatenate((host_indx, subhalo_indx)).astype(int)
-    central = jnp.concatenate((jnp.ones(n_host), jnp.zeros(n_sub))).astype(int)
-
-    z_obs_all = jnp.concatenate(
-        (cenpop.z_obs, jnp.repeat(cenpop.z_obs, subpop.nsub_per_host))
-    )
-    cenpop = cenpop._replace(z_obs=z_obs_all)
-
-    t_obs_all = jnp.concatenate(
-        (cenpop.t_obs, jnp.repeat(cenpop.t_obs, subpop.nsub_per_host))
-    )
-    cenpop = cenpop._replace(t_obs=t_obs_all)
-
-    logmp_obs_all = jnp.concatenate((cenpop.logmp_obs, subpop.logmp_obs))
-    cenpop = cenpop._replace(logmp_obs=logmp_obs_all)
-
-    # compute mah values at z=0 for subs
-    logmp0_subs = _log_mah_kern(subpop.mah_params, 10**cenpop.logt0, cenpop.logt0)
-    logmp0_all = jnp.concatenate((cenpop.logmp0, logmp0_subs))
-    cenpop = cenpop._replace(logmp0=logmp0_all)
-
-    cenpop = cenpop._replace(
-        cen_weight=np.concatenate(
-            (cenpop.cen_weight, jnp.repeat(cenpop.cen_weight, subpop.nsub_per_host))
-        )
-    )
-
-    # combine halo and subhalo mah_params
-    mah_params_names = cenpop.mah_params._fields
-    mah_params_tot = np.zeros((len(mah_params_names), n_host + n_sub))
-    for i, _param in enumerate(mah_params_names):
-        mah_params_tot[i, :] = np.concatenate(
-            (
-                cenpop.mah_params._asdict()[_param],
-                subpop.mah_params._asdict()[_param],
-            )
-        )
-    mah_params_ntup = namedtuple("mah_params", cenpop.mah_params._fields)(
-        *mah_params_tot
-    )
-    cenpop = cenpop._replace(mah_params=mah_params_ntup)
-
-    logmu_obs_all = jnp.concatenate((jnp.zeros(n_host), subpop.logmu_obs))
-
-    sat_weight_all = jnp.concatenate((jnp.ones(n_host), subpop.sat_weight))
-
-    # create the output namedtuple containing host and subhalo information;
-    # this will contain all host halo information, updated to include
-    # the subhalo information and some fields are updated to new shapes
-    halopop = WeightedLightcone(
-        *cenpop, central, sat_weight_all, subpop.nsub_per_host, logmu_obs_all, halo_indx
-    )
+    halopop = _combine_cenpop_subpop(cenpop, subpop)
 
     return halopop
-
-
-SAT_FIELDS = ["central", "sat_weight", "nsub_per_host", "logmu_obs", "halo_indx"]
-_FIELDS = list(mclch.CenPop._fields) + SAT_FIELDS
-WeightedLightcone = namedtuple("WeightedLightcone", _FIELDS)
