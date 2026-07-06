@@ -205,6 +205,44 @@ class DiffMahFlow:
             return get_bounded_mah_params(DEFAULT_MAH_UPARAMS._make(uparam_array.T))
         else:
             return uparam_array
+        
+    def make_logprob_diffmahnet(self):
+        @jax.jit
+        def _logprob_fn(flow_params, lgm_obs, t_obs, uparam):
+            condition = jnp.array([lgm_obs, t_obs]).T
+            return self.log_prob_uparams(condition, uparam, flow_params=flow_params)
+
+        return _logprob_fn
+
+    def log_prob_uparams(self, condition, uparam_array, flow_params=None):
+        """Log density of unbounded Diffmah parameters under the conditional flow.
+
+        Parameters
+        ----------
+        condition : ndarray, shape (n, 2)
+            Columns are ``(lgm_obs, t_obs)``.
+        uparam_array : ndarray, shape (n, 5)
+            Unbounded Diffmah parameters, before applying the flow scaler.
+        flow_params : ndarray, optional
+            Flat flow parameters for functional use.
+
+        Returns
+        -------
+        ndarray, shape (n,)
+            Log probabilities ``log p(u_params | condition)``.
+        """
+        flow = (
+            self._flow_from_flat_params(flow_params)
+            if flow_params is not None
+            else self.flow
+        )
+
+        condition_scaled = scaler_transform(condition, self.scaler.u_scaler)
+        x_scaled = scaler_transform(uparam_array, self.scaler.x_scaler)
+
+        return jax.vmap(lambda xs, cs: flow.log_prob(xs, condition=cs))(
+            x_scaled, condition_scaled
+        )
 
     def get_params(self):
         param_tree = self._partition()[0]
