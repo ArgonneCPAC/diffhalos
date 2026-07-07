@@ -3,7 +3,6 @@ notebooks/
 
 # testing data directories
 testing_data/
-# diffhalos/hmf/emulator/fitting_tools/tests/testing_data/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
