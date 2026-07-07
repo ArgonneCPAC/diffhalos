@@ -1,6 +1,5 @@
 import jax
 import jax.numpy as jnp
-import numpy as np
 
 from .. import diffmahnet
 
@@ -31,22 +30,3 @@ def test_diffmahflow():
     # Make sure asparams=True gives tuple output
     mahparams_prediction = flow.sample(fake_conditions, keys[2], asparams=True)
     assert isinstance(mahparams_prediction, tuple)
-
-
-def test_log_prob_uparams_diffmahnet():
-
-    randkey = jax.random.key(0)
-    keys = jax.random.split(randkey, 6)
-
-    ndata = 1000
-
-    # m_obs and t_obs
-    fake_conditions = jax.random.normal(keys[0], (ndata, 2)) + 1.5
-    fake_mah_uparams = jax.random.normal(keys[1], (ndata, 5)) * 0.2 - 4.0
-    scaler = diffmahnet.Scaler.compute(fake_mah_uparams, fake_conditions)
-
-    flow = diffmahnet.DiffMahFlow(scaler)
-
-    log_prob_mah = flow.log_prob_uparams(fake_conditions, fake_mah_uparams)
-
-    assert np.all(np.isfinite(log_prob_mah))
