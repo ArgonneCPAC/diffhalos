@@ -25,3 +25,10 @@ To build html of test coverage::
 
     $ pytest -v --cov --cov-report html
     $ open htmlcov/index.html
+
+Demo notebooks
+--------------
+The `diffhalos_quickstart.ipynb` notebook illustrates how to use some of the core functions of diffhalos. In particular,
+it demonstrates how to generate halo and subhalo lightcones, while it also shows that the output from the Monte-Carlo
+lightcone realizations agree with the exact theory predictions from the halo mass function and the conditional
+subhalo mas function implemented in diffhalos.

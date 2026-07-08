@@ -4,3 +4,4 @@ dsps
 diffmah
 dsps
 flowjax
+matplotlib
