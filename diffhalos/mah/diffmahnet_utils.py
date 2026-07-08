@@ -23,7 +23,6 @@ from diffmah.diffmah_kernels import (
 )
 
 from . import diffmahnet
-from .utils import rescale_mah_parameters
 
 DEFAULT_MAH_UPARAMS = get_unbounded_mah_params(DEFAULT_MAH_PARAMS)
 
@@ -210,9 +209,11 @@ def get_mah_from_unbounded_params(
     mah_params_uncorrected = DEFAULT_MAH_PARAMS._make(mah_params_bound)
     _, log_mah = mah_halopop(mah_params_uncorrected, t_grid, logt0)
 
-    mah_params_corrected = rescale_mah_parameters(
-        mah_params_uncorrected, m_vals, log_mah[:, -1]
-    )
+    # rescale mah parameters
+    delta_logm_obs = log_mah[:, -1] - m_vals
+    logm0_rescaled = mah_params_uncorrected.logm0 - delta_logm_obs
+    mah_params_corrected = mah_params_uncorrected._replace(logm0=logm0_rescaled)
+
     _, log_mah = mah_halopop(mah_params_corrected, t_grid, logt0)
 
     return log_mah
