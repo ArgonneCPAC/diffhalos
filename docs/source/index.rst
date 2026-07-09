@@ -16,6 +16,7 @@ User Guide
 
    installation.rst
    diffhalos_quickstart.ipynb
+   MAHs_with_Diffhalos.ipynb
    tutorials.rst
 
 See :ref:`Citation Information <cite_info>` for how to acknowledge diffhalos.
