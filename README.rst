@@ -28,7 +28,10 @@ To build html of test coverage::
 
 Demo notebooks
 --------------
-The `diffhalos_quickstart.ipynb` notebook illustrates how to use some of the core functions of diffhalos. In particular,
-it demonstrates how to generate halo and subhalo lightcones, while it also shows that the output from the Monte-Carlo
-lightcone realizations agree with the exact theory predictions from the halo mass function and the conditional
-subhalo mas function implemented in diffhalos.
+The `diffhalos_quickstart.ipynb` notebook illustrates how to use some of the core functions of diffhalos. In particular, it demonstrates 
+how to generate halo and subhalo lightcones using the Monte-Carlo and quasi-Monte Carlo versions of the generator. In addition, 
+it shows that the lightcone outputs agree well with the exact theory predictions from the halo and subhalo mass functions in diffhalos. 
+
+The `diffhalos_mah.ipynb` notebook goes over the basics of using the `DiffmahNet` model in `Diffhalos` to generate mass assembly 
+histories (MAHs) of populations of dark matter halos. It also demonstrates how the MAH of halos is part of the standard output 
+from lightcone generation.
