@@ -24,7 +24,6 @@ from diffmah.diffmah_kernels import (
 
 from . import diffmahnet
 
-
 DEFAULT_MAH_UPARAMS = get_unbounded_mah_params(DEFAULT_MAH_PARAMS)
 
 __all__ = (
@@ -172,6 +171,7 @@ def get_mah_from_unbounded_params(
     mah_params_unbound,
     logt0,
     t_grid,
+    m_vals,
 ):
     """
     Helper function to generate the MAH from
@@ -190,6 +190,9 @@ def get_mah_from_unbounded_params(
     t_grid: ndarray of shape (n_t, )
         cosmic time grid at which to compute the MAH
 
+    m_vals: ndarray of shape (n_halo, )
+        correct mass values for rescaling the MAH parameters
+
     Returns
     -------
     log_mah: ndarray of shape (n_halo, n_t)
@@ -204,8 +207,14 @@ def get_mah_from_unbounded_params(
     )
 
     mah_params_uncorrected = DEFAULT_MAH_PARAMS._make(mah_params_bound)
-
     _, log_mah = mah_halopop(mah_params_uncorrected, t_grid, logt0)
+
+    # rescale mah parameters
+    delta_logm_obs = log_mah[:, -1] - m_vals
+    logm0_rescaled = mah_params_uncorrected.logm0 - delta_logm_obs
+    mah_params_corrected = mah_params_uncorrected._replace(logm0=logm0_rescaled)
+
+    _, log_mah = mah_halopop(mah_params_corrected, t_grid, logt0)
 
     return log_mah
 
