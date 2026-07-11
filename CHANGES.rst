@@ -1,3 +1,9 @@
+0.2.0 (2026-07-11)
+-------------------
+- Reorganize lightcone generator functions (https://github.com/ArgonneCPAC/diffhalos/pull/41)
+- Add documentation (https://github.com/ArgonneCPAC/diffhalos/pull/44)
+
+
 0.1.1 (2026-05-06)
 -------------------
 - Update definitions and naming conventions of weights in generators of weighted lightcones (https://github.com/ArgonneCPAC/diffhalos/pull/39)
