@@ -1,11 +1,10 @@
 Diffhalos: Differentiable Populations of Dark Matter Halos
 ==========================================================
 
-Diffhalos is a generative model of cosmological volumes of dark matter halos, subhalos,
-and their merger trees, and these docs show you how to use it.
+Diffhalos is a generative model of cosmological volumes of dark matter halos, subhalos, and their merger trees.
 The Diffhalos library is written in `JAX <https://jax.readthedocs.io/>`__,
 and makes differentiable predictions for halo populations in a lightcone, or at a single redshift.
-The code is publicly available on
+The code is publicly available on 
 `GitHub <https://github.com/ArgonneCPAC/diffhalos/>`__.
 
 User Guide
