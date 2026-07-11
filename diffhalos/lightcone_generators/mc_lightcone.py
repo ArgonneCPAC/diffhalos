@@ -450,12 +450,11 @@ def weighted_lc(
                 Base-10 log of z=0 age of the Universe for the input cosmology
 
             cen_weight: ndarray of shape (n_halos_tot, )
-
                 For centrals, cen_weight is determined by the halo mass function (HMF)
                 For satellites, cen_weight is HMF weight of the associated central
                 For satellites, cen_weight = halopop.cen_weight[halopop.halo_indx]
 
-            central : ndarray of shape (n_halos_tot, )
+            central: ndarray of shape (n_halos_tot, )
                 Integer equals 1 for central halos and 0 for subhalos
 
             sat_weight: ndarray of shape (n_halos_tot, )

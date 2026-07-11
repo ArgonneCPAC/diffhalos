@@ -212,7 +212,7 @@ def weighted_lc_subhalos(
     subhalo_model_key=DEFAULT_DIFFMAHNET_SAT_MODEL,
 ):
     """
-    Generate a subhalo lightcone
+    Generate a weighted subhalo lightcone
 
     Parameters
     ----------
