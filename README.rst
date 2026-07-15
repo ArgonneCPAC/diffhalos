@@ -45,7 +45,7 @@ and we talk about how they differ in their approch to lightcone generation.
 Citing diffhalos
 ----------------
 Citation information for the paper can be found at `this ADS link <https://ui.adsabs.harvard.edu/abs/2026arXiv260710419Z/abstract>`_, 
-copied below for convenience:::
+copied below for convenience::
 
     @ARTICLE{2026arXiv260710419Z,
         author = {{Zacharegkas}, Georgios and {Hearin}, Andrew P. and {Pearl}, Alan and {Becker}, Matthew R. and {K{\'e}ruzor{\'e}}, Florian and {Ortega-Martinez}, Sara},
