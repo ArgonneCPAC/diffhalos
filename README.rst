@@ -41,3 +41,24 @@ in the lightcones.
 We demonstrate and explain in more detail the fundamentals of using the Monte Carlo and quasi-Monte Carlo generators, and discuss their differences, 
 in the notebook :code:`diffhalos_mc_vs_qmc.ipynb`. In there, we cover the basics of how to use each version for host halos, 
 and we talk about how they differ in their approch to lightcone generation.
+
+Citing diffhalos
+----------------
+Citation information for the paper can be found at `this ADS link <https://ui.adsabs.harvard.edu/abs/2026arXiv260710419Z/abstract>`_, 
+copied below for convenience::
+
+    @ARTICLE{2026arXiv260710419Z,
+        author = {{Zacharegkas}, Georgios and {Hearin}, Andrew P. and {Pearl}, Alan and {Becker}, Matthew R. and {K{\'e}ruzor{\'e}}, Florian and {Ortega-Martinez}, Sara},
+            title = "{Diffhalos: A Generative Model of Cosmological Lightcones of Dark Matter Halos}",
+        journal = {arXiv e-prints},
+        keywords = {Astrophysics of Galaxies, Cosmology and Nongalactic Astrophysics},
+            year = 2026,
+            month = jul,
+            eid = {arXiv:2607.10419},
+            pages = {arXiv:2607.10419},
+    archivePrefix = {arXiv},
+        eprint = {2607.10419},
+    primaryClass = {astro-ph.GA},
+        adsurl = {https://ui.adsabs.harvard.edu/abs/2026arXiv260710419Z},
+        adsnote = {Provided by the SAO/NASA Astrophysics Data System}
+    }
